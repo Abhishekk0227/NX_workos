@@ -626,16 +626,6 @@ export default function EmployeeLeave() {
                 />
               </div>
 
-              {/* Blue Info Callout matching EppanelM.png Screen 7 */}
-              <div className="p-3 bg-blue-50 border border-blue-100 rounded-2xl flex items-start gap-2.5">
-                <div className="w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
-                  i
-                </div>
-                <p className="text-xs text-blue-800 font-medium leading-relaxed">
-                  Leave will be automatically deducted from your available balance as per company policy.
-                </p>
-              </div>
-
               {/* Action Buttons matching EppanelM.png Screen 7 */}
               <div className="pt-2 flex items-center gap-3">
                 <button
