@@ -293,6 +293,7 @@ export default function EmployeeLeave() {
                   {status}
                 </button>
               ))}
+            </div>
           </div>
 
           {/* Desktop Table View */}
@@ -442,7 +443,6 @@ export default function EmployeeLeave() {
               )}
             </div>
           </div>
-        </div>
       )}
 
       {/* APPLY LEAVE MODAL matching EppanelD.png #8 & EppanelM.png #8 */}

@@ -153,7 +153,11 @@ export default function HRDashboard() {
             </div>
             <span className="text-[11px] font-semibold text-slate-600 truncate">Total Employees</span>
           </div>
-          <div className="text-2xl sm:text-3xl font-black text-slate-900">{stats.totalEmployees}</div>
+          {loading ? (
+            <div className="h-8 w-12 bg-slate-100 animate-pulse rounded-lg my-0.5" />
+          ) : (
+            <div className="text-2xl sm:text-3xl font-black text-slate-900">{stats.totalEmployees}</div>
+          )}
         </Link>
 
         {/* Present Today */}
@@ -164,7 +168,11 @@ export default function HRDashboard() {
             </div>
             <span className="text-[11px] font-semibold text-slate-600 truncate">Present Today</span>
           </div>
-          <div className="text-2xl sm:text-3xl font-black text-slate-900">{stats.presentToday}</div>
+          {loading ? (
+            <div className="h-8 w-12 bg-slate-100 animate-pulse rounded-lg my-0.5" />
+          ) : (
+            <div className="text-2xl sm:text-3xl font-black text-slate-900">{stats.presentToday}</div>
+          )}
         </Link>
 
         {/* On Leave */}
@@ -175,7 +183,11 @@ export default function HRDashboard() {
             </div>
             <span className="text-[11px] font-semibold text-slate-600 truncate">On Leave</span>
           </div>
-          <div className="text-2xl sm:text-3xl font-black text-slate-900">{stats.onLeaveToday}</div>
+          {loading ? (
+            <div className="h-8 w-12 bg-slate-100 animate-pulse rounded-lg my-0.5" />
+          ) : (
+            <div className="text-2xl sm:text-3xl font-black text-slate-900">{stats.onLeaveToday}</div>
+          )}
         </Link>
 
         {/* Absent Today */}
@@ -186,7 +198,11 @@ export default function HRDashboard() {
             </div>
             <span className="text-[11px] font-semibold text-slate-600 truncate">Absent Today</span>
           </div>
-          <div className="text-2xl sm:text-3xl font-black text-slate-900">{stats.absentToday}</div>
+          {loading ? (
+            <div className="h-8 w-12 bg-slate-100 animate-pulse rounded-lg my-0.5" />
+          ) : (
+            <div className="text-2xl sm:text-3xl font-black text-slate-900">{stats.absentToday}</div>
+          )}
         </Link>
       </div>
 

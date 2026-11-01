@@ -5,13 +5,21 @@ const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(() => {
-    const savedUser = localStorage.getItem('nx_user');
-    return savedUser ? JSON.parse(savedUser) : null;
+    try {
+      const savedUser = localStorage.getItem('nx_user');
+      return savedUser ? JSON.parse(savedUser) : null;
+    } catch {
+      return null;
+    }
   });
   const [token, setToken] = useState(() => localStorage.getItem('nx_token'));
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => {
+    const storedToken = localStorage.getItem('nx_token');
+    const savedUser = localStorage.getItem('nx_user');
+    return !(storedToken && savedUser);
+  });
 
-  // Validate session on mount
+  // Validate session on mount in background
   useEffect(() => {
     const verifyAuth = async () => {
       const storedToken = localStorage.getItem('nx_token');
@@ -23,8 +31,12 @@ export const AuthProvider = ({ children }) => {
             localStorage.setItem('nx_user', JSON.stringify(res.data.user));
           }
         } catch (err) {
-          console.warn('Session verification failed:', err.message);
-          logout();
+          console.warn('Session verification note:', err.message);
+          // Only logout if token is explicitly rejected as unauthorized (401)
+          if (err.response?.status === 401) {
+            logout();
+          }
+          // Otherwise, retain cached session during transient network/cold-start issues
         }
       }
       setLoading(false);
