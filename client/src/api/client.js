@@ -1,9 +1,11 @@
 import axios from 'axios';
 
-// Dynamic API base URL: defaults to /api proxy locally, or VITE_API_URL when set
+// Production Backend URI: https://nx-workos-server.vercel.app
+const PRODUCTION_BACKEND_URL = 'https://nx-workos-server.vercel.app';
+
 const apiBase = import.meta.env.VITE_API_URL
   ? `${import.meta.env.VITE_API_URL.replace(/\/$/, '')}/api`
-  : '/api';
+  : `${PRODUCTION_BACKEND_URL}/api`;
 
 const api = axios.create({
   baseURL: apiBase,
