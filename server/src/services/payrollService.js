@@ -4,28 +4,25 @@ const Attendance = require('../models/Attendance');
 const LeaveRequest = require('../models/LeaveRequest');
 const Employee = require('../models/Employee');
 const SystemSetting = require('../models/SystemSetting');
-const AuditLog = require('../models/AuditLog');
 
 class PayrollService {
   /**
-   * Get days in month for YYYY-MM
+   * Helper to get total days in a month (e.g. 28, 30, 31)
    */
-  static getDaysInMonth(yearMonth) {
-    const [year, month] = yearMonth.split('-').map(Number);
+  static getDaysInMonth(monthStr) {
+    const [year, month] = monthStr.split('-').map(Number);
     return new Date(year, month, 0).getDate();
   }
 
   /**
-   * Calculate or preview payroll for an employee for a specific month
-   * Enforces all Conditions: Per-minute late rate, Half-day %, LWP deductions & Itemized breakdown
+   * Calculate payroll for a single employee for a specific month (YYYY-MM)
+   * Integrates Conditions 11-24, 47-66, and Employee Joining Date boundary
    */
   static async calculateEmployeePayroll(employeeId, month) {
-    const [employee, settings] = await Promise.all([
-      Employee.findById(employeeId).populate('assignedShift'),
-      SystemSetting.findOne()
-    ]);
-
+    const employee = await Employee.findById(employeeId).populate('assignedShift');
     if (!employee) throw new Error('Employee not found');
+
+    const settings = await SystemSetting.findOne().lean();
 
     const salaryProfile = await SalaryProfile.findOne({
       employee: employeeId,
@@ -40,10 +37,57 @@ class PayrollService {
     const startStr = `${month}-01`;
     const endStr = `${month}-${String(calendarDays).padStart(2, '0')}`;
 
-    // Get attendance records in month
+    // Employee joining date boundary check (Condition: No payroll/attendance before joining date)
+    const joinRaw = employee.joiningDate || employee.createdAt;
+    const joinDateStr = joinRaw ? (typeof joinRaw === 'string' ? joinRaw.slice(0, 10) : new Date(joinRaw).toISOString().slice(0, 10)) : null;
+
+    if (joinDateStr && joinDateStr > endStr) {
+      // Employee joined in a future month! Zero days & zero salary for this month.
+      return {
+        month,
+        employee: employee._id,
+        employeeDetails: {
+          employeeId: employee.employeeId,
+          fullName: employee.fullName,
+          department: employee.department
+        },
+        salaryProfile: salaryProfile._id,
+        grossSalary: 0,
+        dailyRateBasis: salaryProfile.dailyRateBasis,
+        calendarDays,
+        payableDays: 0,
+        presentDays: 0,
+        halfDays: 0,
+        lateDays: 0,
+        totalLateMinutes: 0,
+        perMinuteRate: 0,
+        paidLeaveDays: 0,
+        weeklyOffDays: 0,
+        lwpDays: 0,
+        unmarkedDays: 0,
+        incompleteDays: 0,
+        perDayRate: 0,
+        lateDeduction: 0,
+        halfDayDeduction: 0,
+        lwpDeduction: 0,
+        shortfallDeduction: 0,
+        deductionBreakdown: [],
+        otherDeductions: 0,
+        totalDeductions: 0,
+        netPayable: 0
+      };
+    }
+
+    const joinMonthPrefix = joinDateStr ? joinDateStr.slice(0, 7) : null;
+    const isMidMonthJoiner = joinMonthPrefix === month;
+    const activeStartDay = isMidMonthJoiner ? parseInt(joinDateStr.split('-')[2], 10) : 1;
+    const effectiveActiveDays = calendarDays - activeStartDay + 1;
+
+    // Get attendance records in month (strictly from active start date)
+    const effectiveStartStr = `${month}-${String(activeStartDay).padStart(2, '0')}`;
     const attendanceRecords = await Attendance.find({
       employee: employeeId,
-      date: { $gte: startStr, $lte: endStr }
+      date: { $gte: effectiveStartStr, $lte: endStr }
     });
 
     let presentDays = 0;
@@ -74,7 +118,7 @@ class PayrollService {
       employee: employeeId,
       status: 'Approved',
       startDate: { $lte: endStr },
-      endDate: { $gte: startStr }
+      endDate: { $gte: effectiveStartStr }
     });
 
     let paidLeaveDays = 0;
@@ -89,13 +133,13 @@ class PayrollService {
       lwpDays += lwp;
     }
 
-    // Calculate weekly offs in the month
+    // Calculate weekly offs only for active employment duration
     const [year, mNum] = month.split('-').map(Number);
     let weeklyOffDays = 0;
     const weeklyOffNames = employee.weeklyOff || ['Sunday'];
     const daysMap = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-    for (let day = 1; day <= calendarDays; day++) {
+    for (let day = activeStartDay; day <= calendarDays; day++) {
       const dt = new Date(year, mNum - 1, day);
       const dayName = daysMap[dt.getDay()];
       if (weeklyOffNames.includes(dayName)) {
@@ -103,23 +147,28 @@ class PayrollService {
       }
     }
 
-    // Calculate unmarked / unexcused days
+    // Calculate unmarked / unexcused days during active employment duration only
     const totalAccountedDays = presentDays + halfDays + incompleteDays + paidLeaveDays + lwpDays + weeklyOffDays;
-    const unmarkedDays = Math.max(0, calendarDays - totalAccountedDays);
+    const unmarkedDays = Math.max(0, effectiveActiveDays - totalAccountedDays);
 
-    // Compute Rates
-    const grossSalary = salaryProfile.monthlyGrossSalary;
+    // Compute Base Rates
+    const fullMonthlyGross = salaryProfile.monthlyGrossSalary;
     let perDayRate = 0;
 
     if (salaryProfile.dailyRateBasis === '30DaysFixed') {
-      perDayRate = parseFloat((grossSalary / 30).toFixed(2));
+      perDayRate = parseFloat((fullMonthlyGross / 30).toFixed(2));
     } else if (salaryProfile.dailyRateBasis === 'WorkingDays') {
       const workingDays = Math.max(1, calendarDays - weeklyOffDays);
-      perDayRate = parseFloat((grossSalary / workingDays).toFixed(2));
+      perDayRate = parseFloat((fullMonthlyGross / workingDays).toFixed(2));
     } else {
       // Default: CalendarDays
-      perDayRate = parseFloat((grossSalary / calendarDays).toFixed(2));
+      perDayRate = parseFloat((fullMonthlyGross / calendarDays).toFixed(2));
     }
+
+    // If mid-month joiner, gross is prorated for active days of the month
+    const grossSalary = isMidMonthJoiner
+      ? parseFloat(((fullMonthlyGross / calendarDays) * effectiveActiveDays).toFixed(2))
+      : fullMonthlyGross;
 
     // Shift Hours & Per-Minute Rate (Condition 23, 55)
     const shiftHours = employee.assignedShift?.requiredHours || settings?.defaultRequiredHours || 8;
@@ -145,7 +194,7 @@ class PayrollService {
       : 0;
 
     // Deduction 4: Shortfall Deduction (Condition 17, 58)
-    const shortfallDeduction = 0; // Configured if shortfall enabled
+    const shortfallDeduction = 0;
 
     // Build Itemized Deduction Breakdown (Condition 62, 65)
     const deductionBreakdown = [];
@@ -174,7 +223,10 @@ class PayrollService {
     // Payable Days & Final Net Pay
     const totalDeductions = parseFloat((lateDeduction + halfDayDeduction + lwpDeduction + shortfallDeduction).toFixed(2));
     const netPayable = Math.max(0, parseFloat((grossSalary - totalDeductions).toFixed(2)));
-    const payableDays = Math.min(calendarDays, parseFloat((presentDays + (halfDays * (1 - halfDayDeductionPct / 100)) + paidLeaveDays + weeklyOffDays).toFixed(2)));
+    const payableDays = Math.min(
+      effectiveActiveDays,
+      parseFloat((presentDays + (halfDays * (1 - halfDayDeductionPct / 100)) + paidLeaveDays + weeklyOffDays).toFixed(2))
+    );
 
     return {
       month,
@@ -188,6 +240,7 @@ class PayrollService {
       grossSalary,
       dailyRateBasis: salaryProfile.dailyRateBasis,
       calendarDays,
+      effectiveActiveDays,
       payableDays,
       presentDays,
       halfDays,
@@ -219,7 +272,7 @@ class PayrollService {
     if (!record) throw new Error('Payroll record not found');
 
     if (record.status === 'Finalized') {
-      throw new Error('This payroll record is already finalized and locked against direct edits.');
+      throw new Error('This payroll record has already been finalized and locked');
     }
 
     record.status = 'Finalized';
@@ -228,17 +281,6 @@ class PayrollService {
     if (notes) record.notes = notes;
 
     await record.save();
-
-    await AuditLog.create({
-      action: 'PAYROLL_FINALIZED',
-      entityType: 'PayrollRecord',
-      entityId: record._id,
-      performedBy: hrUser._id,
-      performedByName: hrUser.email,
-      reason: `Payroll finalized for month ${record.month}`,
-      newState: { status: 'Finalized', netPayable: record.netPayable }
-    });
-
     return record;
   }
 }

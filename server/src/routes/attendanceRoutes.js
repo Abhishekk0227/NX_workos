@@ -40,6 +40,18 @@ router.post('/punch-in', protect, async (req, res, next) => {
 
     const todayStr = AttendanceService.formatDate(new Date());
 
+    // Joining date boundary check
+    const joinRaw = employee.joiningDate || employee.createdAt;
+    if (joinRaw) {
+      const joinStr = new Date(joinRaw).toISOString().slice(0, 10);
+      if (todayStr < joinStr) {
+        return res.status(400).json({
+          success: false,
+          message: `Your employment starting date is ${joinStr}. Attendance cannot be marked prior to joining date.`
+        });
+      }
+    }
+
     const [settings, existing] = await Promise.all([
       SystemSetting.findOne(),
       Attendance.findOne({
@@ -320,7 +332,7 @@ router.get('/all', protect, authorize('HR'), async (req, res, next) => {
     }
 
     const records = await Attendance.find(filter)
-      .populate('employee', 'employeeId fullName department designation')
+      .populate('employee', 'employeeId fullName department designation joiningDate createdAt')
       .populate('shift')
       .populate('dailyReport')
       .sort({ date: -1, createdAt: -1 });
