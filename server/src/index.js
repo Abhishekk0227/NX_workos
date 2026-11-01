@@ -18,6 +18,25 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+// Root Server Status Endpoint
+app.get('/', (req, res) => {
+  res.json({
+    success: true,
+    system: 'NX Work OS API Server',
+    status: 'online',
+    version: '1.0.0',
+    message: 'NX Work OS Backend is running successfully on Vercel',
+    endpoints: {
+      health: '/api/health',
+      auth: '/api/auth/login',
+      employees: '/api/employees',
+      shifts: '/api/shifts',
+      attendance: '/api/attendance'
+    },
+    timestamp: new Date().toISOString()
+  });
+});
+
 // API Health Check
 app.get('/api/health', (req, res) => {
   res.json({
@@ -26,6 +45,16 @@ app.get('/api/health', (req, res) => {
     version: '1.0.0',
     timestamp: new Date().toISOString()
   });
+});
+
+// Middleware to ensure DB connection is ready before handling requests (Serverless optimization)
+app.use(async (req, res, next) => {
+  try {
+    await connectDB();
+    next();
+  } catch (err) {
+    next(err);
+  }
 });
 
 // Route mounts
@@ -55,11 +84,15 @@ app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
 
-// Connect to Database and start listener
-connectDB().then(() => {
-  app.listen(PORT, () => {
-    console.log(`[NX Work OS Server] Running on http://localhost:${PORT}`);
+// Connect to Database and start listener in non-serverless environments
+if (!process.env.VERCEL) {
+  connectDB().then(() => {
+    app.listen(PORT, () => {
+      console.log(`[NX Work OS Server] Running on http://localhost:${PORT}`);
+    });
+  }).catch((err) => {
+    console.error('Initial DB connection failed:', err.message);
   });
-});
+}
 
 module.exports = app;

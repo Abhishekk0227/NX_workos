@@ -9,15 +9,32 @@ try {
   // Ignore fallback error
 }
 
+let cachedPromise = null;
+
 const connectDB = async () => {
+  if (mongoose.connection.readyState >= 1) {
+    return mongoose.connection;
+  }
+
+  if (cachedPromise) {
+    return cachedPromise;
+  }
+
   try {
     const mongoUri = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/nx_work_os';
-    const conn = await mongoose.connect(mongoUri);
+    cachedPromise = mongoose.connect(mongoUri, {
+      serverSelectionTimeoutMS: 8000
+    });
+    const conn = await cachedPromise;
     console.log(`[MongoDB] Connected: ${conn.connection.host}/${conn.connection.name}`);
     return conn;
   } catch (error) {
+    cachedPromise = null;
     console.error(`[MongoDB Error] Connection failed: ${error.message}`);
-    process.exit(1);
+    if (!process.env.VERCEL) {
+      process.exit(1);
+    }
+    throw error;
   }
 };
 
