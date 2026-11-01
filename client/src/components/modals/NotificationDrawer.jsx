@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   X,
   Bell,
@@ -8,23 +9,25 @@ import {
   Calendar,
   CheckCheck,
   Radio,
-  Send,
-  Sparkles,
-  Megaphone
+  ExternalLink,
+  Megaphone,
+  DollarSign
 } from 'lucide-react';
 import { useNotifications } from '../../context/NotificationContext';
+import { useAuth } from '../../context/AuthContext';
 import {
   isPushSupported,
   getPushPermissionStatus,
   requestPushPermission,
   showPushNotification
 } from '../../services/pushNotification';
-import api from '../../api/client';
+import { resolveNotificationRoute } from '../common/NotificationToast';
 
 export default function NotificationDrawer({ isOpen, onClose }) {
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const [pushStatus, setPushStatus] = useState(getPushPermissionStatus());
-  const [testingPush, setTestingPush] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -44,35 +47,33 @@ export default function NotificationDrawer({ isOpen, onClose }) {
     }
   };
 
-  const handleSendTestPush = async () => {
-    setTestingPush(true);
-    try {
-      await api.post('/notifications/test-push');
-      showPushNotification('NX Work OS — Test Push Notification', {
-        body: 'Real-time push delivery verified! You will receive live shift, broadcast, and task alerts.'
-      });
-      alert('Test push notification dispatched!');
-    } catch (err) {
-      console.warn(err);
-      // Fallback local notification
-      showPushNotification('NX Work OS — Push Notification Test', {
-        body: 'Real-time push delivery verified! You will receive live shift, broadcast, and task alerts.'
-      });
-    } finally {
-      setTestingPush(false);
+  const handleItemClick = (item) => {
+    markAsRead(item._id);
+    onClose();
+    const route = resolveNotificationRoute(item, user?.role);
+    if (route) {
+      navigate(route);
     }
   };
 
   const getIcon = (type, title = '') => {
-    if (title.toLowerCase().includes('notice') || title.toLowerCase().includes('broadcast')) {
-      return <Megaphone className="w-4 h-4 text-rose-600" />;
+    const t = (title || '').toLowerCase();
+    if (t.includes('notice') || t.includes('broadcast')) {
+      return <Megaphone className="w-4 h-4 text-purple-600" />;
     }
     switch (type) {
-      case 'Attendance': return <Clock className="w-4 h-4 text-blue-600" />;
-      case 'Leave': return <Calendar className="w-4 h-4 text-emerald-600" />;
-      case 'Task': return <CheckCircle2 className="w-4 h-4 text-purple-600" />;
-      case 'Correction': return <AlertCircle className="w-4 h-4 text-amber-600" />;
-      default: return <Bell className="w-4 h-4 text-slate-600" />;
+      case 'Attendance':
+        return <Clock className="w-4 h-4 text-emerald-600" />;
+      case 'Leave':
+        return <Calendar className="w-4 h-4 text-rose-600" />;
+      case 'Task':
+        return <CheckCircle2 className="w-4 h-4 text-blue-600" />;
+      case 'Payroll':
+        return <DollarSign className="w-4 h-4 text-amber-600" />;
+      case 'Correction':
+        return <AlertCircle className="w-4 h-4 text-amber-600" />;
+      default:
+        return <Bell className="w-4 h-4 text-slate-600" />;
     }
   };
 
@@ -82,7 +83,7 @@ export default function NotificationDrawer({ isOpen, onClose }) {
         {/* Header */}
         <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/80">
           <div className="flex items-center gap-2">
-            <Bell className="w-5 h-5 text-emerald-700" />
+            <Bell className="w-5 h-5 text-blue-600" />
             <h3 className="font-bold text-slate-900 text-sm">Notifications & Alerts</h3>
             {unreadCount > 0 && (
               <span className="bg-rose-100 text-rose-700 text-[10px] px-2 py-0.5 rounded-full font-bold">
@@ -108,42 +109,21 @@ export default function NotificationDrawer({ isOpen, onClose }) {
           </div>
         </div>
 
-        {/* PUSH NOTIFICATION CONTROLLER BANNER */}
-        <div className="p-3.5 bg-gradient-to-r from-slate-900 to-slate-800 text-white border-b border-slate-700 space-y-2">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Radio className="w-4 h-4 text-emerald-400 animate-pulse" />
-              <span className="text-xs font-bold">Native Push Notifications</span>
+        {/* PUSH NOTIFICATION STATUS BANNER (Clean production view, no test alert button) */}
+        {pushStatus !== 'granted' && isPushSupported() && (
+          <div className="p-3 bg-slate-900 text-white border-b border-slate-800 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 min-w-0">
+              <Radio className="w-4 h-4 text-amber-400 shrink-0" />
+              <span className="text-xs text-slate-300 truncate">Enable instant device alerts</span>
             </div>
-            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-              pushStatus === 'granted'
-                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-            }`}>
-              {pushStatus === 'granted' ? 'Active / Allowed' : 'Disabled'}
-            </span>
+            <button
+              onClick={handleEnablePush}
+              className="py-1 px-3 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg transition cursor-pointer shrink-0"
+            >
+              Enable
+            </button>
           </div>
-
-          <div className="flex items-center gap-2 pt-1">
-            {pushStatus !== 'granted' ? (
-              <button
-                onClick={handleEnablePush}
-                className="w-full py-1.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition cursor-pointer shadow-xs"
-              >
-                Enable Push Notifications
-              </button>
-            ) : (
-              <button
-                onClick={handleSendTestPush}
-                disabled={testingPush}
-                className="w-full py-1.5 px-3 bg-white/10 hover:bg-white/20 text-white text-xs font-bold rounded-xl transition cursor-pointer border border-white/20 flex items-center justify-center gap-1.5"
-              >
-                <Send className="w-3 h-3 text-emerald-400" />
-                <span>{testingPush ? 'Sending...' : 'Send Test Push Alert'}</span>
-              </button>
-            )}
-          </div>
-        </div>
+        )}
 
         {/* Notification List */}
         <div className="flex-1 overflow-y-auto p-4 space-y-3">
@@ -155,32 +135,38 @@ export default function NotificationDrawer({ isOpen, onClose }) {
           ) : (
             notifications.map((item) => {
               const isNotice = item.title?.toLowerCase().includes('notice') || item.title?.toLowerCase().includes('broadcast');
+              const read = item.isRead || (item.readBy || []).some(r => r.user === user?._id || r.user?._id === user?._id);
+
               return (
                 <div
                   key={item._id}
-                  onClick={() => markAsRead(item._id)}
-                  className={`p-3.5 rounded-2xl border transition-all cursor-pointer ${
-                    item.isRead
-                      ? 'bg-white border-slate-100 text-slate-600'
+                  onClick={() => handleItemClick(item)}
+                  className={`group p-3.5 rounded-2xl border transition-all cursor-pointer ${
+                    read
+                      ? 'bg-white border-slate-100 text-slate-600 hover:border-slate-300 hover:bg-slate-50/50'
                       : isNotice
-                      ? 'bg-rose-50/70 border-rose-200 text-slate-900 shadow-xs'
-                      : 'bg-blue-50/60 border-blue-100 text-slate-900 shadow-xs'
-                  } hover:border-slate-300`}
+                      ? 'bg-rose-50/70 border-rose-200 text-slate-900 shadow-2xs hover:border-rose-300'
+                      : 'bg-blue-50/60 border-blue-100 text-slate-900 shadow-2xs hover:border-blue-300'
+                  }`}
                 >
                   <div className="flex items-start gap-3">
-                    <div className="p-2 rounded-xl bg-white shadow-xs shrink-0 border border-slate-100">
+                    <div className="p-2 rounded-xl bg-white shadow-2xs shrink-0 border border-slate-100">
                       {getIcon(item.type, item.title)}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-1 mb-1">
-                        <p className="text-xs font-bold text-slate-900 truncate">
+                        <p className="text-xs font-bold text-slate-900 truncate group-hover:text-blue-600 transition">
                           {item.title}
                         </p>
                         <span className="text-[10px] text-slate-400 whitespace-nowrap">
                           {new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </span>
                       </div>
-                      <p className="text-xs text-slate-600 leading-relaxed line-clamp-3">{item.message}</p>
+                      <p className="text-xs text-slate-600 leading-relaxed line-clamp-2">{item.message}</p>
+                      <div className="flex items-center gap-1 text-[10px] text-blue-600 font-semibold mt-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <span>Open section</span>
+                        <ExternalLink className="w-2.5 h-2.5" />
+                      </div>
                     </div>
                   </div>
                 </div>

@@ -75,8 +75,8 @@ const RootRedirector = () => {
 export default function App() {
   return (
     <AuthProvider>
-      <NotificationProvider>
-        <BrowserRouter>
+      <BrowserRouter>
+        <NotificationProvider>
           <Routes>
             {/* Public Route */}
             <Route path="/login" element={<Login />} />
@@ -124,8 +124,8 @@ export default function App() {
             <Route path="/" element={<RootRedirector />} />
             <Route path="*" element={<RootRedirector />} />
           </Routes>
-        </BrowserRouter>
-      </NotificationProvider>
+        </NotificationProvider>
+      </BrowserRouter>
     </AuthProvider>
   );
 }
