@@ -267,19 +267,12 @@ export default function HRAttendance() {
 
   return (
     <div className="space-y-6">
-      {/* Top Header with Live India Time Badge */}
+      {/* Top Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">Attendance</h1>
-            {/* Live IST Real-time Indicator */}
-            <div className="hidden sm:inline-flex items-center gap-2 px-3 py-1 bg-slate-900 text-white rounded-xl text-xs font-mono font-semibold shadow-xs">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span>{liveISTString}</span>
-            </div>
-          </div>
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">Attendance</h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Attendance tracking, real-time IST session timestamps, and start-date bounded logs
+            Attendance tracking, session timestamps, and start-date bounded logs
           </p>
         </div>
 
@@ -306,15 +299,6 @@ export default function HRAttendance() {
             Daily Attendance Log
           </button>
         </div>
-      </div>
-
-      {/* Mobile Live IST Badge */}
-      <div className="sm:hidden flex items-center justify-between p-2.5 bg-slate-900 text-white rounded-xl text-xs font-mono font-semibold shadow-xs">
-        <span className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-          <span>India Time (IST):</span>
-        </span>
-        <span className="text-emerald-400">{liveISTString}</span>
       </div>
 
       {/* Pending Correction Alert Banner */}
@@ -421,14 +405,6 @@ export default function HRAttendance() {
                 className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition cursor-pointer shrink-0"
               >
                 <ChevronRight className="w-4 h-4" />
-              </button>
-
-              <button
-                onClick={() => setCalendarDate(new Date())}
-                className="px-2.5 sm:px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-[11px] sm:text-xs font-bold transition cursor-pointer whitespace-nowrap shrink-0"
-                title="Jump to Current Month"
-              >
-                This Month
               </button>
             </div>
           </div>

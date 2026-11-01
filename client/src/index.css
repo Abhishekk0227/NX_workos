@@ -4,7 +4,7 @@
 
 @layer base {
   body {
-    @apply bg-slate-50 text-slate-800 font-sans;
+    @apply bg-[#f8f9fa] text-slate-800 font-sans;
   }
 }
 

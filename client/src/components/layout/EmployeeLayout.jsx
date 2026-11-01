@@ -46,7 +46,7 @@ export default function EmployeeLayout() {
   const displayInitials = emp?.fullName ? emp.fullName.split(' ').map(n => n[0]).join('') : 'RS';
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row pb-16 md:pb-0">
+    <div className="min-h-screen bg-[#f8f9fa] flex flex-col md:flex-row pb-16 md:pb-0">
       {/* Mobile Drawer Backdrop */}
       {mobileDrawerOpen && (
         <div

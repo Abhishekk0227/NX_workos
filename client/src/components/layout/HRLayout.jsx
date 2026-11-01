@@ -46,7 +46,7 @@ export default function HRLayout() {
   ];
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row pb-16 md:pb-0">
+    <div className="min-h-screen bg-[#f8f9fa] flex flex-col md:flex-row pb-16 md:pb-0">
       {/* Desktop Left Sidebar (Matching hrpanelD.png) */}
       <aside
         className="hidden md:sticky md:flex top-0 left-0 z-50 h-screen w-60 bg-[#0f172a] text-slate-300 flex-col border-r border-slate-800"

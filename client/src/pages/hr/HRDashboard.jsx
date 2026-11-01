@@ -122,25 +122,36 @@ export default function HRDashboard() {
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      {/* Top Banner matching HrpanelMui.png Screen 1 */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+      {/* Top Banner */}
+      <div className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">Good Morning, HR Admin</h1>
+          <h1 className="text-lg sm:text-2xl font-bold text-slate-900 tracking-tight">Good Morning, HR Admin</h1>
           <p className="text-xs text-slate-500 mt-0.5">Here's today's overview</p>
-          <div className="inline-flex items-center gap-2 mt-2 px-3 py-1 bg-white border border-slate-200/90 rounded-xl text-xs font-semibold text-slate-700 shadow-xs">
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0">
+          <div className="hidden sm:inline-flex items-center gap-2 px-3 py-1.5 bg-white border border-slate-200/90 rounded-xl text-xs font-semibold text-slate-700 shadow-2xs">
             <Calendar className="w-3.5 h-3.5 text-blue-600" />
             <span>{todayDateFormatted}</span>
           </div>
-        </div>
 
-        <button
-          onClick={fetchDashboardData}
-          disabled={loading}
-          className="p-2 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 text-slate-600 transition shadow-xs cursor-pointer self-end sm:self-auto"
-          title="Refresh Data"
-        >
-          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-        </button>
+          <button
+            onClick={fetchDashboardData}
+            disabled={loading}
+            className="p-2 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 text-slate-600 transition shadow-2xs cursor-pointer"
+            title="Refresh Data"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          </button>
+        </div>
+      </div>
+
+      {/* Mobile Date Pill */}
+      <div className="sm:hidden">
+        <div className="inline-flex items-center gap-2 px-3 py-1 bg-white border border-slate-200/90 rounded-xl text-xs font-semibold text-slate-700 shadow-2xs">
+          <Calendar className="w-3.5 h-3.5 text-blue-600" />
+          <span>{todayDateFormatted}</span>
+        </div>
       </div>
 
       {/* 4 Top KPI Cards matching HrpanelMui.png Screen 1 (2x2 Grid on mobile) */}
