@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="192" height="192">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="100%" stop-color="#1e293b"/>
+    </linearGradient>
+    <linearGradient id="accentGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2563eb"/>
+      <stop offset="50%" stop-color="#06b6d4"/>
+      <stop offset="100%" stop-color="#10b981"/>
+    </linearGradient>
+    <linearGradient id="nxGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#e2e8f0"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="192" height="192" rx="42" fill="url(#bgGrad)"/>
+  <rect x="3" y="3" width="186" height="186" rx="39" fill="none" stroke="#334155" stroke-width="2"/>
+
+  <!-- Logo Emblem: Dynamic Geometric Hexagon & NX Mark -->
+  <g transform="translate(46, 44)">
+    <!-- Hexagon Frame -->
+    <path d="M50 0 L95 26 L95 78 L50 104 L5 78 L5 26 Z" fill="none" stroke="url(#accentGrad)" stroke-width="6" stroke-linejoin="round"/>
+    
+    <!-- Central N-X Monogram -->
+    <!-- N -->
+    <path d="M28 32 L28 72 M28 32 L52 72 M52 32 L52 72" stroke="url(#nxGrad)" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+    <!-- X accent -->
+    <path d="M60 44 L78 62 M78 44 L60 62" stroke="url(#accentGrad)" stroke-width="5" stroke-linecap="round"/>
+  </g>
+</svg>

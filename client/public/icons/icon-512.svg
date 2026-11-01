@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgGrad512" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="100%" stop-color="#1e293b"/>
+    </linearGradient>
+    <linearGradient id="accentGrad512" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2563eb"/>
+      <stop offset="50%" stop-color="#06b6d4"/>
+      <stop offset="100%" stop-color="#10b981"/>
+    </linearGradient>
+    <linearGradient id="nxGrad512" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#e2e8f0"/>
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="16" flood-color="#06b6d4" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="512" height="512" rx="112" fill="url(#bgGrad512)"/>
+  <rect x="6" y="6" width="500" height="500" rx="106" fill="none" stroke="#334155" stroke-width="4"/>
+
+  <!-- Logo Emblem: Dynamic Geometric Hexagon & NX Mark -->
+  <g transform="translate(126, 120)" filter="url(#glow)">
+    <!-- Hexagon Frame -->
+    <path d="M130 0 L248 68 L248 204 L130 272 L12 204 L12 68 Z" fill="none" stroke="url(#accentGrad512)" stroke-width="16" stroke-linejoin="round"/>
+    
+    <!-- Central N-X Monogram -->
+    <!-- N -->
+    <path d="M72 84 L72 188 M72 84 L135 188 M135 84 L135 188" stroke="url(#nxGrad512)" stroke-width="17" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+    <!-- X accent -->
+    <path d="M156 115 L204 163 M204 115 L156 163" stroke="url(#accentGrad512)" stroke-width="14" stroke-linecap="round"/>
+  </g>
+</svg>
