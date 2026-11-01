@@ -42,6 +42,20 @@ export default function HRTasksReports() {
     priority: 'Medium'
   });
 
+  const fetchEmployees = async () => {
+    try {
+      const res = await api.get('/employees?status=Active');
+      if (res.data?.success) {
+        const empList = res.data.employees || [];
+        setEmployees(empList);
+        return empList;
+      }
+    } catch (err) {
+      console.error('Failed to load active employees:', err);
+    }
+    return [];
+  };
+
   const fetchReports = async () => {
     setReportsLoading(true);
     try {
@@ -57,18 +71,19 @@ export default function HRTasksReports() {
   const fetchTasks = async () => {
     setTasksLoading(true);
     try {
-      const [tRes, eRes] = await Promise.all([
-        api.get(`/tasks/hr?employeeId=${selectedEmpFilter}&status=${selectedStatusFilter}`),
-        api.get('/employees?status=Active')
-      ]);
-      setTasks(tRes.data?.tasks || []);
-      setEmployees(eRes.data?.employees || []);
+      const res = await api.get(`/tasks/hr?employeeId=${selectedEmpFilter}&status=${selectedStatusFilter}`);
+      setTasks(res.data?.tasks || []);
     } catch (err) {
       console.error(err);
     } finally {
       setTasksLoading(false);
     }
   };
+
+  // Always fetch employees on mount so dropdown is always ready
+  useEffect(() => {
+    fetchEmployees();
+  }, []);
 
   useEffect(() => {
     if (activeTab === 'reports') {
@@ -77,6 +92,21 @@ export default function HRTasksReports() {
       fetchTasks();
     }
   }, [activeTab, reportDate, reportEmpFilter, selectedEmpFilter, selectedStatusFilter]);
+
+  const openAssignModal = async () => {
+    let empList = employees;
+    if (!empList || empList.length === 0) {
+      empList = await fetchEmployees();
+    }
+    setAssignForm({
+      employeeId: empList.length > 0 ? empList[0]._id : '',
+      title: '',
+      description: '',
+      dueDate: '',
+      priority: 'Medium'
+    });
+    setShowAssignModal(true);
+  };
 
   const handleAssignTask = async (e) => {
     e.preventDefault();
@@ -110,16 +140,7 @@ export default function HRTasksReports() {
         </div>
 
         <button
-          onClick={() => {
-            setAssignForm({
-              employeeId: employees[0]?._id || '',
-              title: '',
-              description: '',
-              dueDate: '',
-              priority: 'Medium'
-            });
-            setShowAssignModal(true);
-          }}
+          onClick={openAssignModal}
           className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold shadow-xs transition active:scale-95 cursor-pointer"
         >
           <Plus className="w-4 h-4" /> Add Task
@@ -159,9 +180,29 @@ export default function HRTasksReports() {
               onChange={(e) => setReportDate(e.target.value)}
               className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-700 outline-none"
             />
+            <select
+              value={reportEmpFilter}
+              onChange={(e) => setReportEmpFilter(e.target.value)}
+              className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-700 outline-none"
+            >
+              <option value="All">All Staff</option>
+              {employees.map((e) => (
+                <option key={e._id} value={e._id}>{e.fullName} ({e.employeeId})</option>
+              ))}
+            </select>
           </div>
         ) : (
           <div className="flex items-center gap-2">
+            <select
+              value={selectedEmpFilter}
+              onChange={(e) => setSelectedEmpFilter(e.target.value)}
+              className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-700 outline-none"
+            >
+              <option value="All">All Employees</option>
+              {employees.map((e) => (
+                <option key={e._id} value={e._id}>{e.fullName} ({e.employeeId})</option>
+              ))}
+            </select>
             <select
               value={selectedStatusFilter}
               onChange={(e) => setSelectedStatusFilter(e.target.value)}
@@ -410,18 +451,34 @@ export default function HRTasksReports() {
 
             <form onSubmit={handleAssignTask} className="p-6 space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Assignee Employee *</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Assignee Employee * {employees.length > 0 ? `(${employees.length} available)` : ''}
+                </label>
                 <select
                   required
                   value={assignForm.employeeId}
                   onChange={(e) => setAssignForm({ ...assignForm, employeeId: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 outline-none"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500"
                 >
                   <option value="">Select Employee</option>
                   {employees.map((e) => (
-                    <option key={e._id} value={e._id}>{e.fullName} ({e.employeeId})</option>
+                    <option key={e._id} value={e._id}>
+                      {e.fullName} ({e.employeeId}) {e.designation ? `• ${e.designation}` : ''}
+                    </option>
                   ))}
                 </select>
+                {employees.length === 0 && (
+                  <p className="text-[11px] text-amber-600 mt-1">
+                    Loading employees... If slow,{' '}
+                    <button
+                      type="button"
+                      onClick={fetchEmployees}
+                      className="underline font-bold text-emerald-700 cursor-pointer"
+                    >
+                      click to refresh
+                    </button>
+                  </p>
+                )}
               </div>
 
               <div>

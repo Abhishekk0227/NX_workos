@@ -12,10 +12,13 @@ import {
   ArrowLeft
 } from 'lucide-react';
 import api from '../../api/client';
+import { useAuth } from '../../context/AuthContext';
 
 export default function EmployeeTasks() {
+  const { user } = useAuth();
   const [personalTasks, setPersonalTasks] = useState([]);
   const [hrAssignedTasks, setHrAssignedTasks] = useState([]);
+  const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // Active Tab: 'my' | 'hr'
@@ -32,8 +35,28 @@ export default function EmployeeTasks() {
     description: '',
     priority: 'Medium',
     taskType: 'Personal',
+    employeeId: '',
     dueDate: new Date().toISOString().split('T')[0]
   });
+
+  const fetchEmployees = async () => {
+    try {
+      const res = await api.get('/employees?status=Active');
+      if (res.data?.success) {
+        setEmployees(res.data.employees || []);
+        return res.data.employees || [];
+      }
+    } catch (err) {
+      console.error('Failed to load employees:', err);
+    }
+    return [];
+  };
+
+  useEffect(() => {
+    if (user?.role === 'HR') {
+      fetchEmployees();
+    }
+  }, [user]);
 
   const fetchTasks = async () => {
     setLoading(true);
@@ -54,13 +77,18 @@ export default function EmployeeTasks() {
     fetchTasks();
   }, []);
 
-  const openCreateModal = () => {
+  const openCreateModal = async () => {
     setEditingTask(null);
+    let empList = employees;
+    if (user?.role === 'HR' && empList.length === 0) {
+      empList = await fetchEmployees();
+    }
     setForm({
       title: '',
       description: '',
       priority: 'Medium',
       taskType: activeTab === 'hr' ? 'HR_Assigned' : 'Personal',
+      employeeId: empList.length > 0 ? empList[0]._id : '',
       dueDate: new Date().toISOString().split('T')[0]
     });
     setShowModal(true);
@@ -85,6 +113,8 @@ export default function EmployeeTasks() {
     try {
       if (editingTask) {
         await api.put(`/tasks/${editingTask._id}`, form);
+      } else if (user?.role === 'HR' && form.employeeId) {
+        await api.post('/tasks/assign', form);
       } else {
         await api.post('/tasks/personal', form);
       }
@@ -536,6 +566,27 @@ export default function EmployeeTasks() {
                   </label>
                 </div>
               </div>
+
+              {/* Assignee Employee (When HR is creating or task is HR_Assigned) */}
+              {(user?.role === 'HR' || form.taskType === 'HR_Assigned') && employees.length > 0 && (
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Assign to Employee *
+                  </label>
+                  <select
+                    value={form.employeeId}
+                    onChange={(e) => setForm({ ...form, employeeId: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Select Employee</option>
+                    {employees.map((e) => (
+                      <option key={e._id} value={e._id}>
+                        {e.fullName} ({e.employeeId}) {e.designation ? `• ${e.designation}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               {/* Due Date picker */}
               <div>
