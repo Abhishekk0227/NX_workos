@@ -1,3 +1,5 @@
+const SystemSetting = require('../models/SystemSetting');
+
 class AttendanceService {
   /**
    * Parse "HH:mm" to minutes from start of day
@@ -30,7 +32,7 @@ class AttendanceService {
   /**
    * Calculate late minutes, early departure minutes, actual working hours, and status
    */
-  static calculateAttendanceMetrics(punchIn, punchOut, shift) {
+  static calculateAttendanceMetrics(punchIn, punchOut, shift, settings = null) {
     let lateMinutes = 0;
     let earlyMinutes = 0;
     let actualWorkingHours = 0;
@@ -56,11 +58,14 @@ class AttendanceService {
     const activeShift = shift || defaultShift;
     const shiftStartMinutes = this.timeToMinutes(activeShift.startTime);
     const shiftEndMinutes = this.timeToMinutes(activeShift.endTime);
-    const graceMinutes = activeShift.gracePeriodMinutes || 0;
+
+    // Grace Period rule (Conditions 5 & 6)
+    const isGraceEnabled = activeShift.enableGracePeriod !== false && (settings ? settings.enableGracePeriod !== false : true);
+    const graceMinutes = isGraceEnabled ? (activeShift.gracePeriodMinutes ?? 15) : 0;
 
     const punchInMinutes = this.dateToMinutes(punchIn);
 
-    // Calculate Late Arrival
+    // Calculate Late Arrival (Conditions 3, 4, 5, 6)
     if (punchInMinutes > shiftStartMinutes + graceMinutes) {
       lateMinutes = punchInMinutes - shiftStartMinutes;
       status = 'Late';
@@ -82,14 +87,29 @@ class AttendanceService {
       earlyMinutes = shiftEndMinutes - punchOutMinutes;
     }
 
-    const durationMs = new Date(punchOut).getTime() - new Date(punchIn).getTime();
+    // Conditions 11 & 12: Working hours calculate strictly within allotted shift boundaries (No extra/overtime counting)
+    const pInDate = new Date(punchIn);
+    const pOutDate = new Date(punchOut);
+
+    const shiftStartDate = new Date(pInDate);
+    const [shStartHour, shStartMin] = (activeShift.startTime || '09:00').split(':').map(Number);
+    shiftStartDate.setHours(shStartHour, shStartMin, 0, 0);
+
+    const shiftEndDate = new Date(pInDate);
+    const [shEndHour, shEndMin] = (activeShift.endTime || '18:00').split(':').map(Number);
+    shiftEndDate.setHours(shEndHour, shEndMin, 0, 0);
+
+    const clampedIn = Math.max(pInDate.getTime(), shiftStartDate.getTime());
+    const clampedOut = Math.min(pOutDate.getTime(), shiftEndDate.getTime());
+    const durationMs = Math.max(0, clampedOut - clampedIn);
+
     if (durationMs > 0) {
       actualWorkingHours = parseFloat((durationMs / (1000 * 60 * 60)).toFixed(2));
     }
 
-    // Determine final status:
-    // Rule: If punch out occurs before completing 6 hours of work, mark as 'Half Day'
-    if (actualWorkingHours < 6) {
+    // Half-Day Threshold check (Conditions 15, 16)
+    const halfDayThreshold = activeShift.halfDayThresholdHours || settings?.halfDayThresholdHours || 6;
+    if (actualWorkingHours < halfDayThreshold) {
       status = 'Half Day';
     } else if (lateMinutes > 0) {
       status = 'Late';

@@ -269,7 +269,7 @@ router.get('/all', protect, authorize('HR'), async (req, res, next) => {
  */
 router.patch('/:id/review', protect, authorize('HR'), async (req, res, next) => {
   try {
-    const { status, reviewRemarks } = req.body;
+    const { status, reviewRemarks, paidType } = req.body;
 
     if (!['Approved', 'Rejected', 'Flagged'].includes(status)) {
       return res.status(400).json({ success: false, message: 'Invalid status' });
@@ -327,20 +327,21 @@ router.patch('/:id/review', protect, authorize('HR'), async (req, res, next) => 
         });
       }
     } else if (prevStatus !== 'Approved' && status === 'Approved') {
-      // If approved from pending or flagged
-      const lwpUnits = leave.classificationBreakdown?.lwpDays || leave.totalDays || 0;
-      if (lwpUnits > 0) {
-        await LeaveLedger.create({
-          employee: leave.employee._id,
-          leaveType: 'LWP',
-          transactionType: 'Debit',
-          units: lwpUnits,
-          referenceModel: 'LeaveRequest',
-          referenceId: leave._id,
-          remarks: `Approved unpaid leave (LWP): ${reviewRemarks || ''}`,
-          performedBy: req.user._id
-        });
+      // If HR explicitly specifies paidType (e.g. approving Health leave as SL or LWP)
+      if (paidType) {
+        if (paidType === 'SL') {
+          leave.autoClassification = 'SL';
+          leave.classificationBreakdown = { clDays: 0, slDays: leave.totalDays, lwpDays: 0 };
+        } else if (paidType === 'CL') {
+          leave.autoClassification = 'CL';
+          leave.classificationBreakdown = { clDays: leave.totalDays, slDays: 0, lwpDays: 0 };
+        } else if (paidType === 'LWP') {
+          leave.autoClassification = 'LWP';
+          leave.classificationBreakdown = { clDays: 0, slDays: 0, lwpDays: leave.totalDays };
+        }
       }
+      // Record proper ledger entries
+      await LeaveService.recordLedgerEntries(leave, req.user._id);
     }
 
     await leave.save();

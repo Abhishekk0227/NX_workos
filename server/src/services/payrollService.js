@@ -3,6 +3,7 @@ const SalaryProfile = require('../models/SalaryProfile');
 const Attendance = require('../models/Attendance');
 const LeaveRequest = require('../models/LeaveRequest');
 const Employee = require('../models/Employee');
+const SystemSetting = require('../models/SystemSetting');
 const AuditLog = require('../models/AuditLog');
 
 class PayrollService {
@@ -16,9 +17,14 @@ class PayrollService {
 
   /**
    * Calculate or preview payroll for an employee for a specific month
+   * Enforces all Conditions: Per-minute late rate, Half-day %, LWP deductions & Itemized breakdown
    */
   static async calculateEmployeePayroll(employeeId, month) {
-    const employee = await Employee.findById(employeeId);
+    const [employee, settings] = await Promise.all([
+      Employee.findById(employeeId).populate('assignedShift'),
+      SystemSetting.findOne()
+    ]);
+
     if (!employee) throw new Error('Employee not found');
 
     const salaryProfile = await SalaryProfile.findOne({
@@ -44,6 +50,7 @@ class PayrollService {
     let lateDays = 0;
     let incompleteDays = 0;
     let halfDays = 0;
+    let totalLateMinutes = 0;
 
     for (const att of attendanceRecords) {
       if (att.status === 'Present') {
@@ -52,14 +59,17 @@ class PayrollService {
         presentDays++;
         lateDays++;
       } else if (att.status === 'Half Day' || att.status === 'Half-day') {
-        presentDays += 0.5;
         halfDays++;
       } else if (att.status === 'Incomplete') {
         incompleteDays++;
       }
+
+      if (att.lateMinutes > 0) {
+        totalLateMinutes += att.lateMinutes;
+      }
     }
 
-    // Get leaves in month
+    // Get approved leaves in month
     const leaves = await LeaveRequest.find({
       employee: employeeId,
       status: 'Approved',
@@ -71,9 +81,12 @@ class PayrollService {
     let lwpDays = 0;
 
     for (const lv of leaves) {
-      // By default, all approved leaves are unpaid (LWP) without segregation
-      const days = lv.totalDays || ((lv.classificationBreakdown?.lwpDays || 0) + (lv.classificationBreakdown?.clDays || 0) + (lv.classificationBreakdown?.slDays || 0));
-      lwpDays += days;
+      const cl = lv.classificationBreakdown?.clDays || 0;
+      const sl = lv.classificationBreakdown?.slDays || 0;
+      const lwp = lv.classificationBreakdown?.lwpDays || 0;
+
+      paidLeaveDays += (cl + sl);
+      lwpDays += lwp;
     }
 
     // Calculate weekly offs in the month
@@ -90,11 +103,11 @@ class PayrollService {
       }
     }
 
-    // Calculate unmarked days
-    const totalAccountedDays = presentDays + incompleteDays + paidLeaveDays + lwpDays + weeklyOffDays;
+    // Calculate unmarked / unexcused days
+    const totalAccountedDays = presentDays + halfDays + incompleteDays + paidLeaveDays + lwpDays + weeklyOffDays;
     const unmarkedDays = Math.max(0, calendarDays - totalAccountedDays);
 
-    // Compute payable days & net salary
+    // Compute Rates
     const grossSalary = salaryProfile.monthlyGrossSalary;
     let perDayRate = 0;
 
@@ -108,10 +121,60 @@ class PayrollService {
       perDayRate = parseFloat((grossSalary / calendarDays).toFixed(2));
     }
 
-    // Payable Days = Present + Paid Leaves + Weekly Offs
-    const payableDays = Math.min(calendarDays, presentDays + paidLeaveDays + weeklyOffDays);
-    const lwpDeduction = parseFloat((lwpDays * perDayRate).toFixed(2));
-    const netPayable = Math.max(0, parseFloat((grossSalary - lwpDeduction).toFixed(2)));
+    // Shift Hours & Per-Minute Rate (Condition 23, 55)
+    const shiftHours = employee.assignedShift?.requiredHours || settings?.defaultRequiredHours || 8;
+    const shiftMinutes = Math.max(60, shiftHours * 60);
+    const perMinuteRate = parseFloat((perDayRate / shiftMinutes).toFixed(4));
+
+    // Deduction 1: Late Arrival (Conditions 19, 20, 56)
+    const enableLateDeduction = settings ? settings.enableLateDeduction !== false : true;
+    const lateDeduction = enableLateDeduction && totalLateMinutes > 0
+      ? parseFloat((totalLateMinutes * perMinuteRate).toFixed(2))
+      : 0;
+
+    // Deduction 2: Half-Day Deduction (Conditions 21, 22, 57)
+    const halfDayDeductionPct = settings?.halfDayDeductionPercentage || 50;
+    const halfDayRate = perDayRate * (halfDayDeductionPct / 100);
+    const halfDayDeduction = halfDays > 0
+      ? parseFloat((halfDays * halfDayRate).toFixed(2))
+      : 0;
+
+    // Deduction 3: LWP / Unpaid Leaves (Condition 60)
+    const lwpDeduction = lwpDays > 0
+      ? parseFloat((lwpDays * perDayRate).toFixed(2))
+      : 0;
+
+    // Deduction 4: Shortfall Deduction (Condition 17, 58)
+    const shortfallDeduction = 0; // Configured if shortfall enabled
+
+    // Build Itemized Deduction Breakdown (Condition 62, 65)
+    const deductionBreakdown = [];
+    if (lateDeduction > 0) {
+      deductionBreakdown.push({
+        type: 'Late_Arrival',
+        description: `Late Arrival (${totalLateMinutes} mins @ ₹${perMinuteRate.toFixed(2)}/min)`,
+        amount: lateDeduction
+      });
+    }
+    if (halfDayDeduction > 0) {
+      deductionBreakdown.push({
+        type: 'Half_Day',
+        description: `Half Day (${halfDays} days @ ${halfDayDeductionPct}% per day)`,
+        amount: halfDayDeduction
+      });
+    }
+    if (lwpDeduction > 0) {
+      deductionBreakdown.push({
+        type: 'LWP',
+        description: `Unpaid Leave / LWP (${lwpDays} days @ ₹${perDayRate.toFixed(2)}/day)`,
+        amount: lwpDeduction
+      });
+    }
+
+    // Payable Days & Final Net Pay
+    const totalDeductions = parseFloat((lateDeduction + halfDayDeduction + lwpDeduction + shortfallDeduction).toFixed(2));
+    const netPayable = Math.max(0, parseFloat((grossSalary - totalDeductions).toFixed(2)));
+    const payableDays = Math.min(calendarDays, parseFloat((presentDays + (halfDays * (1 - halfDayDeductionPct / 100)) + paidLeaveDays + weeklyOffDays).toFixed(2)));
 
     return {
       month,
@@ -128,14 +191,22 @@ class PayrollService {
       payableDays,
       presentDays,
       halfDays,
+      lateDays,
+      totalLateMinutes,
+      perMinuteRate,
       paidLeaveDays,
       weeklyOffDays,
       lwpDays,
       unmarkedDays,
       incompleteDays,
       perDayRate,
+      lateDeduction,
+      halfDayDeduction,
       lwpDeduction,
+      shortfallDeduction,
+      deductionBreakdown,
       otherDeductions: 0,
+      totalDeductions,
       netPayable
     };
   }

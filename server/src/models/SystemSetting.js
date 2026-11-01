@@ -42,6 +42,54 @@ const systemSettingSchema = new mongoose.Schema(
       type: Number,
       default: 15
     },
+    enableGracePeriod: {
+      type: Boolean,
+      default: true
+    },
+    halfDayThresholdHours: {
+      type: Number,
+      default: 6
+    },
+    halfDayDeductionPercentage: {
+      type: Number,
+      default: 50
+    },
+    enableLateDeduction: {
+      type: Boolean,
+      default: true
+    },
+    enableShortfallDeduction: {
+      type: Boolean,
+      default: false
+    },
+    fullDayCutoffMinutes: {
+      type: Number,
+      default: 120
+    },
+    morningHalfDayCutoffMinutes: {
+      type: Number,
+      default: 60
+    },
+    afternoonHalfDayCutoffMinutes: {
+      type: Number,
+      default: 60
+    },
+    lunchStartTime: {
+      type: String,
+      default: '13:30'
+    },
+    monthlyClAllowance: {
+      type: Number,
+      default: 1
+    },
+    yearlyClTotal: {
+      type: Number,
+      default: 12
+    },
+    yearlySlTotal: {
+      type: Number,
+      default: 12
+    },
     defaultRequiredHours: {
       type: Number,
       default: 9

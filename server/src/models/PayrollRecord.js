@@ -84,10 +84,41 @@ const payrollRecordSchema = new mongoose.Schema(
       type: Number,
       default: 0
     },
+    perMinuteRate: {
+      type: Number,
+      default: 0
+    },
+    lateMinutes: {
+      type: Number,
+      default: 0
+    },
+    lateDeduction: {
+      type: Number,
+      default: 0
+    },
+    halfDays: {
+      type: Number,
+      default: 0
+    },
+    halfDayDeduction: {
+      type: Number,
+      default: 0
+    },
+    shortfallDeduction: {
+      type: Number,
+      default: 0
+    },
     lwpDeduction: {
       type: Number,
       default: 0
     },
+    deductionBreakdown: [
+      {
+        type: { type: String },
+        description: { type: String },
+        amount: { type: Number, default: 0 }
+      }
+    ],
     otherDeductions: {
       type: Number,
       default: 0

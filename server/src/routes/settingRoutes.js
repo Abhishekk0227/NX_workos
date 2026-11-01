@@ -41,6 +41,18 @@ router.put('/', protect, authorize('HR'), async (req, res, next) => {
       designations,
       employmentTypes,
       gracePeriodMinutes,
+      enableGracePeriod,
+      halfDayThresholdHours,
+      halfDayDeductionPercentage,
+      enableLateDeduction,
+      enableShortfallDeduction,
+      fullDayCutoffMinutes,
+      morningHalfDayCutoffMinutes,
+      afternoonHalfDayCutoffMinutes,
+      lunchStartTime,
+      monthlyClAllowance,
+      yearlyClTotal,
+      yearlySlTotal,
       defaultRequiredHours,
       dailyRateBasis
     } = req.body;
@@ -50,8 +62,20 @@ router.put('/', protect, authorize('HR'), async (req, res, next) => {
     if (departments) settings.departments = departments;
     if (designations) settings.designations = designations;
     if (employmentTypes) settings.employmentTypes = employmentTypes;
-    if (gracePeriodMinutes !== undefined) settings.gracePeriodMinutes = gracePeriodMinutes;
-    if (defaultRequiredHours !== undefined) settings.defaultRequiredHours = defaultRequiredHours;
+    if (gracePeriodMinutes !== undefined) settings.gracePeriodMinutes = Number(gracePeriodMinutes);
+    if (enableGracePeriod !== undefined) settings.enableGracePeriod = Boolean(enableGracePeriod);
+    if (halfDayThresholdHours !== undefined) settings.halfDayThresholdHours = Number(halfDayThresholdHours);
+    if (halfDayDeductionPercentage !== undefined) settings.halfDayDeductionPercentage = Number(halfDayDeductionPercentage);
+    if (enableLateDeduction !== undefined) settings.enableLateDeduction = Boolean(enableLateDeduction);
+    if (enableShortfallDeduction !== undefined) settings.enableShortfallDeduction = Boolean(enableShortfallDeduction);
+    if (fullDayCutoffMinutes !== undefined) settings.fullDayCutoffMinutes = Number(fullDayCutoffMinutes);
+    if (morningHalfDayCutoffMinutes !== undefined) settings.morningHalfDayCutoffMinutes = Number(morningHalfDayCutoffMinutes);
+    if (afternoonHalfDayCutoffMinutes !== undefined) settings.afternoonHalfDayCutoffMinutes = Number(afternoonHalfDayCutoffMinutes);
+    if (lunchStartTime !== undefined) settings.lunchStartTime = lunchStartTime;
+    if (monthlyClAllowance !== undefined) settings.monthlyClAllowance = Number(monthlyClAllowance);
+    if (yearlyClTotal !== undefined) settings.yearlyClTotal = Number(yearlyClTotal);
+    if (yearlySlTotal !== undefined) settings.yearlySlTotal = Number(yearlySlTotal);
+    if (defaultRequiredHours !== undefined) settings.defaultRequiredHours = Number(defaultRequiredHours);
     if (dailyRateBasis) settings.dailyRateBasis = dailyRateBasis;
 
     await settings.save();

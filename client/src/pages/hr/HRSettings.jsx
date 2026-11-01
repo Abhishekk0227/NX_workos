@@ -14,14 +14,18 @@ import {
   User,
   Lock,
   Check,
-  X
+  X,
+  ShieldCheck,
+  Sliders,
+  DollarSign,
+  AlertTriangle
 } from 'lucide-react';
 import api from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
 
 export default function HRSettings() {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState('shifts'); // 'roles' | 'company' | 'shifts' | 'notifications' | 'profile'
+  const [activeTab, setActiveTab] = useState('shifts'); // 'shifts' | 'policy' | 'company' | 'roles' | 'notifications' | 'profile'
 
   const [shifts, setShifts] = useState([]);
   const [settings, setSettings] = useState({
@@ -32,6 +36,18 @@ export default function HRSettings() {
     departments: ['Engineering', 'Product Design', 'Operations', 'Human Resources', 'Sales & Marketing'],
     designations: ['Developer', 'Designer', 'QA Tester', 'Operations Specialist', 'HR Manager'],
     gracePeriodMinutes: 15,
+    enableGracePeriod: true,
+    halfDayThresholdHours: 6,
+    halfDayDeductionPercentage: 50,
+    enableLateDeduction: true,
+    enableShortfallDeduction: false,
+    fullDayCutoffMinutes: 120,
+    morningHalfDayCutoffMinutes: 60,
+    afternoonHalfDayCutoffMinutes: 60,
+    lunchStartTime: '13:30',
+    monthlyClAllowance: 1,
+    yearlyClTotal: 12,
+    yearlySlTotal: 12,
     defaultRequiredHours: 8.5,
     dailyRateBasis: 'CalendarDays'
   });
@@ -144,11 +160,11 @@ export default function HRSettings() {
 
   return (
     <div className="space-y-6">
-      {/* Top Header matching hrpanelD.png #9 */}
+      {/* Top Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">Roles & Settings</h1>
-          <p className="text-xs text-slate-500 mt-0.5">Configure shifts, company parameters, permissions, and security</p>
+          <p className="text-xs text-slate-500 mt-0.5">Configure shifts, company parameters, attendance policies, and security</p>
         </div>
 
         <button
@@ -160,11 +176,12 @@ export default function HRSettings() {
         </button>
       </div>
 
-      {/* 5 Segmented Navigation Tabs matching hrpanelD.png #9, #10, #11, #12 */}
+      {/* Segmented Navigation Tabs */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
         <div className="p-2.5 bg-slate-50 border-b border-slate-200/80 flex items-center gap-1.5 overflow-x-auto">
           {[
-            { id: 'shifts', label: 'Shift & Working Hours', icon: Clock },
+            { id: 'shifts', label: 'Shift & Hours', icon: Clock },
+            { id: 'policy', label: 'Attendance & Leave Policy', icon: ShieldCheck },
             { id: 'company', label: 'Company Settings', icon: Building2 },
             { id: 'roles', label: 'Employee Roles', icon: Shield },
             { id: 'notifications', label: 'Notifications', icon: Bell },
@@ -188,7 +205,7 @@ export default function HRSettings() {
           })}
         </div>
 
-        {/* TAB 1: SHIFT & WORKING HOURS matching hrpanelD.png #11 */}
+        {/* TAB 1: SHIFT & WORKING HOURS */}
         {activeTab === 'shifts' && (
           <div className="p-6 space-y-6">
             <div>
@@ -296,7 +313,239 @@ export default function HRSettings() {
           </div>
         )}
 
-        {/* TAB 2: COMPANY SETTINGS matching hrpanelD.png #10 */}
+        {/* TAB 2: ATTENDANCE & LEAVE POLICY (Conditions 1-80) */}
+        {activeTab === 'policy' && (
+          <div className="p-6 space-y-6 max-w-3xl">
+            <div>
+              <h3 className="font-bold text-slate-900 text-sm mb-1">Attendance, Late & Leave Deduction Policies</h3>
+              <p className="text-xs text-slate-500 mb-4">
+                Configurable business rules for automatic leave processing, half-day thresholds, and per-minute salary deductions.
+              </p>
+            </div>
+
+            {/* Section 1: Late Arrival & Grace Period */}
+            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/70 space-y-3">
+              <h4 className="font-bold text-slate-900 text-xs flex items-center gap-2">
+                <Clock className="w-4 h-4 text-emerald-600" />
+                Late Arrival & Grace Period (Conditions 3-6, 19-20, 56)
+              </h4>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+                <label className="flex items-center justify-between p-3 bg-white rounded-xl border border-slate-200/80 cursor-pointer">
+                  <div>
+                    <span className="text-xs font-semibold text-slate-800 block">Enable Grace Period</span>
+                    <span className="text-[10px] text-slate-400">Late calculation begins after grace period</span>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={settings.enableGracePeriod !== false}
+                    onChange={(e) => setSettings({ ...settings, enableGracePeriod: e.target.checked })}
+                    className="w-4 h-4 text-emerald-600 rounded"
+                  />
+                </label>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Grace Period Duration (Minutes)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={settings.gracePeriodMinutes || 15}
+                    onChange={(e) => setSettings({ ...settings, gracePeriodMinutes: Number(e.target.value) })}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs outline-none"
+                  />
+                </div>
+
+                <label className="flex items-center justify-between p-3 bg-white rounded-xl border border-slate-200/80 cursor-pointer sm:col-span-2">
+                  <div>
+                    <span className="text-xs font-semibold text-slate-800 block">Enable Per-Minute Late Deduction in Payroll</span>
+                    <span className="text-[10px] text-slate-400">
+                      Calculates salary deduction based on exact late arrival minutes: (Daily Rate ÷ Shift Minutes) × Late Mins
+                    </span>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={settings.enableLateDeduction !== false}
+                    onChange={(e) => setSettings({ ...settings, enableLateDeduction: e.target.checked })}
+                    className="w-4 h-4 text-emerald-600 rounded"
+                  />
+                </label>
+              </div>
+            </div>
+
+            {/* Section 2: Half-Day Working Hours & Deduction */}
+            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/70 space-y-3">
+              <h4 className="font-bold text-slate-900 text-xs flex items-center gap-2">
+                <Sliders className="w-4 h-4 text-blue-600" />
+                Half-Day Threshold & Salary Deduction (Conditions 15-17, 21-22, 57)
+              </h4>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Half-Day Working Hours Threshold
+                  </label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    min="1"
+                    value={settings.halfDayThresholdHours || 6}
+                    onChange={(e) => setSettings({ ...settings, halfDayThresholdHours: Number(e.target.value) })}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs outline-none"
+                  />
+                  <span className="text-[10px] text-slate-400 mt-0.5 block">Punch out before this threshold marks Half-Day</span>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Half-Day Deduction Percentage (%)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={settings.halfDayDeductionPercentage || 50}
+                    onChange={(e) => setSettings({ ...settings, halfDayDeductionPercentage: Number(e.target.value) })}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs outline-none"
+                  />
+                  <span className="text-[10px] text-slate-400 mt-0.5 block">Default 50% salary deduction on half-day</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Section 3: Leave Quotas & 1 Monthly Paid CL Rule */}
+            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/70 space-y-3">
+              <h4 className="font-bold text-slate-900 text-xs flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-purple-600" />
+                Leave Entitlements & Monthly 1 CL Limit (Conditions 25-27, 36-46)
+              </h4>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-1">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Monthly Paid CL Allowance
+                  </label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    min="0"
+                    value={settings.monthlyClAllowance || 1}
+                    onChange={(e) => setSettings({ ...settings, monthlyClAllowance: Number(e.target.value) })}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs outline-none font-bold text-purple-700"
+                  />
+                  <span className="text-[10px] text-slate-400 mt-0.5 block">1 Paid CL/month; subsequent leaves auto-deduct as LWP</span>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Annual Total CL Entitlement
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={settings.yearlyClTotal || 12}
+                    onChange={(e) => setSettings({ ...settings, yearlyClTotal: Number(e.target.value) })}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs outline-none"
+                  />
+                  <span className="text-[10px] text-slate-400 mt-0.5 block">Total 12 Casual Leaves per year</span>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Annual Total SL Entitlement
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={settings.yearlySlTotal || 12}
+                    onChange={(e) => setSettings({ ...settings, yearlySlTotal: Number(e.target.value) })}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs outline-none"
+                  />
+                  <span className="text-[10px] text-slate-400 mt-0.5 block">Sick Leave paid only upon HR review</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Section 4: Leave Application Cut-off Windows */}
+            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/70 space-y-3">
+              <h4 className="font-bold text-slate-900 text-xs flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-600" />
+                Leave Application Cut-off Windows (Conditions 32-35)
+              </h4>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Full-Day Leave Advance Cutoff (Minutes before Shift)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={settings.fullDayCutoffMinutes || 120}
+                    onChange={(e) => setSettings({ ...settings, fullDayCutoffMinutes: Number(e.target.value) })}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs outline-none"
+                  />
+                  <span className="text-[10px] text-slate-400 mt-0.5 block">e.g. 120 mins (2 hours before shift start)</span>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Morning Half-Day Cutoff (Minutes before Shift)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={settings.morningHalfDayCutoffMinutes || 60}
+                    onChange={(e) => setSettings({ ...settings, morningHalfDayCutoffMinutes: Number(e.target.value) })}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs outline-none"
+                  />
+                  <span className="text-[10px] text-slate-400 mt-0.5 block">e.g. 60 mins before shift start</span>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Lunch Break Start Time
+                  </label>
+                  <input
+                    type="text"
+                    value={settings.lunchStartTime || '13:30'}
+                    onChange={(e) => setSettings({ ...settings, lunchStartTime: e.target.value })}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs outline-none"
+                  />
+                  <span className="text-[10px] text-slate-400 mt-0.5 block">Base for Afternoon Half-Day cutoff</span>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Afternoon Half-Day Cutoff (Minutes before Lunch)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={settings.afternoonHalfDayCutoffMinutes || 60}
+                    onChange={(e) => setSettings({ ...settings, afternoonHalfDayCutoffMinutes: Number(e.target.value) })}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs outline-none"
+                  />
+                  <span className="text-[10px] text-slate-400 mt-0.5 block">e.g. 60 mins before lunch start</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-2 flex justify-end">
+              <button
+                type="button"
+                onClick={handleSaveSettings}
+                disabled={saving}
+                className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs transition cursor-pointer"
+              >
+                Save Attendance & Leave Policies
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 3: COMPANY SETTINGS */}
         {activeTab === 'company' && (
           <div className="p-6 space-y-4 max-w-xl">
             <h3 className="font-bold text-slate-900 text-sm mb-1">Corporate Details</h3>
@@ -347,7 +596,7 @@ export default function HRSettings() {
           </div>
         )}
 
-        {/* TAB 3: EMPLOYEE ROLES matching hrpanelD.png #9 */}
+        {/* TAB 4: EMPLOYEE ROLES */}
         {activeTab === 'roles' && (
           <div className="p-6 space-y-4">
             <h3 className="font-bold text-slate-900 text-sm mb-1">System Roles & Access Control</h3>
@@ -368,10 +617,10 @@ export default function HRSettings() {
                     { feature: 'Punch Out & Work Report Mandatory Bullets', emp: true, hr: true },
                     { feature: 'View Personal Tasks & Checklist', emp: true, hr: true },
                     { feature: 'Assign Directives to Staff', emp: false, hr: true },
-                    { feature: 'Autonomous Leave Application', emp: true, hr: true },
-                    { feature: 'Leave Approval & LWP Conversion', emp: false, hr: true },
-                    { feature: 'Payroll Review & Compensation (Confidential)', emp: false, hr: true },
-                    { feature: 'System Shift & Policy Configuration', emp: false, hr: true }
+                    { feature: 'Autonomous Leave Application (Auto <= 24 hrs)', emp: true, hr: true },
+                    { feature: 'Leave Approval & LWP / SL Reclassification', emp: false, hr: true },
+                    { feature: 'Payroll Review & Itemized Deductions (Confidential)', emp: false, hr: true },
+                    { feature: 'Shift Clamping & Policy Configuration', emp: false, hr: true }
                   ].map((row, i) => (
                     <tr key={i} className="hover:bg-slate-50">
                       <td className="py-3 px-4 font-semibold text-slate-800">{row.feature}</td>
@@ -399,7 +648,7 @@ export default function HRSettings() {
           </div>
         )}
 
-        {/* TAB 4: NOTIFICATIONS */}
+        {/* TAB 5: NOTIFICATIONS */}
         {activeTab === 'notifications' && (
           <div className="p-6 space-y-4 max-w-xl">
             <h3 className="font-bold text-slate-900 text-sm mb-1">Operational Alerts</h3>
@@ -426,7 +675,7 @@ export default function HRSettings() {
           </div>
         )}
 
-        {/* TAB 5: HR PROFILE */}
+        {/* TAB 6: HR PROFILE */}
         {activeTab === 'profile' && (
           <div className="p-6 space-y-6 max-w-xl">
             <div>

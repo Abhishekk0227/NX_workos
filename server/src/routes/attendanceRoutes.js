@@ -4,6 +4,7 @@ const Attendance = require('../models/Attendance');
 const DailyReport = require('../models/DailyReport');
 const Employee = require('../models/Employee');
 const ShiftTemplate = require('../models/ShiftTemplate');
+const SystemSetting = require('../models/SystemSetting');
 const AuditLog = require('../models/AuditLog');
 const AttendanceService = require('../services/attendanceService');
 const NotificationService = require('../services/notificationService');
@@ -39,11 +40,13 @@ router.post('/punch-in', protect, async (req, res, next) => {
 
     const todayStr = AttendanceService.formatDate(new Date());
 
-    // Check if attendance already exists for today
-    const existing = await Attendance.findOne({
-      employee: employee._id,
-      date: todayStr
-    });
+    const [settings, existing] = await Promise.all([
+      SystemSetting.findOne(),
+      Attendance.findOne({
+        employee: employee._id,
+        date: todayStr
+      })
+    ]);
 
     if (existing && existing.punchIn) {
       return res.status(400).json({
@@ -55,7 +58,7 @@ router.post('/punch-in', protect, async (req, res, next) => {
     }
 
     const now = new Date();
-    const metrics = AttendanceService.calculateAttendanceMetrics(now, null, employee.assignedShift);
+    const metrics = AttendanceService.calculateAttendanceMetrics(now, null, employee.assignedShift, settings);
 
     let attendance;
     if (existing) {
@@ -151,7 +154,8 @@ router.post('/punch-out', protect, async (req, res, next) => {
     }
 
     // 2. Compute final working metrics
-    const metrics = AttendanceService.calculateAttendanceMetrics(attendance.punchIn, now, attendance.shift);
+    const settings = await SystemSetting.findOne();
+    const metrics = AttendanceService.calculateAttendanceMetrics(attendance.punchIn, now, attendance.shift, settings);
 
     attendance.punchOut = now;
     attendance.dailyReport = report._id;
@@ -363,10 +367,12 @@ router.post('/review-correction', protect, authorize('HR'), async (req, res, nex
         attendance.punchOut = attendance.correction.requestedPunchOut;
       }
 
+      const settings = await SystemSetting.findOne();
       const metrics = AttendanceService.calculateAttendanceMetrics(
         attendance.punchIn,
         attendance.punchOut,
-        attendance.shift
+        attendance.shift,
+        settings
       );
 
       attendance.actualWorkingHours = metrics.actualWorkingHours;
@@ -444,10 +450,12 @@ router.post('/manual-correct', protect, authorize('HR'), async (req, res, next) 
     if (punchOut) attendance.punchOut = new Date(punchOut);
 
     if (attendance.punchIn && attendance.punchOut) {
+      const settings = await SystemSetting.findOne();
       const metrics = AttendanceService.calculateAttendanceMetrics(
         attendance.punchIn,
         attendance.punchOut,
-        attendance.shift
+        attendance.shift,
+        settings
       );
       attendance.actualWorkingHours = metrics.actualWorkingHours;
       attendance.lateMinutes = metrics.lateMinutes;

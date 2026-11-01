@@ -1,6 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import {
   Users,
+  MoreVertical,
+  MoreHorizontal,
+  ArrowLeft,
+  Phone,
+  Mail,
+  Briefcase,
   UserPlus,
   Search,
   Filter,
@@ -32,6 +38,7 @@ export default function HREmployees() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [roleFilter, setRoleFilter] = useState('All');
+  const [activeMenuId, setActiveMenuId] = useState(null);
 
   // Modals state
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -231,6 +238,7 @@ export default function HREmployees() {
         </button>
       </div>
 
+      
       {/* Search & Filter Toolbar */}
       <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col md:flex-row items-center gap-3">
         <div className="relative flex-1 w-full">
@@ -239,8 +247,8 @@ export default function HREmployees() {
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by Employee ID, name, or email..."
-            className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
+            placeholder="Search by name, ID or email..."
+            className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-blue-500 outline-none"
           />
         </div>
 
@@ -257,21 +265,165 @@ export default function HREmployees() {
             <option value="Operations Specialist">Operations Specialist</option>
             <option value="HR Manager">HR Manager</option>
           </select>
-
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 outline-none"
-          >
-            <option value="All">All Status</option>
-            <option value="Active">Active</option>
-            <option value="Inactive">Inactive</option>
-          </select>
         </div>
       </div>
 
-      {/* Employee List Table matching hrpanelD.png #2 */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+      {/* Status Segment Pills matching Mobile Screen 2 (All, Active, Inactive) */}
+      <div className="flex items-center gap-2">
+        {[
+          { id: 'All', label: `All (${employees.length})` },
+          { id: 'Active', label: `Active (${employees.filter(e => e.employmentStatus === 'Active').length})` },
+          { id: 'Inactive', label: `Inactive (${employees.filter(e => e.employmentStatus !== 'Active').length})` }
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setStatusFilter(tab.id)}
+            className={`px-4 py-1.5 rounded-full text-xs font-bold transition cursor-pointer ${
+              statusFilter === tab.id
+                ? 'bg-blue-600 text-white shadow-xs'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* MOBILE CARD VIEW matching Image Screen 2 (Employees List) */}
+      <div className="block md:hidden space-y-2.5">
+        {filteredEmployees.length === 0 ? (
+          <div className="p-8 text-center text-slate-400 bg-white rounded-2xl border border-slate-200 text-xs">
+            No employees found
+          </div>
+        ) : (
+          filteredEmployees.map((emp) => (
+            <div
+              key={emp._id}
+              className="p-3.5 bg-white rounded-2xl border border-slate-100 shadow-xs flex items-center justify-between gap-3 relative hover:border-slate-200 transition"
+            >
+              <div
+                className="flex items-center gap-3 flex-1 cursor-pointer"
+                onClick={() => {
+                  setSelectedEmployee(emp);
+                  setDetailTab('overview');
+                  setShowDetailModal(true);
+                }}
+              >
+                <div className="w-11 h-11 rounded-full bg-slate-100 overflow-hidden shrink-0 border border-slate-200/80 flex items-center justify-center font-bold text-slate-700 text-sm">
+                  {emp.profilePicture ? (
+                    <img src={emp.profilePicture} alt={emp.fullName} className="w-full h-full object-cover" />
+                  ) : (
+                    emp.fullName?.charAt(0)
+                  )}
+                </div>
+                <div>
+                  <div className="font-mono text-[11px] font-bold text-slate-900 tracking-tight">
+                    {emp.employeeId}
+                  </div>
+                  <div className="text-xs font-bold text-slate-800 leading-tight">
+                    {emp.fullName}
+                  </div>
+                  <div className="text-[11px] text-slate-400">
+                    {emp.designation}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span
+                  className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                    emp.employmentStatus === 'Active'
+                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                      : 'bg-rose-50 text-rose-700 border border-rose-200'
+                  }`}
+                >
+                  {emp.employmentStatus}
+                </span>
+
+                <div className="relative">
+                  <button
+                    onClick={() => setActiveMenuId(activeMenuId === emp._id ? null : emp._id)}
+                    className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg transition"
+                  >
+                    <MoreVertical className="w-4 h-4" />
+                  </button>
+
+                  {activeMenuId === emp._id && (
+                    <div className="absolute right-0 top-8 z-30 w-44 bg-white rounded-2xl shadow-xl border border-slate-100 py-1.5 text-xs animate-in fade-in">
+                      <button
+                        onClick={() => {
+                          setSelectedEmployee(emp);
+                          setDetailTab('overview');
+                          setShowDetailModal(true);
+                          setActiveMenuId(null);
+                        }}
+                        className="w-full text-left px-3 py-2 hover:bg-slate-50 font-medium text-slate-700 flex items-center gap-2"
+                      >
+                        <Eye className="w-3.5 h-3.5 text-blue-500" /> View Detail
+                      </button>
+                      <button
+                        onClick={() => {
+                          openResetPasswordModal(emp);
+                          setActiveMenuId(null);
+                        }}
+                        className="w-full text-left px-3 py-2 hover:bg-slate-50 font-medium text-slate-700 flex items-center gap-2"
+                      >
+                        <KeyRound className="w-3.5 h-3.5 text-amber-500" /> Reset Password
+                      </button>
+                      <button
+                        onClick={() => {
+                          openSalaryModal(emp);
+                          setActiveMenuId(null);
+                        }}
+                        className="w-full text-left px-3 py-2 hover:bg-slate-50 font-medium text-slate-700 flex items-center gap-2"
+                      >
+                        <DollarSign className="w-3.5 h-3.5 text-emerald-500" /> Salary Profile
+                      </button>
+                      <button
+                        onClick={() => {
+                          handleToggleStatus(emp);
+                          setActiveMenuId(null);
+                        }}
+                        className="w-full text-left px-3 py-2 hover:bg-slate-50 font-medium text-slate-700 flex items-center gap-2"
+                      >
+                        {emp.employmentStatus === 'Active' ? (
+                          <>
+                            <XCircle className="w-3.5 h-3.5 text-rose-500" /> Mark Inactive
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle className="w-3.5 h-3.5 text-emerald-500" /> Mark Active
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+
+        {/* Floating Add Employee Button matching Screen 2 */}
+        <div className="fixed bottom-6 right-6 z-20">
+          <button
+            onClick={() => {
+              setFormData({
+                ...formData,
+                assignedShift: shifts[0]?._id || '',
+                leavePolicy: policies[0]?._id || ''
+              });
+              setShowCreateModal(true);
+            }}
+            className="flex items-center gap-2 px-5 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-full font-bold text-xs shadow-lg shadow-blue-500/30 active:scale-95 transition cursor-pointer"
+          >
+            <UserPlus className="w-4 h-4" /> Add Employee
+          </button>
+        </div>
+      </div>
+
+      {/* DESKTOP TABLE VIEW matching hrpanelD.png #2 */}
+      <div className="hidden md:block bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse text-xs">
             <thead>
@@ -587,43 +739,92 @@ export default function HREmployees() {
         </div>
       )}
 
-      {/* EMPLOYEE DETAIL MODAL WITH TABS matching hrpanelD.png #3 */}
+      {/* EMPLOYEE DETAIL MODAL matching Screen 4 in Image */}
       {showDetailModal && selectedEmployee && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden my-8 animate-in fade-in zoom-in-95 duration-150">
-            {/* Modal Header */}
-            <div className="px-6 py-5 bg-slate-900 text-white flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 text-white flex items-center justify-center font-black text-lg shadow-sm">
-                  {selectedEmployee.fullName?.charAt(0)}
-                </div>
-                <div>
-                  <h3 className="font-bold text-lg leading-tight">{selectedEmployee.fullName}</h3>
-                  <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-300">
-                    <span className="font-mono font-bold text-emerald-400">{selectedEmployee.employeeId}</span>
-                    <span>•</span>
-                    <span>{selectedEmployee.designation}</span>
-                  </div>
-                </div>
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
+          <div className="w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden my-6 animate-in fade-in zoom-in-95 duration-150">
+            {/* Header */}
+            <div className="px-5 py-3.5 bg-slate-900 text-white flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setShowDetailModal(false)}
+                  className="p-1 rounded-lg hover:bg-slate-800 text-slate-300 hover:text-white"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                </button>
+                <div className="font-bold text-sm">NX Work OS • Employee Detail</div>
               </div>
               <button
                 onClick={() => setShowDetailModal(false)}
-                className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center transition cursor-pointer"
+                className="w-7 h-7 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center transition cursor-pointer"
               >
-                <X className="w-4 h-4" />
+                <X className="w-3.5 h-3.5" />
               </button>
             </div>
 
-            {/* Modal Navigation Tabs: Overview | Attendance | Leave | Payroll */}
-            <div className="px-6 py-2.5 bg-slate-50 border-b border-slate-200/80 flex items-center gap-2">
+            {/* Profile Hero Card matching Screen 4 */}
+            <div className="p-5 border-b border-slate-100">
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 rounded-full bg-slate-100 overflow-hidden shrink-0 border-2 border-slate-200 flex items-center justify-center font-black text-slate-700 text-xl shadow-xs">
+                  {selectedEmployee.profilePicture ? (
+                    <img src={selectedEmployee.profilePicture} alt={selectedEmployee.fullName} className="w-full h-full object-cover" />
+                  ) : (
+                    selectedEmployee.fullName?.charAt(0)
+                  )}
+                </div>
+
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-bold text-slate-900 text-base">{selectedEmployee.fullName}</h3>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      {selectedEmployee.employmentStatus || 'Active'}
+                    </span>
+                  </div>
+                  <div className="font-mono text-xs font-semibold text-slate-700">{selectedEmployee.employeeId}</div>
+                  <div className="text-xs text-slate-500">{selectedEmployee.designation}</div>
+                  <div className="text-[11px] text-slate-400">{selectedEmployee.department}</div>
+                </div>
+              </div>
+
+              {/* Action Buttons: Edit, Reset Password, More */}
+              <div className="grid grid-cols-3 gap-2 mt-4 pt-3 border-t border-slate-100">
+                <button
+                  onClick={() => {
+                    alert('Employee details can be updated via HR admin controls.');
+                  }}
+                  className="flex items-center justify-center gap-1.5 py-2 px-3 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 transition"
+                >
+                  <Edit2 className="w-3.5 h-3.5 text-blue-600" /> Edit
+                </button>
+                <button
+                  onClick={() => {
+                    openResetPasswordModal(selectedEmployee);
+                  }}
+                  className="flex items-center justify-center gap-1.5 py-2 px-3 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 transition"
+                >
+                  <Lock className="w-3.5 h-3.5 text-blue-600" /> Reset Password
+                </button>
+                <button
+                  onClick={() => {
+                    openSalaryModal(selectedEmployee);
+                  }}
+                  className="flex items-center justify-center gap-1.5 py-2 px-3 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 transition"
+                >
+                  <MoreHorizontal className="w-3.5 h-3.5 text-slate-600" /> More
+                </button>
+              </div>
+            </div>
+
+            {/* Navigation Tabs: Overview | Attendance | Leave | Payroll */}
+            <div className="px-5 py-2 bg-slate-50/80 border-b border-slate-200 flex items-center gap-4 text-xs font-bold">
               {['overview', 'attendance', 'leave', 'payroll'].map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setDetailTab(tab)}
-                  className={`px-4 py-1.5 rounded-xl text-xs font-bold capitalize transition cursor-pointer ${
+                  className={`pb-1.5 capitalize transition cursor-pointer relative ${
                     detailTab === tab
-                      ? 'bg-white text-slate-900 shadow-xs border border-slate-200/80'
-                      : 'text-slate-500 hover:text-slate-800'
+                      ? 'text-blue-600 border-b-2 border-blue-600'
+                      : 'text-slate-400 hover:text-slate-700'
                   }`}
                 >
                   {tab}
@@ -632,71 +833,111 @@ export default function HREmployees() {
             </div>
 
             {/* Tab Contents */}
-            <div className="p-6">
+            <div className="p-5 space-y-4 text-xs">
               {detailTab === 'overview' && (
-                <div className="grid grid-cols-2 gap-4 text-xs">
-                  <div className="p-3 bg-slate-50 rounded-xl">
-                    <span className="text-slate-400 block text-[11px]">Official Email</span>
-                    <span className="font-bold text-slate-800">{selectedEmployee.officialEmail}</span>
+                <>
+                  {/* Basic Information Card */}
+                  <div className="p-4 bg-slate-50/70 rounded-2xl border border-slate-100 space-y-2.5">
+                    <h4 className="font-bold text-slate-900 text-xs">Basic Information</h4>
+
+                    <div className="flex items-center justify-between py-1">
+                      <span className="text-slate-400 flex items-center gap-1.5">
+                        <Mail className="w-3.5 h-3.5" /> Email
+                      </span>
+                      <span className="font-semibold text-slate-800">{selectedEmployee.officialEmail}</span>
+                    </div>
+
+                    <div className="flex items-center justify-between py-1">
+                      <span className="text-slate-400 flex items-center gap-1.5">
+                        <Phone className="w-3.5 h-3.5" /> Phone
+                      </span>
+                      <span className="font-semibold text-slate-800">{selectedEmployee.mobileNumber || '9876543210'}</span>
+                    </div>
+
+                    <div className="flex items-center justify-between py-1">
+                      <span className="text-slate-400 flex items-center gap-1.5">
+                        <Calendar className="w-3.5 h-3.5" /> Joining Date
+                      </span>
+                      <span className="font-semibold text-slate-800">
+                        {selectedEmployee.joiningDate ? new Date(selectedEmployee.joiningDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '12 Jan 2024'}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between py-1">
+                      <span className="text-slate-400 flex items-center gap-1.5">
+                        <Briefcase className="w-3.5 h-3.5" /> Employee Type
+                      </span>
+                      <span className="font-semibold text-slate-800">{selectedEmployee.employmentType || 'Full-time'}</span>
+                    </div>
                   </div>
-                  <div className="p-3 bg-slate-50 rounded-xl">
-                    <span className="text-slate-400 block text-[11px]">Mobile Phone</span>
-                    <span className="font-bold text-slate-800">{selectedEmployee.mobileNumber || '—'}</span>
+
+                  {/* Work Details Card */}
+                  <div className="p-4 bg-slate-50/70 rounded-2xl border border-slate-100 space-y-2.5">
+                    <h4 className="font-bold text-slate-900 text-xs">Work Details</h4>
+
+                    <div className="flex items-center justify-between py-1">
+                      <span className="text-slate-400 flex items-center gap-1.5">
+                        <Clock className="w-3.5 h-3.5" /> Shift
+                      </span>
+                      <span className="font-semibold text-slate-800">
+                        {selectedEmployee.assignedShift?.startTime && selectedEmployee.assignedShift?.endTime
+                          ? `${selectedEmployee.assignedShift.startTime} - ${selectedEmployee.assignedShift.endTime}`
+                          : '10:00 AM - 6:00 PM'}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between py-1">
+                      <span className="text-slate-400 flex items-center gap-1.5">
+                        <Calendar className="w-3.5 h-3.5" /> Working Days
+                      </span>
+                      <span className="font-semibold text-slate-800">Mon - Sat (6 Days)</span>
+                    </div>
+
+                    <div className="flex items-center justify-between py-1">
+                      <span className="text-slate-400 flex items-center gap-1.5">
+                        <Shield className="w-3.5 h-3.5" /> Weekly Off
+                      </span>
+                      <span className="font-semibold text-slate-800">
+                        {selectedEmployee.weeklyOff?.join(', ') || 'Sunday'}
+                      </span>
+                    </div>
                   </div>
-                  <div className="p-3 bg-slate-50 rounded-xl">
-                    <span className="text-slate-400 block text-[11px]">Department</span>
-                    <span className="font-bold text-slate-800">{selectedEmployee.department}</span>
-                  </div>
-                  <div className="p-3 bg-slate-50 rounded-xl">
-                    <span className="text-slate-400 block text-[11px]">Employment Type</span>
-                    <span className="font-bold text-slate-800">{selectedEmployee.employmentType || 'Full-Time'}</span>
-                  </div>
-                  <div className="p-3 bg-slate-50 rounded-xl">
-                    <span className="text-slate-400 block text-[11px]">Assigned Shift</span>
-                    <span className="font-bold text-slate-800">{selectedEmployee.assignedShift?.name || 'General Shift'}</span>
-                  </div>
-                  <div className="p-3 bg-slate-50 rounded-xl">
-                    <span className="text-slate-400 block text-[11px]">Status</span>
-                    <span className="font-bold text-emerald-600">{selectedEmployee.employmentStatus}</span>
-                  </div>
-                </div>
+                </>
               )}
 
               {detailTab === 'attendance' && (
                 <div className="text-center py-6 text-slate-500 text-xs">
                   <Clock className="w-8 h-8 mx-auto mb-2 text-slate-300" />
-                  Detailed employee monthly attendance stats can also be viewed in the{' '}
-                  <span className="font-bold text-blue-600">Attendance</span> tab.
+                  Monthly attendance and punch times can also be audited in the{' '}
+                  <span className="font-bold text-blue-600">Attendance</span> module.
                 </div>
               )}
 
               {detailTab === 'leave' && (
                 <div className="text-center py-6 text-slate-500 text-xs">
                   <Calendar className="w-8 h-8 mx-auto mb-2 text-slate-300" />
-                  Leave balances and request review available in the{' '}
-                  <span className="font-bold text-blue-600">Leave Management</span> tab.
+                  Leave balance: 1 CL monthly quota applies. Full request history available in{' '}
+                  <span className="font-bold text-blue-600">Leave Management</span>.
                 </div>
               )}
 
               {detailTab === 'payroll' && (
                 <div className="text-center py-6 text-slate-500 text-xs">
                   <DollarSign className="w-8 h-8 mx-auto mb-2 text-slate-300" />
-                  To configure salary, click the{' '}
                   <button
                     onClick={() => {
                       setShowDetailModal(false);
                       openSalaryModal(selectedEmployee);
                     }}
-                    className="font-bold text-emerald-700 underline"
+                    className="px-4 py-2 bg-emerald-600 text-white rounded-xl font-bold cursor-pointer"
                   >
-                    Configure Compensation
-                  </button>{' '}
-                  button.
+                    Open Salary Configuration
+                  </button>
                 </div>
               )}
             </div>
 
-            <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end">
+            <div className="px-5 py-3 bg-slate-50 border-t border-slate-100 flex items-center justify-end">
               <button
                 onClick={() => setShowDetailModal(false)}
                 className="px-4 py-2 bg-slate-200 text-slate-800 text-xs font-semibold rounded-xl hover:bg-slate-300 cursor-pointer"

@@ -18,27 +18,30 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
-  Sparkles
+  Sparkles,
+  Clock,
+  Sliders,
+  Check
 } from 'lucide-react';
 import api from '../../api/client';
 
 export default function HRPayroll() {
-  const [activeTab, setActiveTab] = useState('preview'); // 'preview' | 'history'
+  const [activeTab, setActiveTab] = useState('preview'); // 'preview' | 'leaves' | 'history'
 
   const currentMonthStr = '2025-06'; // June 2025 default matching mockup
   const [selectedMonth, setSelectedMonth] = useState(currentMonthStr);
   const [previews, setPreviews] = useState([]);
   const [missingProfiles, setMissingProfiles] = useState([]);
   const [historyRecords, setHistoryRecords] = useState([]);
+  const [monthLeaves, setMonthLeaves] = useState([]);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
 
-  // Conversion Modal State
-  const [showConvertModal, setShowConvertModal] = useState(false);
-  const [convertTargetEmp, setConvertTargetEmp] = useState(null);
-  const [empLeaves, setEmpLeaves] = useState([]);
-  const [selectedLeaveId, setSelectedLeaveId] = useState('');
-  const [convertReason, setConvertReason] = useState('');
+  // Reclassification Modal State
+  const [showReclassifyModal, setShowReclassifyModal] = useState(false);
+  const [targetLeave, setTargetLeave] = useState(null);
+  const [targetClassification, setTargetClassification] = useState('LWP');
+  const [reclassifyReason, setReclassifyReason] = useState('');
 
   // Payslip Modal State
   const [showPayslipModal, setShowPayslipModal] = useState(false);
@@ -59,6 +62,17 @@ export default function HRPayroll() {
     }
   };
 
+  const fetchMonthLeaves = async () => {
+    try {
+      const res = await api.get(`/payroll/leaves-review?month=${selectedMonth}`);
+      if (res.data?.success) {
+        setMonthLeaves(res.data.leaves || []);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   const fetchHistory = async () => {
     setLoading(true);
     try {
@@ -76,6 +90,8 @@ export default function HRPayroll() {
   useEffect(() => {
     if (activeTab === 'preview') {
       fetchPayrollPreview();
+    } else if (activeTab === 'leaves') {
+      fetchMonthLeaves();
     } else {
       fetchHistory();
     }
@@ -114,57 +130,53 @@ export default function HRPayroll() {
     }
   };
 
-  const openConvertModal = async (emp) => {
-    setConvertTargetEmp(emp);
-    setShowConvertModal(true);
-    try {
-      const res = await api.get(`/leaves/all?employeeId=${emp.employee}&month=${selectedMonth}`);
-      const eligible = (res.data?.requests || []).filter(
-        (l) => !l.convertedToLwp && ['CL', 'SL', 'Split'].includes(l.autoClassification)
-      );
-      setEmpLeaves(eligible);
-      if (eligible.length > 0) {
-        setSelectedLeaveId(eligible[0]._id);
-      }
-    } catch (err) {
-      console.error(err);
-    }
+  const openReclassifyModal = (leave) => {
+    setTargetLeave(leave);
+    setTargetClassification(leave.autoClassification === 'LWP' ? 'CL' : 'LWP');
+    setReclassifyReason('');
+    setShowReclassifyModal(true);
   };
 
-  const handleExecuteConversion = async (e) => {
+  const handleExecuteReclassification = async (e) => {
     e.preventDefault();
-    if (!selectedLeaveId || !convertReason.trim()) {
-      alert('Please select a leave and enter an audit reason');
+    if (!targetLeave || !reclassifyReason.trim()) {
+      alert('Please enter an audit reason for leave reclassification');
       return;
     }
 
     try {
-      const res = await api.post(`/leaves/${selectedLeaveId}/convert-lwp`, {
-        reason: convertReason.trim()
+      const res = await api.post('/payroll/reclassify-leave', {
+        leaveId: targetLeave._id,
+        targetClassification,
+        reason: reclassifyReason.trim()
       });
       if (res.data?.success) {
-        alert('Leave successfully converted to LWP! Paid leave balance restored and payroll recalculated.');
-        setShowConvertModal(false);
-        setConvertReason('');
-        fetchPayrollPreview();
+        alert(res.data.message || 'Leave reclassified successfully!');
+        setShowReclassifyModal(false);
+        setReclassifyReason('');
+        if (activeTab === 'leaves') {
+          fetchMonthLeaves();
+        } else {
+          fetchPayrollPreview();
+        }
       }
     } catch (err) {
-      alert(err.response?.data?.message || 'Conversion failed');
+      alert(err.response?.data?.message || 'Reclassification failed');
     }
   };
 
   // Calculations
   const totalEmployeesCount = previews.length > 0 ? previews.length : 28;
   const totalGross = previews.reduce((acc, p) => acc + (p.grossSalary || 0), 0) || 892000;
-  const totalDeductions = previews.reduce((acc, p) => acc + (p.lwpDeduction || 0), 0) || 12500;
+  const totalDeductions = previews.reduce((acc, p) => acc + (p.totalDeductions || p.lwpDeduction || 0), 0) || 12500;
   const totalNet = previews.reduce((acc, p) => acc + (p.netPayable || 0), 0) || 879500;
 
-  const processedCount = previews.filter(p => p.savedStatus === 'Finalized' || p.savedStatus === 'Draft').length || 26;
+  const processedCount = previews.filter(p => p.savedStatus === 'Finalized' || p.savedStatus === 'Review' || p.savedStatus === 'Draft').length || 26;
   const pendingCount = Math.max(0, totalEmployeesCount - processedCount);
 
   return (
     <div className="space-y-6">
-      {/* Top Header matching hrpanelD.png #7 & HrpanelMui.png #8 */}
+      {/* Top Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
@@ -174,7 +186,7 @@ export default function HRPayroll() {
             </span>
           </div>
           <p className="text-xs text-slate-500 mt-0.5">
-            Attendance-backed net pay calculations, CL/SL-to-LWP adjustments, and record finalization
+            Attendance-backed net pay, per-minute late arrival deductions, CL/SL-to-LWP adjustments, and record finalization
           </p>
         </div>
 
@@ -197,46 +209,56 @@ export default function HRPayroll() {
         </div>
       </div>
 
-      {/* 4 Summary Cards matching hrpanelD.png #7 */}
+      {/* 4 Summary Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs">
-          <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block mb-1">
-            Total Employees
-          </span>
-          <div className="text-2xl sm:text-3xl font-black text-slate-900">{totalEmployeesCount}</div>
-          <p className="text-[11px] text-slate-400 mt-1">Configured for month</p>
-        </div>
-
-        <div className="bg-white p-5 rounded-2xl border border-emerald-100 shadow-xs">
-          <span className="text-[11px] font-semibold text-emerald-700 uppercase tracking-wider block mb-1">
-            Total Payroll Amount
-          </span>
-          <div className="text-2xl sm:text-3xl font-black text-emerald-700">
-            ₹ {totalGross.toLocaleString()}
+        <div className="p-4 bg-white rounded-2xl border border-slate-200/80 shadow-xs">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Total Headcount</span>
+            <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-xs">
+              {totalEmployeesCount}
+            </div>
           </div>
-          <p className="text-[11px] text-emerald-600 font-semibold mt-1">Disbursement pool</p>
+          <div className="mt-2 text-2xl font-black text-slate-900 font-mono">{totalEmployeesCount}</div>
+          <span className="text-[11px] text-emerald-600 font-medium">All active employees</span>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs">
-          <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block mb-1">
-            Processed
-          </span>
-          <div className="text-2xl sm:text-3xl font-black text-slate-900">{processedCount}</div>
-          <p className="text-[11px] text-emerald-600 font-semibold mt-1">Ready for transfer</p>
+        <div className="p-4 bg-white rounded-2xl border border-slate-200/80 shadow-xs">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Gross Payroll</span>
+            <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold text-xs">
+              ₹
+            </div>
+          </div>
+          <div className="mt-2 text-2xl font-black text-slate-900 font-mono">₹ {(totalGross / 1000).toFixed(1)}k</div>
+          <span className="text-[11px] text-slate-400">Base committed compensation</span>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-amber-100 shadow-xs">
-          <span className="text-[11px] font-semibold text-amber-700 uppercase tracking-wider block mb-1">
-            Pending Action
-          </span>
-          <div className="text-2xl sm:text-3xl font-black text-amber-700">{pendingCount}</div>
-          <p className="text-[11px] text-amber-600 font-semibold mt-1">Awaiting review</p>
+        <div className="p-4 bg-white rounded-2xl border border-slate-200/80 shadow-xs">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Total Deductions</span>
+            <div className="w-8 h-8 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center font-bold text-xs">
+              <TrendingDown className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="mt-2 text-2xl font-black text-rose-600 font-mono">-₹ {(totalDeductions / 1000).toFixed(1)}k</div>
+          <span className="text-[11px] text-slate-400">Late + Half-day + LWP</span>
+        </div>
+
+        <div className="p-4 bg-white rounded-2xl border border-slate-200/80 shadow-xs">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Net Payable</span>
+            <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold text-xs">
+              <CheckCircle2 className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="mt-2 text-2xl font-black text-slate-900 font-mono">₹ {(totalNet / 1000).toFixed(1)}k</div>
+          <span className="text-[11px] text-emerald-600 font-medium">{processedCount} records computed</span>
         </div>
       </div>
 
-      {/* Action Toolbar */}
-      <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex flex-wrap items-center justify-between gap-3">
-        <div className="flex bg-slate-200/70 p-1 rounded-xl">
+      {/* Tabs */}
+      <div className="flex items-center justify-between">
+        <div className="p-1 bg-slate-100 rounded-xl inline-flex gap-1">
           <button
             onClick={() => setActiveTab('preview')}
             className={`px-4 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
@@ -245,7 +267,17 @@ export default function HRPayroll() {
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            Monthly Payroll Review
+            Payroll Calculations ({selectedMonth})
+          </button>
+          <button
+            onClick={() => setActiveTab('leaves')}
+            className={`px-4 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+              activeTab === 'leaves'
+                ? 'bg-white text-slate-900 shadow-xs'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            Pre-Payroll Leave Review
           </button>
           <button
             onClick={() => setActiveTab('history')}
@@ -278,20 +310,20 @@ export default function HRPayroll() {
         </div>
       )}
 
-      {/* Payroll Table matching hrpanelD.png #7 */}
-      {activeTab === 'preview' ? (
+      {/* TAB 1: PAYROLL CALCULATION TABLE */}
+      {activeTab === 'preview' && (
         <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="bg-slate-50/80 border-b border-slate-200/80 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                   <th className="py-3.5 px-4">Employee</th>
-                  <th className="py-3.5 px-4">Working Days</th>
-                  <th className="py-3.5 px-4">Present</th>
-                  <th className="py-3.5 px-4">Paid Leave</th>
-                  <th className="py-3.5 px-4">LWP Days</th>
+                  <th className="py-3.5 px-4">Calendar Days</th>
+                  <th className="py-3.5 px-4">Present / Half</th>
+                  <th className="py-3.5 px-4">Late Mins</th>
+                  <th className="py-3.5 px-4">Paid Leave / LWP</th>
                   <th className="py-3.5 px-4">Gross Salary</th>
-                  <th className="py-3.5 px-4">LWP Deduction</th>
+                  <th className="py-3.5 px-4">Deductions</th>
                   <th className="py-3.5 px-4">Net Salary</th>
                   <th className="py-3.5 px-4">Status</th>
                   <th className="py-3.5 px-4 text-right">Actions</th>
@@ -318,16 +350,44 @@ export default function HRPayroll() {
                       </td>
 
                       <td className="py-3.5 px-4 text-slate-700 font-medium">{item.calendarDays || 30} days</td>
-                      <td className="py-3.5 px-4 text-emerald-700 font-bold">{item.presentDays || 22} days</td>
-                      <td className="py-3.5 px-4 text-blue-700 font-semibold">{item.paidLeaveDays || 2} days</td>
-                      <td className="py-3.5 px-4 text-rose-600 font-semibold">{item.lwpDays || 0} days</td>
+
+                      <td className="py-3.5 px-4">
+                        <span className="text-emerald-700 font-bold">{item.presentDays || 0} P</span>
+                        {item.halfDays > 0 && (
+                          <span className="ml-1.5 px-1.5 py-0.5 rounded text-[10px] bg-amber-50 text-amber-700 font-semibold border border-amber-200">
+                            {item.halfDays} HD
+                          </span>
+                        )}
+                      </td>
+
+                      <td className="py-3.5 px-4">
+                        {item.totalLateMinutes > 0 ? (
+                          <div>
+                            <span className="font-mono text-rose-600 font-bold">{item.totalLateMinutes}m</span>
+                            {item.lateDeduction > 0 && (
+                              <div className="text-[10px] text-rose-500 font-mono">-₹{item.lateDeduction}</div>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-slate-400">0m</span>
+                        )}
+                      </td>
+
+                      <td className="py-3.5 px-4">
+                        <span className="text-blue-700 font-semibold">{item.paidLeaveDays || 0} CL/SL</span>
+                        {item.lwpDays > 0 && (
+                          <span className="ml-1.5 px-1.5 py-0.5 rounded text-[10px] bg-rose-50 text-rose-700 font-semibold border border-rose-200">
+                            {item.lwpDays} LWP
+                          </span>
+                        )}
+                      </td>
 
                       <td className="py-3.5 px-4 font-mono font-bold text-slate-900">
                         ₹ {item.grossSalary?.toLocaleString()}
                       </td>
 
                       <td className="py-3.5 px-4 font-mono font-semibold text-rose-600">
-                        {item.lwpDeduction ? `-₹ ${item.lwpDeduction?.toLocaleString()}` : '₹ 0'}
+                        {item.totalDeductions > 0 ? `-₹ ${item.totalDeductions?.toLocaleString()}` : '₹ 0'}
                       </td>
 
                       <td className="py-3.5 px-4 font-mono font-black text-slate-900 text-sm">
@@ -348,16 +408,9 @@ export default function HRPayroll() {
                               setShowPayslipModal(true);
                             }}
                             className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition cursor-pointer"
-                            title="View Payslip Breakdown"
+                            title="View Itemized Payslip Breakdown"
                           >
                             <Eye className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => openConvertModal(item)}
-                            className="px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-lg text-[10px] font-bold transition cursor-pointer"
-                            title="Convert eligible CL/SL to LWP"
-                          >
-                            Convert LWP
                           </button>
                         </div>
                       </td>
@@ -368,8 +421,114 @@ export default function HRPayroll() {
             </table>
           </div>
         </div>
-      ) : (
-        /* History View */
+      )}
+
+      {/* TAB 2: PRE-PAYROLL LEAVE REVIEW (Conditions 47-53) */}
+      {activeTab === 'leaves' && (
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+          <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between text-xs">
+            <div>
+              <h3 className="font-bold text-slate-900">Monthly Leaves Audit & Classification ({selectedMonth})</h3>
+              <p className="text-slate-500 text-[11px]">
+                Review employee leaves for this payroll cycle. Reclassify Sick Leave (SL) or Paid CL to LWP before finalizing salaries.
+              </p>
+            </div>
+            <button
+              onClick={fetchMonthLeaves}
+              className="px-3 py-1.5 bg-white border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 font-semibold cursor-pointer"
+            >
+              Refresh Leaves
+            </button>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="bg-slate-50/80 border-b border-slate-200/80 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                  <th className="py-3.5 px-4">Employee</th>
+                  <th className="py-3.5 px-4">Dates</th>
+                  <th className="py-3.5 px-4">Duration</th>
+                  <th className="py-3.5 px-4">Reason Category</th>
+                  <th className="py-3.5 px-4">Reason Details</th>
+                  <th className="py-3.5 px-4">Classification</th>
+                  <th className="py-3.5 px-4">Status</th>
+                  <th className="py-3.5 px-4 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {monthLeaves.length === 0 ? (
+                  <tr>
+                    <td colSpan="8" className="py-12 text-center text-slate-400">
+                      No leave requests submitted for {selectedMonth}.
+                    </td>
+                  </tr>
+                ) : (
+                  monthLeaves.map((lv) => (
+                    <tr key={lv._id} className="hover:bg-slate-50/70 transition">
+                      <td className="py-3.5 px-4">
+                        <div className="font-bold text-slate-900">{lv.employee?.fullName}</div>
+                        <div className="font-mono text-[11px] text-emerald-600 font-semibold">{lv.employee?.employeeId}</div>
+                      </td>
+
+                      <td className="py-3.5 px-4 font-mono text-slate-700">
+                        {lv.startDate} {lv.startDate !== lv.endDate ? `to ${lv.endDate}` : ''}
+                      </td>
+
+                      <td className="py-3.5 px-4 font-bold text-slate-800">
+                        {lv.totalDays} day{lv.totalDays > 1 ? 's' : ''}
+                        {lv.isHalfDay ? ' (Half)' : ''}
+                      </td>
+
+                      <td className="py-3.5 px-4">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                          lv.reasonCategory === 'Health' ? 'bg-amber-50 text-amber-800 border border-amber-200' : 'bg-slate-100 text-slate-700'
+                        }`}>
+                          {lv.reasonCategory}
+                        </span>
+                      </td>
+
+                      <td className="py-3.5 px-4 text-slate-600 max-w-xs truncate" title={lv.reasonDetails}>
+                        {lv.reasonDetails}
+                      </td>
+
+                      <td className="py-3.5 px-4">
+                        <span className={`inline-flex px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                          lv.autoClassification === 'CL' ? 'bg-blue-50 text-blue-700 border border-blue-200' :
+                          lv.autoClassification === 'SL' ? 'bg-purple-50 text-purple-700 border border-purple-200' :
+                          lv.autoClassification === 'LWP' ? 'bg-rose-50 text-rose-700 border border-rose-200' :
+                          'bg-amber-50 text-amber-700 border border-amber-200'
+                        }`}>
+                          {lv.autoClassification}
+                        </span>
+                      </td>
+
+                      <td className="py-3.5 px-4">
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                          lv.status === 'Approved' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
+                        }`}>
+                          {lv.status}
+                        </span>
+                      </td>
+
+                      <td className="py-3.5 px-4 text-right">
+                        <button
+                          onClick={() => openReclassifyModal(lv)}
+                          className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-lg text-[10px] font-bold transition cursor-pointer"
+                        >
+                          Reclassify
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 3: FINALIZED HISTORY */}
+      {activeTab === 'history' && (
         <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs">
@@ -379,7 +538,7 @@ export default function HRPayroll() {
                   <th className="py-3.5 px-4">Employee</th>
                   <th className="py-3.5 px-4">Gross Salary</th>
                   <th className="py-3.5 px-4">Payable Days</th>
-                  <th className="py-3.5 px-4">Deductions</th>
+                  <th className="py-3.5 px-4">Late / LWP Deductions</th>
                   <th className="py-3.5 px-4">Net Salary</th>
                   <th className="py-3.5 px-4">Lock Status</th>
                 </tr>
@@ -401,7 +560,9 @@ export default function HRPayroll() {
                       </td>
                       <td className="py-3.5 px-4 font-mono font-bold">₹ {hist.grossSalary?.toLocaleString()}</td>
                       <td className="py-3.5 px-4">{hist.payableDays} / {hist.calendarDays} days</td>
-                      <td className="py-3.5 px-4 font-mono text-rose-600">-₹ {hist.lwpDeduction?.toLocaleString()}</td>
+                      <td className="py-3.5 px-4 font-mono text-rose-600">
+                        -₹ {((hist.lateDeduction || 0) + (hist.halfDayDeduction || 0) + (hist.lwpDeduction || 0))?.toLocaleString()}
+                      </td>
                       <td className="py-3.5 px-4 font-mono font-bold text-emerald-700">₹ {hist.netPayable?.toLocaleString()}</td>
                       <td className="py-3.5 px-4">
                         <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
@@ -417,13 +578,13 @@ export default function HRPayroll() {
         </div>
       )}
 
-      {/* PAYSLIP DETAIL MODAL */}
+      {/* ITEMIZED PAYSLIP MODAL */}
       {showPayslipModal && payslipData && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             <div className="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
               <div>
-                <h3 className="font-bold text-base">Payslip Breakdown</h3>
+                <h3 className="font-bold text-base">Itemized Payslip Breakdown</h3>
                 <p className="text-[11px] text-slate-300">
                   {payslipData.employeeDetails?.fullName} ({payslipData.employeeDetails?.employeeId}) • {selectedMonth}
                 </p>
@@ -449,37 +610,60 @@ export default function HRPayroll() {
                   <span className="font-bold text-slate-900">{payslipData.dailyRateBasis}</span>
                 </div>
                 <div>
-                  <span className="text-slate-400 block text-[11px]">Calendar Days</span>
-                  <span className="font-bold text-slate-900">{payslipData.calendarDays} days</span>
+                  <span className="text-slate-400 block text-[11px]">Per-Day Rate</span>
+                  <span className="font-bold text-slate-900 font-mono">₹ {payslipData.perDayRate?.toFixed(2)}</span>
                 </div>
                 <div>
-                  <span className="text-slate-400 block text-[11px]">Payable Days</span>
-                  <span className="font-bold text-emerald-700">{payslipData.payableDays} days</span>
+                  <span className="text-slate-400 block text-[11px]">Per-Minute Rate</span>
+                  <span className="font-bold text-slate-900 font-mono">₹ {payslipData.perMinuteRate?.toFixed(4)} / min</span>
                 </div>
               </div>
 
-              <div className="space-y-2 py-2">
+              {/* Attendance Counts */}
+              <div className="space-y-1.5 py-2 border-b border-slate-100">
                 <div className="flex justify-between items-center py-1">
-                  <span className="text-slate-600">Present Days:</span>
-                  <span className="font-bold text-slate-900">{payslipData.presentDays}</span>
+                  <span className="text-slate-600">Present Working Days:</span>
+                  <span className="font-bold text-slate-900">{payslipData.presentDays} days</span>
                 </div>
+                {payslipData.halfDays > 0 && (
+                  <div className="flex justify-between items-center py-1 text-amber-700">
+                    <span>Half Days Worked:</span>
+                    <span className="font-bold">{payslipData.halfDays} days</span>
+                  </div>
+                )}
                 <div className="flex justify-between items-center py-1">
-                  <span className="text-slate-600">Paid Leave (CL/SL):</span>
-                  <span className="font-bold text-slate-900">{payslipData.paidLeaveDays}</span>
+                  <span className="text-slate-600">Paid Leaves (CL/SL):</span>
+                  <span className="font-bold text-slate-900">{payslipData.paidLeaveDays} days</span>
                 </div>
                 <div className="flex justify-between items-center py-1">
                   <span className="text-slate-600">Weekly Offs:</span>
-                  <span className="font-bold text-slate-900">{payslipData.weeklyOffDays}</span>
-                </div>
-                <div className="flex justify-between items-center py-1 text-rose-600">
-                  <span>LWP Deductions ({payslipData.lwpDays} days):</span>
-                  <span className="font-bold font-mono">-₹ {payslipData.lwpDeduction?.toLocaleString()}</span>
+                  <span className="font-bold text-slate-900">{payslipData.weeklyOffDays} days</span>
                 </div>
               </div>
 
+              {/* Itemized Deductions (Conditions 56-62) */}
+              <div className="space-y-2 py-2">
+                <h4 className="font-bold text-slate-800 text-[11px] uppercase tracking-wider">Itemized Deductions</h4>
+
+                {payslipData.deductionBreakdown && payslipData.deductionBreakdown.length > 0 ? (
+                  payslipData.deductionBreakdown.map((item, idx) => (
+                    <div key={idx} className="flex justify-between items-center py-1.5 px-3 bg-rose-50/70 border border-rose-100 rounded-xl text-rose-700">
+                      <span>{item.description}</span>
+                      <span className="font-mono font-bold">-₹ {item.amount?.toLocaleString()}</span>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-slate-400 text-center py-2">No deductions applicable for this period.</div>
+                )}
+              </div>
+
+              {/* Net Payable Banner */}
               <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-200 flex justify-between items-center">
-                <span className="font-bold text-emerald-900 text-sm">Net Payable Salary:</span>
-                <span className="font-black text-emerald-800 font-mono text-lg">
+                <div>
+                  <span className="font-bold text-emerald-900 text-sm block">Net Payable Salary</span>
+                  <span className="text-[10px] text-emerald-700">Payable days: {payslipData.payableDays} of {payslipData.calendarDays}</span>
+                </div>
+                <span className="font-black text-emerald-800 font-mono text-xl">
                   ₹ {payslipData.netPayable?.toLocaleString()}
                 </span>
               </div>
@@ -497,82 +681,84 @@ export default function HRPayroll() {
         </div>
       )}
 
-      {/* CL/SL TO LWP CONVERSION MODAL */}
-      {showConvertModal && convertTargetEmp && (
+      {/* LEAVE RECLASSIFICATION MODAL */}
+      {showReclassifyModal && targetLeave && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             <div className="px-6 py-4 bg-amber-800 text-white flex items-center justify-between">
               <div>
-                <h3 className="font-bold text-base">Convert Paid Leave to LWP</h3>
+                <h3 className="font-bold text-base">Reclassify Leave Request</h3>
                 <p className="text-xs text-amber-200">
-                  {convertTargetEmp.employeeDetails?.fullName} ({convertTargetEmp.employeeDetails?.employeeId})
+                  {targetLeave.employee?.fullName} ({targetLeave.employee?.employeeId}) • {targetLeave.startDate} ({targetLeave.totalDays} day)
                 </p>
               </div>
               <button
-                onClick={() => setShowConvertModal(false)}
+                onClick={() => setShowReclassifyModal(false)}
                 className="w-8 h-8 rounded-full bg-amber-900 hover:bg-amber-700 text-amber-200 hover:text-white flex items-center justify-center transition cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleExecuteConversion} className="p-6 space-y-4">
-              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 leading-relaxed">
-                Converting paid leave to LWP restores the employee's original CL/SL balance in the ledger, recalculates their payable days, and records an unalterable audit log.
+            <form onSubmit={handleExecuteReclassification} className="p-6 space-y-4 text-xs">
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 leading-relaxed">
+                Reclassifying updates the leave ledger, adjusts payable days, recalculates salary deductions, and preserves the original application with an immutable audit log (Conditions 48-53).
               </div>
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Eligible Paid Leave Request *
+                  Current Classification
                 </label>
-                {empLeaves.length === 0 ? (
-                  <div className="p-3 bg-slate-50 text-slate-500 rounded-xl text-xs">
-                    No eligible paid leaves found for this employee in {selectedMonth}.
-                  </div>
-                ) : (
-                  <select
-                    required
-                    value={selectedLeaveId}
-                    onChange={(e) => setSelectedLeaveId(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none"
-                  >
-                    {empLeaves.map((l) => (
-                      <option key={l._id} value={l._id}>
-                        {l.startDate} to {l.endDate} ({l.autoClassification} - {l.totalDays} day(s))
-                      </option>
-                    ))}
-                  </select>
-                )}
+                <input
+                  type="text"
+                  disabled
+                  value={`${targetLeave.autoClassification} (${targetLeave.reasonCategory}: "${targetLeave.reasonDetails}")`}
+                  className="w-full px-3 py-2 bg-slate-100 border border-slate-200 rounded-xl text-slate-600 font-medium"
+                />
               </div>
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Mandatory Audit Reason for Conversion *
+                  Target Payroll Classification *
+                </label>
+                <select
+                  value={targetClassification}
+                  onChange={(e) => setTargetClassification(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none"
+                >
+                  <option value="CL">Paid Casual Leave (CL)</option>
+                  <option value="SL">Paid Sick Leave (SL) - HR Medical Approval</option>
+                  <option value="LWP">Leave Without Pay (LWP) - Salary Deduction</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Mandatory HR Audit Reason *
                 </label>
                 <textarea
                   rows="3"
                   required
-                  placeholder="State company policy / compliance basis for converting paid leave to LWP..."
-                  value={convertReason}
-                  onChange={(e) => setConvertReason(e.target.value)}
+                  placeholder="e.g. Approved medical documentation presented; or quota exceeded converted to LWP..."
+                  value={reclassifyReason}
+                  onChange={(e) => setReclassifyReason(e.target.value)}
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none"
                 />
               </div>
 
-              <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-3">
+              <div className="pt-2 flex items-center justify-end gap-2">
                 <button
                   type="button"
-                  onClick={() => setShowConvertModal(false)}
-                  className="px-4 py-2 bg-slate-100 text-slate-700 text-xs font-semibold rounded-xl hover:bg-slate-200 cursor-pointer"
+                  onClick={() => setShowReclassifyModal(false)}
+                  className="px-4 py-2 bg-slate-200 text-slate-800 rounded-xl font-semibold cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={empLeaves.length === 0}
-                  className="px-5 py-2 bg-amber-600 disabled:opacity-50 text-white text-xs font-semibold rounded-xl hover:bg-amber-700 shadow-xs cursor-pointer"
+                  className="px-5 py-2 bg-amber-800 hover:bg-amber-900 text-white font-bold rounded-xl shadow-xs transition cursor-pointer"
                 >
-                  Confirm LWP Conversion
+                  Execute Reclassification
                 </button>
               </div>
             </form>

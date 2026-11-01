@@ -4,6 +4,8 @@ const PayrollRecord = require('../models/PayrollRecord');
 const Employee = require('../models/Employee');
 const SalaryProfile = require('../models/SalaryProfile');
 const AuditLog = require('../models/AuditLog');
+const LeaveRequest = require('../models/LeaveRequest');
+const LeaveService = require('../services/leaveService');
 const PayrollService = require('../services/payrollService');
 const NotificationService = require('../services/notificationService');
 const { protect } = require('../middleware/auth');
@@ -113,7 +115,14 @@ router.post('/generate', async (req, res, next) => {
           existing.unmarkedDays = calculated.unmarkedDays;
           existing.incompleteDays = calculated.incompleteDays;
           existing.perDayRate = calculated.perDayRate;
+          existing.perMinuteRate = calculated.perMinuteRate;
+          existing.lateMinutes = calculated.lateMinutes;
+          existing.lateDeduction = calculated.lateDeduction;
+          existing.halfDays = calculated.halfDays;
+          existing.halfDayDeduction = calculated.halfDayDeduction;
+          existing.shortfallDeduction = calculated.shortfallDeduction;
           existing.lwpDeduction = calculated.lwpDeduction;
+          existing.deductionBreakdown = calculated.deductionBreakdown;
           existing.netPayable = calculated.netPayable;
           existing.status = 'Review';
           record = await existing.save();
@@ -133,7 +142,14 @@ router.post('/generate', async (req, res, next) => {
             unmarkedDays: calculated.unmarkedDays,
             incompleteDays: calculated.incompleteDays,
             perDayRate: calculated.perDayRate,
+            perMinuteRate: calculated.perMinuteRate,
+            lateMinutes: calculated.lateMinutes,
+            lateDeduction: calculated.lateDeduction,
+            halfDays: calculated.halfDays,
+            halfDayDeduction: calculated.halfDayDeduction,
+            shortfallDeduction: calculated.shortfallDeduction,
             lwpDeduction: calculated.lwpDeduction,
+            deductionBreakdown: calculated.deductionBreakdown,
             netPayable: calculated.netPayable,
             status: 'Review'
           });
@@ -226,6 +242,88 @@ router.get('/history', async (req, res, next) => {
       success: true,
       count: history.length,
       history
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+
+/**
+ * GET /api/payroll/leaves-review
+ * Review employee leaves for the given month before running payroll
+ */
+router.get('/leaves-review', async (req, res, next) => {
+  try {
+    const { month } = req.query;
+    if (!month || !/^\d{4}-\d{2}$/.test(month)) {
+      return res.status(400).json({ success: false, message: 'Valid month (YYYY-MM) is required' });
+    }
+
+    const leaves = await LeaveRequest.find({
+      startDate: { $regex: new RegExp(`^${month}`) }
+    })
+      .populate('employee', 'employeeId fullName department designation')
+      .populate('reviewedBy', 'email')
+      .sort({ startDate: 1 });
+
+    res.json({
+      success: true,
+      month,
+      count: leaves.length,
+      leaves
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /api/payroll/reclassify-leave
+ * HR reclassifies a leave request (CL, SL, LWP) with audit reason during payroll processing
+ */
+router.post('/reclassify-leave', async (req, res, next) => {
+  try {
+    const { leaveId, targetClassification, reason } = req.body;
+
+    if (!leaveId || !targetClassification || !reason || !reason.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'leaveId, targetClassification (CL/SL/LWP), and a mandatory audit reason are required.'
+      });
+    }
+
+    if (!['CL', 'SL', 'LWP', 'Paid_CL', 'Paid_SL'].includes(targetClassification)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid target classification. Must be CL, SL, or LWP.'
+      });
+    }
+
+    const updatedLeave = await LeaveService.reclassifyLeave(
+      leaveId,
+      targetClassification,
+      req.user,
+      reason.trim()
+    );
+
+    await AuditLog.create({
+      action: 'PAYROLL_LEAVE_RECLASSIFIED',
+      entityType: 'LeaveRequest',
+      entityId: updatedLeave._id,
+      performedBy: req.user._id,
+      performedByName: req.user.email,
+      reason: reason.trim(),
+      details: {
+        newClassification: updatedLeave.autoClassification,
+        breakdown: updatedLeave.classificationBreakdown
+      }
+    });
+
+    res.json({
+      success: true,
+      message: `Leave successfully reclassified to ${updatedLeave.autoClassification}`,
+      leave: updatedLeave
     });
   } catch (err) {
     next(err);
