@@ -24,13 +24,23 @@ class PayrollService {
 
     const settings = await SystemSetting.findOne().lean();
 
-    const salaryProfile = await SalaryProfile.findOne({
+    let salaryProfile = await SalaryProfile.findOne({
       employee: employeeId,
       isCurrent: true
     });
 
     if (!salaryProfile) {
-      throw new Error(`No active salary profile found for employee ${employee.employeeId}. Please configure salary first.`);
+      if (employee.salary && employee.salary > 0) {
+        salaryProfile = await SalaryProfile.create({
+          employee: employee._id,
+          monthlyGrossSalary: employee.salary,
+          dailyRateBasis: 'CalendarDays',
+          isCurrent: true,
+          effectiveFrom: employee.joiningDate || new Date()
+        });
+      } else {
+        throw new Error(`No active salary profile found for employee ${employee.employeeId}. Please configure salary first.`);
+      }
     }
 
     const calendarDays = this.getDaysInMonth(month);

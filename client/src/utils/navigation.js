@@ -25,3 +25,4 @@ export const resolveNotificationRoute = (notif, userRole) => {
 
   return isHR ? '/hr/dashboard' : '/employee/home';
 };
+

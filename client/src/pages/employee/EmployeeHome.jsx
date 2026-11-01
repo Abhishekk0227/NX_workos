@@ -137,16 +137,8 @@ export default function EmployeeHome() {
   // Leave balance number (CL + SL available)
   const totalLeaveBalance = (leaveBalances?.clBalance || 0) + (leaveBalances?.slBalance || 0);
 
-  // Fallback demo tasks if employee hasn't created any yet, so UI matches screenshot
-  const displayTasks = tasks.length > 0
-    ? tasks.slice(0, 3)
-    : [
-        { _id: 'demo-1', title: 'Client meeting notes', priority: 'High', status: 'Pending', isDemo: true },
-        { _id: 'demo-2', title: 'Update website content', priority: 'Medium', status: 'Pending', isDemo: true },
-        { _id: 'demo-3', title: 'Team meeting', priority: 'Low', status: 'Pending', isDemo: true }
-      ];
-
-  const totalTasksCount = tasks.length > 0 ? tasks.length : 3;
+  const displayTasks = tasks.slice(0, 4);
+  const totalTasksCount = tasks.length;
 
   return (
     <div className="space-y-4 max-w-lg mx-auto sm:max-w-2xl lg:max-w-4xl pb-6">
@@ -262,7 +254,7 @@ export default function EmployeeHome() {
           <div>
             <span className="text-xs font-semibold text-slate-600 block">Tasks</span>
             <div className="text-2xl font-black text-blue-600 leading-tight mt-1">
-              {pendingTasksCount > 0 ? pendingTasksCount : (tasks.length > 0 ? 0 : 5)}
+              {pendingTasksCount}
             </div>
             <span className="text-[11px] text-slate-400 font-medium block mt-0.5">Pending</span>
           </div>
@@ -279,7 +271,7 @@ export default function EmployeeHome() {
           <div>
             <span className="text-xs font-semibold text-slate-600 block">Leave</span>
             <div className="text-2xl font-black text-rose-500 leading-tight mt-1">
-              {totalLeaveBalance > 0 ? totalLeaveBalance : 2}
+              {totalLeaveBalance}
             </div>
             <span className="text-[11px] text-slate-400 font-medium block mt-0.5">Balance</span>
           </div>
@@ -337,7 +329,16 @@ export default function EmployeeHome() {
 
         {/* Tasks List */}
         <div className="space-y-3">
-          {displayTasks.map((task) => {
+          {displayTasks.length === 0 ? (
+            <div className="text-center py-6 text-slate-400 space-y-1">
+              <ClipboardList className="w-7 h-7 mx-auto text-slate-300" />
+              <p className="text-xs font-semibold text-slate-600">No tasks created yet</p>
+              <Link to="/employee/tasks" className="text-xs text-blue-600 font-bold hover:underline inline-block">
+                + Add your first task
+              </Link>
+            </div>
+          ) : (
+            displayTasks.map((task) => {
             const isCompleted = task.status === 'Completed';
             const priorityClass =
               task.priority === 'High'
@@ -394,7 +395,7 @@ export default function EmployeeHome() {
                 </div>
               </div>
             );
-          })}
+          }))}
         </div>
       </div>
 
