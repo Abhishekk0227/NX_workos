@@ -1,4 +1,13 @@
 const mongoose = require('mongoose');
+const dns = require('dns');
+
+// On Windows or certain ISP DNS servers, SRV lookup fails with querySrv ECONNREFUSED.
+// Setting public DNS servers ensures Atlas SRV connection strings resolve properly.
+try {
+  dns.setServers(['8.8.8.8', '8.8.4.4', '1.1.1.1']);
+} catch (e) {
+  // Ignore fallback error
+}
 
 const connectDB = async () => {
   try {

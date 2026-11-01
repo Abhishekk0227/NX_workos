@@ -15,6 +15,11 @@ const AuditLog = require('../models/AuditLog');
 const ShiftTemplate = require('../models/ShiftTemplate');
 const LeavePolicy = require('../models/LeavePolicy');
 const SystemSetting = require('../models/SystemSetting');
+const dns = require('dns');
+
+try {
+  dns.setServers(['8.8.8.8', '8.8.4.4', '1.1.1.1']);
+} catch (e) {}
 
 dotenv.config();
 

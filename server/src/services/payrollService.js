@@ -71,8 +71,9 @@ class PayrollService {
     let lwpDays = 0;
 
     for (const lv of leaves) {
-      paidLeaveDays += (lv.classificationBreakdown?.clDays || 0) + (lv.classificationBreakdown?.slDays || 0);
-      lwpDays += (lv.classificationBreakdown?.lwpDays || 0);
+      // By default, all approved leaves are unpaid (LWP) without segregation
+      const days = lv.totalDays || ((lv.classificationBreakdown?.lwpDays || 0) + (lv.classificationBreakdown?.clDays || 0) + (lv.classificationBreakdown?.slDays || 0));
+      lwpDays += days;
     }
 
     // Calculate weekly offs in the month

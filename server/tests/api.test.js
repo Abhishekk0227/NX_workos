@@ -28,10 +28,10 @@ test('AttendanceService: Time conversion and late arrival calculation', () => {
   assert.equal(metricsFull.status, 'Present', 'Status should be Present');
   assert.equal(metricsFull.actualWorkingHours, 8.83, 'Working hours should be calculated correctly');
 
-  // Worked less than 50%
+  // Worked less than 6 hours -> Half Day
   const earlyPunchOut = new Date('2026-10-31T12:00:00');
-  const metricsIncomplete = AttendanceService.calculateAttendanceMetrics(onTimeDate, earlyPunchOut, shift);
-  assert.equal(metricsIncomplete.status, 'Incomplete', 'Status should be Incomplete if worked under 50%');
+  const metricsHalfDay = AttendanceService.calculateAttendanceMetrics(onTimeDate, earlyPunchOut, shift);
+  assert.equal(metricsHalfDay.status, 'Half Day', 'Status should be Half Day if worked under 6 hours');
 });
 
 test('PayrollService: Days in month calculation', () => {

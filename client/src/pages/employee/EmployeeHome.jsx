@@ -33,7 +33,7 @@ export default function EmployeeHome() {
   const navigate = useNavigate();
 
   const [attendance, setAttendance] = useState(null);
-  const [leaveBalances, setLeaveBalances] = useState({ clBalance: 6, slBalance: 4, lwpCount: 0 });
+  const [leaveBalances, setLeaveBalances] = useState({ clBalance: 0, slBalance: 0, lwpCount: 0 });
   const [tasks, setTasks] = useState([]);
   const [pendingTasksCount, setPendingTasksCount] = useState(5);
   const [broadcasts, setBroadcasts] = useState([]);
@@ -58,7 +58,7 @@ export default function EmployeeHome() {
         setAttendance(attRes.value.data.attendance);
       }
       if (balRes.status === 'fulfilled') {
-        setLeaveBalances(balRes.value.data.balances || { clBalance: 6, slBalance: 4, lwpCount: 0 });
+        setLeaveBalances(balRes.value.data.balances || { clBalance: 0, slBalance: 0, lwpCount: 0 });
       }
       if (taskRes.status === 'fulfilled') {
         const pTasks = taskRes.value.data.personalTasks || [];
@@ -267,10 +267,10 @@ export default function EmployeeHome() {
             <CalendarOff className="w-5 h-5" />
           </div>
           <div>
-            <span className="text-[11px] text-slate-500 font-medium">Leave</span>
+            <span className="text-[11px] text-slate-500 font-medium">Leave (Unpaid)</span>
             <div className="text-lg sm:text-xl font-bold text-slate-900 mt-0.5">
-              {leaveBalances.clBalance + leaveBalances.slBalance}{' '}
-              <span className="text-xs font-normal text-slate-400">Balance</span>
+              {leaveBalances.lwpCount || 0}{' '}
+              <span className="text-xs font-normal text-slate-400">Taken</span>
             </div>
           </div>
         </Link>

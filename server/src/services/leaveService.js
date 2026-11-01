@@ -122,71 +122,19 @@ class LeaveService {
       }
     }
 
-    // 5. Balance check & intelligent auto-classification
-    const balances = await this.getBalance(employee._id);
-    let remainingDays = requestedDays;
-    let clDays = 0;
-    let slDays = 0;
-    let lwpDays = 0;
+    // 5. Default: All leaves are Unpaid Leave (LWP) by default without segregation
+    const clDays = 0;
+    const slDays = 0;
+    const lwpDays = requestedDays;
+    const autoClassification = 'LWP';
 
-    // Reason-based priority: Health -> SL first; Personal/Other -> CL first
-    if (reasonCategory === 'Health') {
-      if (balances.slBalance >= remainingDays) {
-        slDays = remainingDays;
-        remainingDays = 0;
-      } else {
-        slDays = balances.slBalance;
-        remainingDays -= slDays;
-
-        if (balances.clBalance >= remainingDays) {
-          clDays = remainingDays;
-          remainingDays = 0;
-        } else {
-          clDays = balances.clBalance;
-          remainingDays -= clDays;
-          lwpDays = remainingDays;
-        }
-      }
-    } else {
-      // Personal or Other
-      if (balances.clBalance >= remainingDays) {
-        clDays = remainingDays;
-        remainingDays = 0;
-      } else {
-        clDays = balances.clBalance;
-        remainingDays -= clDays;
-
-        if (balances.slBalance >= remainingDays) {
-          slDays = remainingDays;
-          remainingDays = 0;
-        } else {
-          slDays = balances.slBalance;
-          remainingDays -= slDays;
-          lwpDays = remainingDays;
-        }
-      }
-    }
-
-    // Determine high-level autoClassification string
-    let autoClassification = 'Pending_Review';
-    if (lwpDays === 0) {
-      if (slDays > 0 && clDays === 0) autoClassification = 'SL';
-      else if (clDays > 0 && slDays === 0) autoClassification = 'CL';
-      else autoClassification = 'Split';
-    } else if (clDays === 0 && slDays === 0) {
-      autoClassification = 'LWP';
-      flagReasons.push('Insufficient paid leave balance: converted to Leave Without Pay (LWP)');
-    } else {
-      autoClassification = 'Split';
-      flagReasons.push('Partial paid leave balance: split across available paid leave and LWP');
-    }
-
+    // Status: Flagged if attendance conflict or late submission, else Approved
     const status = flagReasons.length > 0 ? 'Flagged' : 'Approved';
 
     return {
       requestedDays,
       autoClassification,
-      classificationBreakdown: { clDays, slDays, lwpDays },
+      classificationBreakdown: { clDays: 0, slDays: 0, lwpDays },
       isLateApplication,
       flagReasons,
       status
@@ -195,52 +143,23 @@ class LeaveService {
 
   /**
    * Post ledger entries for an approved or auto-classified leave
+   * All leaves are recorded as Unpaid Leave (LWP)
    */
   static async recordLedgerEntries(leaveRequest, performedBy = null) {
-    const { employee, classificationBreakdown, _id } = leaveRequest;
-    const entries = [];
+    const { employee, classificationBreakdown, _id, totalDays } = leaveRequest;
+    const lwpUnits = classificationBreakdown?.lwpDays ?? totalDays;
 
-    if (classificationBreakdown?.clDays > 0) {
-      entries.push({
-        employee,
-        leaveType: 'CL',
-        transactionType: 'Debit',
-        units: classificationBreakdown.clDays,
-        referenceModel: 'LeaveRequest',
-        referenceId: _id,
-        remarks: `Leave request debit for ${leaveRequest.startDate}`,
-        performedBy
-      });
-    }
-
-    if (classificationBreakdown?.slDays > 0) {
-      entries.push({
-        employee,
-        leaveType: 'SL',
-        transactionType: 'Debit',
-        units: classificationBreakdown.slDays,
-        referenceModel: 'LeaveRequest',
-        referenceId: _id,
-        remarks: `Leave request debit for ${leaveRequest.startDate}`,
-        performedBy
-      });
-    }
-
-    if (classificationBreakdown?.lwpDays > 0) {
-      entries.push({
+    if (lwpUnits > 0) {
+      await LeaveLedger.create({
         employee,
         leaveType: 'LWP',
         transactionType: 'Debit',
-        units: classificationBreakdown.lwpDays,
+        units: lwpUnits,
         referenceModel: 'LeaveRequest',
         referenceId: _id,
-        remarks: `LWP recorded for ${leaveRequest.startDate}`,
+        remarks: `Unpaid leave (LWP) recorded for ${leaveRequest.startDate}`,
         performedBy
       });
-    }
-
-    if (entries.length > 0) {
-      await LeaveLedger.insertMany(entries);
     }
   }
 

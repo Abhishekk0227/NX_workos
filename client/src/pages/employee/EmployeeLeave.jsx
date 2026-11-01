@@ -23,7 +23,7 @@ import api from '../../api/client';
 
 export default function EmployeeLeave() {
   const [requests, setRequests] = useState([]);
-  const [balances, setBalances] = useState({ clBalance: 6, slBalance: 4, lwpCount: 0 });
+  const [balances, setBalances] = useState({ clBalance: 0, slBalance: 0, lwpCount: 0 });
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('balance'); // 'balance' or 'requests'
   const [statusFilter, setStatusFilter] = useState('All'); // 'All', 'Pending', 'Approved', 'Rejected'
@@ -32,7 +32,7 @@ export default function EmployeeLeave() {
   const [showApplyModal, setShowApplyModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [applyForm, setApplyForm] = useState({
-    leaveType: 'CL',
+    leaveType: 'LWP',
     startDate: new Date().toISOString().split('T')[0],
     endDate: new Date().toISOString().split('T')[0],
     isHalfDay: false,
@@ -77,7 +77,7 @@ export default function EmployeeLeave() {
         alert(res.data.message || 'Leave applied successfully!');
         setShowApplyModal(false);
         setApplyForm({
-          leaveType: 'CL',
+          leaveType: 'LWP',
           startDate: new Date().toISOString().split('T')[0],
           endDate: new Date().toISOString().split('T')[0],
           isHalfDay: false,
@@ -154,66 +154,67 @@ export default function EmployeeLeave() {
         </button>
       </div>
 
-      {/* VIEW 1: LEAVE BALANCE matching EppanelM.png Screen 8 */}
+      {/* VIEW 1: LEAVE BALANCE */}
       {activeTab === 'balance' && (
         <div className="space-y-4">
-          {/* 3 Clean Balance Cards with Icons & Chevron */}
-          <div className="space-y-2.5">
-            {/* Casual Leave */}
-            <div
-              onClick={() => setShowApplyModal(true)}
-              className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs flex items-center justify-between gap-3 hover:border-emerald-300 transition cursor-pointer"
-            >
+          {/* Policy Notice Card */}
+          <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/80 rounded-2xl p-4 sm:p-5 shadow-2xs">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
               <div className="flex items-center gap-3">
-                <div className="w-11 h-11 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-                  <Umbrella className="w-5 h-5" />
+                <div className="w-11 h-11 rounded-2xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-xs font-bold text-sm">
+                  LWP
                 </div>
                 <div>
-                  <h4 className="text-xs font-bold text-slate-800">Casual Leave (CL)</h4>
-                  <div className="text-sm font-bold text-slate-900 mt-0.5">
-                    {balances.clBalance} / 12 <span className="text-xs font-normal text-slate-400">Days Left</span>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-bold text-amber-950">Standard Unpaid Leave Policy</h3>
+                    <span className="px-2 py-0.5 bg-amber-200/70 text-amber-900 text-[10px] font-extrabold uppercase rounded-md tracking-wider">
+                      Default
+                    </span>
                   </div>
+                  <p className="text-xs text-amber-800/80 mt-0.5">
+                    All leaves are unpaid by default without segregation. Leave deductions are calculated directly in payroll.
+                  </p>
                 </div>
               </div>
-              <ChevronRight className="w-4 h-4 text-slate-400" />
+              <button
+                onClick={() => setShowApplyModal(true)}
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold shadow-xs transition active:scale-95 cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" /> Apply Leave
+              </button>
+            </div>
+          </div>
+
+          {/* Quick Metrics */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs">
+              <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block mb-1">
+                Total Unpaid Leaves
+              </span>
+              <div className="text-2xl font-black text-amber-600">
+                {balances.lwpCount || 0} <span className="text-xs font-semibold text-slate-400">Days</span>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-0.5">Recorded as LWP</p>
             </div>
 
-            {/* Sick Leave */}
-            <div
-              onClick={() => setShowApplyModal(true)}
-              className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs flex items-center justify-between gap-3 hover:border-rose-300 transition cursor-pointer"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-11 h-11 rounded-2xl bg-rose-50 text-rose-500 flex items-center justify-center shrink-0">
-                  <Heart className="w-5 h-5" />
-                </div>
-                <div>
-                  <h4 className="text-xs font-bold text-slate-800">Sick Leave (SL)</h4>
-                  <div className="text-sm font-bold text-slate-900 mt-0.5">
-                    {balances.slBalance} / 10 <span className="text-xs font-normal text-slate-400">Days Left</span>
-                  </div>
-                </div>
+            <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs">
+              <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block mb-1">
+                Approved Requests
+              </span>
+              <div className="text-2xl font-black text-emerald-600">
+                {requests.filter(r => r.status === 'Approved').length}
               </div>
-              <ChevronRight className="w-4 h-4 text-slate-400" />
+              <p className="text-[11px] text-slate-400 mt-0.5">Accounted in payroll</p>
             </div>
 
-            {/* Unpaid Leave */}
-            <div
-              onClick={() => setShowApplyModal(true)}
-              className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs flex items-center justify-between gap-3 hover:border-amber-300 transition cursor-pointer"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-11 h-11 rounded-2xl bg-amber-50 text-amber-500 flex items-center justify-center shrink-0">
-                  <Infinity className="w-5 h-5" />
-                </div>
-                <div>
-                  <h4 className="text-xs font-bold text-slate-800">Unpaid Leave (LWP)</h4>
-                  <div className="text-sm font-bold text-slate-900 mt-0.5">
-                    Unlimited
-                  </div>
-                </div>
+            <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs col-span-2 sm:col-span-1">
+              <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block mb-1">
+                Pending Requests
+              </span>
+              <div className="text-2xl font-black text-slate-700">
+                {requests.filter(r => r.status === 'Pending' || r.status === 'Pending_Review' || r.status === 'Flagged').length}
               </div>
-              <ChevronRight className="w-4 h-4 text-slate-400" />
+              <p className="text-[11px] text-slate-400 mt-0.5">Awaiting HR review</p>
             </div>
           </div>
 
@@ -479,29 +480,22 @@ export default function EmployeeLeave() {
 
             {/* Modal Form */}
             <form onSubmit={handleApplyLeave} className="p-6 space-y-4">
-              {/* Leave Type Select */}
+              {/* Leave Policy Notice */}
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-2">Leave Type *</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {[
-                    { id: 'CL', label: 'Casual (CL)', count: balances.clBalance, color: 'text-emerald-700 border-emerald-300 bg-emerald-50' },
-                    { id: 'SL', label: 'Sick (SL)', count: balances.slBalance, color: 'text-rose-700 border-rose-300 bg-rose-50' },
-                    { id: 'LWP', label: 'Unpaid (LWP)', count: 'Unlimited', color: 'text-amber-700 border-amber-300 bg-amber-50' }
-                  ].map((type) => (
-                    <button
-                      key={type.id}
-                      type="button"
-                      onClick={() => setApplyForm({ ...applyForm, leaveType: type.id })}
-                      className={`p-2.5 rounded-xl border text-center transition cursor-pointer ${
-                        applyForm.leaveType === type.id
-                          ? `${type.color} ring-2 ring-emerald-500 font-bold`
-                          : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-600 font-medium'
-                      }`}
-                    >
-                      <div className="text-xs">{type.label}</div>
-                      <div className="text-[10px] text-slate-400 mt-0.5">Avail: {type.count}</div>
-                    </button>
-                  ))}
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">Leave Classification</label>
+                <div className="p-3 bg-amber-50/80 border border-amber-200/90 rounded-2xl flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-amber-500 text-white flex items-center justify-center font-black text-xs shrink-0 shadow-xs">
+                      LWP
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-amber-950">Standard Unpaid Leave (LWP)</div>
+                      <div className="text-[11px] text-amber-800">Company policy: all leaves are unpaid by default without segregation</div>
+                    </div>
+                  </div>
+                  <span className="text-[10px] font-bold text-amber-800 bg-amber-200/60 px-2.5 py-1 rounded-lg shrink-0">
+                    Payroll Deductible
+                  </span>
                 </div>
               </div>
 

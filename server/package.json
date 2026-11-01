@@ -8,6 +8,7 @@
     "dev": "node --watch src/index.js",
     "seed": "node src/seed/seed.js",
     "clean": "node src/seed/clearEmployees.js",
+    "reset:dummy": "node src/seed/resetAndCreateDummy.js",
     "test": "node --test tests/**/*.test.js"
   },
   "dependencies": {

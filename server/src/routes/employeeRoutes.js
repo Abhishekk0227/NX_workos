@@ -152,19 +152,20 @@ router.post('/', protect, authorize('HR'), async (req, res, next) => {
     employee.user = user._id;
     await employee.save();
 
-    // 3. Setup initial Leave Ledger credits (from policy or default 12 CL, 12 SL)
-    let clGrant = 12;
-    let slGrant = 12;
+    // 3. Setup initial Leave Ledger credits if policy grants paid quotas
+    let clGrant = 0;
+    let slGrant = 0;
     if (leavePolicy) {
       const pol = await LeavePolicy.findById(leavePolicy);
       if (pol) {
-        clGrant = pol.clAnnualQuota || 12;
-        slGrant = pol.slAnnualQuota || 12;
+        clGrant = pol.clAnnualQuota || 0;
+        slGrant = pol.slAnnualQuota || 0;
       }
     }
 
-    await LeaveLedger.insertMany([
-      {
+    const initialEntries = [];
+    if (clGrant > 0) {
+      initialEntries.push({
         employee: employee._id,
         leaveType: 'CL',
         transactionType: 'Credit',
@@ -172,8 +173,10 @@ router.post('/', protect, authorize('HR'), async (req, res, next) => {
         referenceModel: 'PolicyGrant',
         remarks: 'Initial annual Casual Leave quota grant',
         performedBy: req.user._id
-      },
-      {
+      });
+    }
+    if (slGrant > 0) {
+      initialEntries.push({
         employee: employee._id,
         leaveType: 'SL',
         transactionType: 'Credit',
@@ -181,8 +184,12 @@ router.post('/', protect, authorize('HR'), async (req, res, next) => {
         referenceModel: 'PolicyGrant',
         remarks: 'Initial annual Sick Leave quota grant',
         performedBy: req.user._id
-      }
-    ]);
+      });
+    }
+
+    if (initialEntries.length > 0) {
+      await LeaveLedger.insertMany(initialEntries);
+    }
 
     // 4. Configure initial salary profile if provided
     if (monthlyGrossSalary && Number(monthlyGrossSalary) > 0) {

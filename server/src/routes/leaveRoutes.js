@@ -289,6 +289,19 @@ router.patch('/:id/review', protect, authorize('HR'), async (req, res, next) => 
     // If changing from Approved to Rejected, reverse ledger debits
     if (prevStatus === 'Approved' && status === 'Rejected') {
       const breakdown = leave.classificationBreakdown || {};
+      const lwpUnits = breakdown.lwpDays || leave.totalDays || 0;
+      if (lwpUnits > 0) {
+        await LeaveLedger.create({
+          employee: leave.employee._id,
+          leaveType: 'LWP',
+          transactionType: 'Reversal',
+          units: lwpUnits,
+          referenceModel: 'LeaveRequest',
+          referenceId: leave._id,
+          remarks: `Reversed rejected unpaid leave: ${reviewRemarks || ''}`,
+          performedBy: req.user._id
+        });
+      }
       if (breakdown.clDays > 0) {
         await LeaveLedger.create({
           employee: leave.employee._id,
@@ -310,6 +323,21 @@ router.patch('/:id/review', protect, authorize('HR'), async (req, res, next) => 
           referenceModel: 'LeaveRequest',
           referenceId: leave._id,
           remarks: `Reversed rejected leave: ${reviewRemarks || ''}`,
+          performedBy: req.user._id
+        });
+      }
+    } else if (prevStatus !== 'Approved' && status === 'Approved') {
+      // If approved from pending or flagged
+      const lwpUnits = leave.classificationBreakdown?.lwpDays || leave.totalDays || 0;
+      if (lwpUnits > 0) {
+        await LeaveLedger.create({
+          employee: leave.employee._id,
+          leaveType: 'LWP',
+          transactionType: 'Debit',
+          units: lwpUnits,
+          referenceModel: 'LeaveRequest',
+          referenceId: leave._id,
+          remarks: `Approved unpaid leave (LWP): ${reviewRemarks || ''}`,
           performedBy: req.user._id
         });
       }
