@@ -152,7 +152,7 @@ export default function EmployeeLayout() {
         </div>
 
         {/* Content Area */}
-        <main className="flex-1 p-3.5 sm:p-6 md:p-8 max-w-6xl w-full mx-auto">
+        <main className="flex-1 p-2.5 sm:p-6 md:p-8 max-w-6xl w-full mx-auto">
           <Outlet />
         </main>
       </div>

@@ -257,37 +257,37 @@ export default function HRPayroll() {
       </div>
 
       {/* Tabs */}
-      <div className="flex items-center justify-between">
-        <div className="p-1 bg-slate-100 rounded-xl inline-flex gap-1">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+        <div className="p-1 bg-slate-100 rounded-xl flex items-center gap-1 overflow-x-auto no-scrollbar">
           <button
             onClick={() => setActiveTab('preview')}
-            className={`px-4 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+            className={`px-3 sm:px-4 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer whitespace-nowrap ${
               activeTab === 'preview'
                 ? 'bg-white text-slate-900 shadow-xs'
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            Payroll Calculations ({selectedMonth})
+            Payroll ({selectedMonth})
           </button>
           <button
             onClick={() => setActiveTab('leaves')}
-            className={`px-4 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+            className={`px-3 sm:px-4 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer whitespace-nowrap ${
               activeTab === 'leaves'
                 ? 'bg-white text-slate-900 shadow-xs'
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            Pre-Payroll Leave Review
+            Leave Review
           </button>
           <button
             onClick={() => setActiveTab('history')}
-            className={`px-4 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+            className={`px-3 sm:px-4 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer whitespace-nowrap ${
               activeTab === 'history'
                 ? 'bg-white text-slate-900 shadow-xs'
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            Finalized History
+            History
           </button>
         </div>
 
@@ -295,7 +295,7 @@ export default function HRPayroll() {
           <button
             onClick={handleFinalizePayroll}
             disabled={processing || previews.length === 0}
-            className="flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-black text-white text-xs font-bold rounded-xl shadow-xs transition cursor-pointer disabled:opacity-50"
+            className="flex items-center justify-center gap-2 px-4 py-2 bg-slate-900 hover:bg-black text-white text-xs font-bold rounded-xl shadow-xs transition cursor-pointer disabled:opacity-50 whitespace-nowrap"
           >
             <Lock className="w-3.5 h-3.5" /> Finalize & Lock Payroll
           </button>
@@ -310,115 +310,184 @@ export default function HRPayroll() {
         </div>
       )}
 
-      {/* TAB 1: PAYROLL CALCULATION TABLE */}
+      {/* TAB 1: PAYROLL CALCULATION (Mobile Cards + Desktop Table) */}
       {activeTab === 'preview' && (
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-xs">
-              <thead>
-                <tr className="bg-slate-50/80 border-b border-slate-200/80 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                  <th className="py-3.5 px-4">Employee</th>
-                  <th className="py-3.5 px-4">Calendar Days</th>
-                  <th className="py-3.5 px-4">Present / Half</th>
-                  <th className="py-3.5 px-4">Late Mins</th>
-                  <th className="py-3.5 px-4">Paid Leave / LWP</th>
-                  <th className="py-3.5 px-4">Gross Salary</th>
-                  <th className="py-3.5 px-4">Deductions</th>
-                  <th className="py-3.5 px-4">Net Salary</th>
-                  <th className="py-3.5 px-4">Status</th>
-                  <th className="py-3.5 px-4 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {previews.length === 0 ? (
-                  <tr>
-                    <td colSpan="10" className="py-12 text-center text-slate-400">
-                      No payroll records generated yet for {selectedMonth}. Click "Generate Payroll" above.
-                    </td>
+        <div className="space-y-3">
+          {/* Mobile Card Feed */}
+          <div className="block md:hidden space-y-2.5">
+            {previews.length === 0 ? (
+              <div className="p-8 text-center text-slate-400 bg-white rounded-2xl border border-slate-200 text-xs">
+                No payroll records generated yet for {selectedMonth}. Click "Generate Payroll" above.
+              </div>
+            ) : (
+              previews.map((item) => (
+                <div
+                  key={item.employee}
+                  className="p-3.5 bg-white rounded-2xl border border-slate-200/80 shadow-2xs space-y-3"
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="font-bold text-slate-900 text-xs">
+                        {item.employeeDetails?.fullName}
+                      </div>
+                      <div className="font-mono text-[10px] text-emerald-600 font-semibold">
+                        {item.employeeDetails?.employeeId} • {item.employeeDetails?.department}
+                      </div>
+                    </div>
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      Processed
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2 text-center bg-slate-50 p-2.5 rounded-xl border border-slate-100 text-xs">
+                    <div>
+                      <span className="text-[9px] uppercase font-bold text-slate-400 block">Gross</span>
+                      <span className="font-mono font-bold text-slate-800">₹{item.grossSalary?.toLocaleString()}</span>
+                    </div>
+                    <div>
+                      <span className="text-[9px] uppercase font-bold text-slate-400 block">Deductions</span>
+                      <span className="font-mono font-bold text-rose-600">
+                        {item.totalDeductions > 0 ? `-₹${item.totalDeductions?.toLocaleString()}` : '₹0'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[9px] uppercase font-bold text-slate-400 block">Net Pay</span>
+                      <span className="font-mono font-black text-emerald-700">₹{item.netPayable?.toLocaleString()}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1 border-t border-slate-100">
+                    <div>
+                      <span>{item.presentDays || 0}P</span>
+                      {item.halfDays > 0 && <span className="ml-1 text-amber-600">+{item.halfDays}HD</span>}
+                      {item.paidLeaveDays > 0 && <span className="ml-1 text-blue-600">+{item.paidLeaveDays}LV</span>}
+                      {item.totalLateMinutes > 0 && <span className="ml-1 text-rose-500 font-mono">({item.totalLateMinutes}m L)</span>}
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        setPayslipData(item);
+                        setShowPayslipModal(true);
+                      }}
+                      className="px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg font-bold text-xs transition"
+                    >
+                      View Payslip
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Desktop Table View */}
+          <div className="hidden md:block bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="bg-slate-50/80 border-b border-slate-200/80 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                    <th className="py-3.5 px-4">Employee</th>
+                    <th className="py-3.5 px-4">Calendar Days</th>
+                    <th className="py-3.5 px-4">Present / Half</th>
+                    <th className="py-3.5 px-4">Late Mins</th>
+                    <th className="py-3.5 px-4">Paid Leave / LWP</th>
+                    <th className="py-3.5 px-4">Gross Salary</th>
+                    <th className="py-3.5 px-4">Deductions</th>
+                    <th className="py-3.5 px-4">Net Salary</th>
+                    <th className="py-3.5 px-4">Status</th>
+                    <th className="py-3.5 px-4 text-right">Actions</th>
                   </tr>
-                ) : (
-                  previews.map((item) => (
-                    <tr key={item.employee} className="hover:bg-slate-50/70 transition">
-                      <td className="py-3.5 px-4">
-                        <div className="font-bold text-slate-900 text-xs">
-                          {item.employeeDetails?.fullName}
-                        </div>
-                        <div className="font-mono text-[11px] text-emerald-600 font-semibold">
-                          {item.employeeDetails?.employeeId}
-                        </div>
-                        <div className="text-[10px] text-slate-400">{item.employeeDetails?.department}</div>
-                      </td>
-
-                      <td className="py-3.5 px-4 text-slate-700 font-medium">{item.calendarDays || 30} days</td>
-
-                      <td className="py-3.5 px-4">
-                        <span className="text-emerald-700 font-bold">{item.presentDays || 0} P</span>
-                        {item.halfDays > 0 && (
-                          <span className="ml-1.5 px-1.5 py-0.5 rounded text-[10px] bg-amber-50 text-amber-700 font-semibold border border-amber-200">
-                            {item.halfDays} HD
-                          </span>
-                        )}
-                      </td>
-
-                      <td className="py-3.5 px-4">
-                        {item.totalLateMinutes > 0 ? (
-                          <div>
-                            <span className="font-mono text-rose-600 font-bold">{item.totalLateMinutes}m</span>
-                            {item.lateDeduction > 0 && (
-                              <div className="text-[10px] text-rose-500 font-mono">-₹{item.lateDeduction}</div>
-                            )}
-                          </div>
-                        ) : (
-                          <span className="text-slate-400">0m</span>
-                        )}
-                      </td>
-
-                      <td className="py-3.5 px-4">
-                        <span className="text-blue-700 font-semibold">{item.paidLeaveDays || 0} CL/SL</span>
-                        {item.lwpDays > 0 && (
-                          <span className="ml-1.5 px-1.5 py-0.5 rounded text-[10px] bg-rose-50 text-rose-700 font-semibold border border-rose-200">
-                            {item.lwpDays} LWP
-                          </span>
-                        )}
-                      </td>
-
-                      <td className="py-3.5 px-4 font-mono font-bold text-slate-900">
-                        ₹ {item.grossSalary?.toLocaleString()}
-                      </td>
-
-                      <td className="py-3.5 px-4 font-mono font-semibold text-rose-600">
-                        {item.totalDeductions > 0 ? `-₹ ${item.totalDeductions?.toLocaleString()}` : '₹ 0'}
-                      </td>
-
-                      <td className="py-3.5 px-4 font-mono font-black text-slate-900 text-sm">
-                        ₹ {item.netPayable?.toLocaleString()}
-                      </td>
-
-                      <td className="py-3.5 px-4">
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                          <CheckCircle2 className="w-3 h-3 text-emerald-500" /> Processed
-                        </span>
-                      </td>
-
-                      <td className="py-3.5 px-4 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          <button
-                            onClick={() => {
-                              setPayslipData(item);
-                              setShowPayslipModal(true);
-                            }}
-                            className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition cursor-pointer"
-                            title="View Itemized Payslip Breakdown"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
-                        </div>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {previews.length === 0 ? (
+                    <tr>
+                      <td colSpan="10" className="py-12 text-center text-slate-400">
+                        No payroll records generated yet for {selectedMonth}. Click "Generate Payroll" above.
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                  ) : (
+                    previews.map((item) => (
+                      <tr key={item.employee} className="hover:bg-slate-50/70 transition">
+                        <td className="py-3.5 px-4">
+                          <div className="font-bold text-slate-900 text-xs">
+                            {item.employeeDetails?.fullName}
+                          </div>
+                          <div className="font-mono text-[11px] text-emerald-600 font-semibold">
+                            {item.employeeDetails?.employeeId}
+                          </div>
+                          <div className="text-[10px] text-slate-400">{item.employeeDetails?.department}</div>
+                        </td>
+
+                        <td className="py-3.5 px-4 text-slate-700 font-medium">{item.calendarDays || 30} days</td>
+
+                        <td className="py-3.5 px-4">
+                          <span className="text-emerald-700 font-bold">{item.presentDays || 0} P</span>
+                          {item.halfDays > 0 && (
+                            <span className="ml-1.5 px-1.5 py-0.5 rounded text-[10px] bg-amber-50 text-amber-700 font-semibold border border-amber-200">
+                              {item.halfDays} HD
+                            </span>
+                          )}
+                        </td>
+
+                        <td className="py-3.5 px-4">
+                          {item.totalLateMinutes > 0 ? (
+                            <div>
+                              <span className="font-mono text-rose-600 font-bold">{item.totalLateMinutes}m</span>
+                              {item.lateDeduction > 0 && (
+                                <div className="text-[10px] text-rose-500 font-mono">-₹{item.lateDeduction}</div>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-slate-400">0m</span>
+                          )}
+                        </td>
+
+                        <td className="py-3.5 px-4">
+                          <span className="text-blue-700 font-semibold">{item.paidLeaveDays || 0} CL/SL</span>
+                          {item.lwpDays > 0 && (
+                            <span className="ml-1.5 px-1.5 py-0.5 rounded text-[10px] bg-rose-50 text-rose-700 font-semibold border border-rose-200">
+                              {item.lwpDays} LWP
+                            </span>
+                          )}
+                        </td>
+
+                        <td className="py-3.5 px-4 font-mono font-bold text-slate-900">
+                          ₹ {item.grossSalary?.toLocaleString()}
+                        </td>
+
+                        <td className="py-3.5 px-4 font-mono font-semibold text-rose-600">
+                          {item.totalDeductions > 0 ? `-₹ ${item.totalDeductions?.toLocaleString()}` : '₹ 0'}
+                        </td>
+
+                        <td className="py-3.5 px-4 font-mono font-black text-slate-900 text-sm">
+                          ₹ {item.netPayable?.toLocaleString()}
+                        </td>
+
+                        <td className="py-3.5 px-4">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            <CheckCircle2 className="w-3 h-3 text-emerald-500" /> Processed
+                          </span>
+                        </td>
+
+                        <td className="py-3.5 px-4 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              onClick={() => {
+                                setPayslipData(item);
+                                setShowPayslipModal(true);
+                              }}
+                              className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition cursor-pointer"
+                              title="View Itemized Payslip Breakdown"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}

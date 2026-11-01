@@ -231,8 +231,105 @@ export default function HRLeave() {
         </div>
       </div>
 
-      {/* Leave Requests Table */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+      {/* Leave Requests - Mobile Cards Feed */}
+      <div className="block md:hidden space-y-2.5">
+        {filteredRequests.length === 0 ? (
+          <div className="p-8 text-center text-slate-400 bg-white rounded-2xl border border-slate-200 text-xs">
+            <CalendarOff className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+            No leave applications matching the filters
+          </div>
+        ) : (
+          filteredRequests.map((req) => (
+            <div
+              key={req._id}
+              className="p-3.5 bg-white rounded-2xl border border-slate-200/80 shadow-2xs space-y-3"
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="font-bold text-slate-900 text-xs">{req.employee?.fullName}</div>
+                  <div className="font-mono text-[10px] text-emerald-600 font-semibold">
+                    {req.employee?.employeeId}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  <span
+                    className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                      req.autoClassification === 'CL'
+                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                        : req.autoClassification === 'SL'
+                        ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                        : 'bg-amber-50 text-amber-700 border border-amber-200'
+                    }`}
+                  >
+                    {req.autoClassification || 'CL'}
+                  </span>
+                  <span
+                    className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                      req.status === 'Approved'
+                        ? 'bg-emerald-50 text-emerald-700'
+                        : req.status === 'Rejected'
+                        ? 'bg-rose-50 text-rose-700'
+                        : 'bg-amber-50 text-amber-700'
+                    }`}
+                  >
+                    {req.status}
+                  </span>
+                </div>
+              </div>
+
+              <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100 text-[11px] space-y-1">
+                <div className="flex justify-between text-slate-700">
+                  <span className="text-slate-400">Duration:</span>
+                  <span className="font-bold">{req.startDate} to {req.endDate} ({req.isHalfDay ? '0.5 Day' : `${req.totalDays} Days`})</span>
+                </div>
+                <div className="text-slate-600 pt-1 border-t border-slate-200/60">
+                  <strong className="text-slate-800">{req.reasonCategory}:</strong> {req.reasonDetails}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-1">
+                <button
+                  onClick={() => openLedgerModal(req.employee)}
+                  className="text-xs text-blue-600 font-bold hover:underline flex items-center gap-1"
+                >
+                  <History className="w-3.5 h-3.5" /> View Ledger
+                </button>
+
+                <div className="flex items-center gap-2">
+                  {req.status !== 'Approved' && (
+                    <button
+                      onClick={() => handleReview(req._id, 'Approved')}
+                      className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition cursor-pointer"
+                    >
+                      Approve
+                    </button>
+                  )}
+                  {req.status !== 'Rejected' && (
+                    <button
+                      onClick={() => handleReview(req._id, 'Rejected')}
+                      className="px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold transition cursor-pointer"
+                    >
+                      Reject
+                    </button>
+                  )}
+                  {!req.convertedToLwp && ['CL', 'SL'].includes(req.autoClassification) && (
+                    <button
+                      onClick={() => handleConvertToLwp(req)}
+                      className="px-2.5 py-1 bg-amber-100 text-amber-900 rounded-lg text-[11px] font-bold"
+                    >
+                      To LWP
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Desktop Leave Requests Table */}
+      <div className="hidden md:block bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse text-xs">
             <thead>

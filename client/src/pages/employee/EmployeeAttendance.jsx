@@ -25,6 +25,7 @@ export default function EmployeeAttendance() {
 
   // Calendar month state
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [selectedCalDay, setSelectedCalDay] = useState(() => new Date().getDate());
 
   // Modals
   const [showPunchIn, setShowPunchIn] = useState(false);
@@ -181,7 +182,7 @@ export default function EmployeeAttendance() {
           </button>
           <button
             onClick={() => setActiveTab('calendar')}
-            className={`hidden sm:inline-block px-3 py-1 rounded-lg text-xs font-bold transition ${
+            className={`px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
               activeTab === 'calendar' ? 'bg-white text-blue-600 shadow-xs' : 'text-slate-600 hover:text-slate-900'
             }`}
           >
@@ -312,43 +313,91 @@ export default function EmployeeAttendance() {
           </div>
 
           {/* Calendar Grid */}
-          <div className="overflow-x-auto">
-            <div className="min-w-[320px]">
-              {/* Day headers */}
-              <div className="grid grid-cols-7 text-center font-bold text-slate-400 text-xs pb-2 border-b border-slate-100">
-                <span>Sun</span>
-                <span>Mon</span>
-                <span>Tue</span>
-                <span>Wed</span>
-                <span>Thu</span>
-                <span>Fri</span>
-                <span>Sat</span>
-              </div>
+          <div className="w-full">
+            {/* Day headers */}
+            <div className="grid grid-cols-7 text-center font-bold text-slate-400 text-[11px] sm:text-xs pb-2 border-b border-slate-100 uppercase tracking-tight">
+              <span>Sun</span>
+              <span>Mon</span>
+              <span>Tue</span>
+              <span>Wed</span>
+              <span>Thu</span>
+              <span>Fri</span>
+              <span>Sat</span>
+            </div>
 
-              {/* Day cells */}
-              <div className="grid grid-cols-7 gap-1 pt-2">
-                {calendarDays.map((cd, idx) => (
+            {/* Day cells */}
+            <div className="grid grid-cols-7 gap-1 sm:gap-1.5 pt-2">
+              {calendarDays.map((cd, idx) => {
+                const isSelected = cd.isCurrentMonth && cd.dayNumber === selectedCalDay;
+                return (
                   <div
                     key={idx}
-                    className={`h-14 sm:h-16 p-1 rounded-xl flex flex-col items-center justify-between border transition ${
+                    onClick={() => cd.isCurrentMonth && setSelectedCalDay(cd.dayNumber)}
+                    className={`aspect-square sm:aspect-auto sm:h-16 p-1 rounded-xl sm:rounded-2xl flex flex-col items-center justify-between border transition cursor-pointer select-none ${
                       !cd.isCurrentMonth
-                        ? 'opacity-20 border-transparent'
+                        ? 'opacity-20 border-transparent cursor-default'
+                        : isSelected
+                        ? 'bg-blue-50 border-blue-500 ring-2 ring-blue-500 shadow-2xs font-bold'
                         : cd.isToday
                         ? 'bg-blue-600 text-white font-bold border-blue-600'
-                        : 'bg-slate-50/70 border-slate-100 text-slate-800'
+                        : 'bg-slate-50/70 border-slate-100 text-slate-800 hover:border-slate-300'
                     }`}
                   >
-                    <span className="text-xs leading-none">{cd.dayNumber}</span>
+                    <span className={`text-[11px] sm:text-xs leading-none ${cd.isToday ? 'text-white' : ''}`}>
+                      {cd.dayNumber}
+                    </span>
                     {cd.dotColor && !cd.isToday && (
-                      <span className={`w-2 h-2 rounded-full ${cd.dotColor}`} />
+                      <span className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full ${cd.dotColor} shadow-2xs`} />
                     )}
                     {cd.isToday && (
-                      <span className="text-[9px] uppercase tracking-wider text-blue-100">Today</span>
+                      <span className="text-[8px] sm:text-[9px] uppercase tracking-wider text-blue-100 font-bold leading-none">
+                        Today
+                      </span>
                     )}
                   </div>
-                ))}
-              </div>
+                );
+              })}
             </div>
+
+            {/* Selected Day Details Preview for Employee */}
+            {(() => {
+              const selectedItem = calendarDays.find(
+                (c) => c.isCurrentMonth && c.dayNumber === selectedCalDay
+              );
+              if (!selectedItem) return null;
+
+              const matchedRecord = history.find((h) => h.date === selectedItem.dateStr);
+
+              return (
+                <div className="mt-4 p-3 bg-slate-50 rounded-2xl border border-slate-200/80 flex items-center justify-between text-xs">
+                  <div>
+                    <div className="font-bold text-slate-900">
+                      Day {selectedCalDay} • {currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                    </div>
+                    <div className="text-[11px] text-slate-500 mt-0.5">
+                      {matchedRecord ? (
+                        <>
+                          Status: <strong className="text-slate-800">{matchedRecord.status}</strong> •
+                          Punch: {matchedRecord.punchIn ? new Date(matchedRecord.punchIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}
+                          {matchedRecord.actualWorkingHours ? ` (${matchedRecord.actualWorkingHours} hrs)` : ''}
+                        </>
+                      ) : (
+                        <span>Status: <strong>{selectedItem.status || 'No record'}</strong></span>
+                      )}
+                    </div>
+                  </div>
+
+                  {matchedRecord && (
+                    <button
+                      onClick={() => openCorrection(matchedRecord)}
+                      className="px-3 py-1 bg-white hover:bg-slate-100 text-blue-600 font-bold text-xs rounded-xl border border-slate-200 shadow-2xs cursor-pointer"
+                    >
+                      Correction
+                    </button>
+                  )}
+                </div>
+              );
+            })()}
           </div>
 
           {/* Legend matching EppanelD.png #4 */}

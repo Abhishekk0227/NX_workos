@@ -38,6 +38,9 @@ export default function HRAttendance() {
   // View switch: 'calendar' | 'log'
   const [viewMode, setViewMode] = useState('calendar');
 
+  // Selected Day in Calendar for mobile & detail inspection
+  const [selectedDay, setSelectedDay] = useState(() => new Date().getDate());
+
   // Calendar State: defaults to live current month/year
   const [calendarDate, setCalendarDate] = useState(() => {
     const now = new Date();
@@ -357,48 +360,47 @@ export default function HRAttendance() {
 
       {/* VIEW 1: MONTHLY CALENDAR VIEW */}
       {viewMode === 'calendar' && (
-        <div className="space-y-6">
+        <div className="space-y-4 sm:space-y-6">
           {/* Controls: Employee dropdown & Interactive Month Picker */}
-          <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-3 w-full sm:w-auto">
+          <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 w-full md:w-auto">
               <label className="text-xs font-bold text-slate-700 whitespace-nowrap">Employee:</label>
               <select
                 value={calendarEmployeeId}
                 onChange={(e) => setCalendarEmployeeId(e.target.value)}
-                className="w-full sm:w-72 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500"
+                className="w-full sm:w-64 md:w-72 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-500"
               >
                 {employees.map((emp) => (
                   <option key={emp._id} value={emp._id}>
-                    {emp.fullName} ({emp.employeeId}) - {emp.designation}
+                    {emp.fullName} ({emp.employeeId})
                   </option>
                 ))}
               </select>
+
+              {/* Joining Date Boundary Notice */}
+              {currentEmp && (
+                <div className="text-[11px] text-slate-500 bg-slate-50 px-2.5 py-1.5 rounded-xl border border-slate-200/70 inline-flex items-center gap-1">
+                  <span>Joined:</span>
+                  <strong className="text-slate-800 font-mono font-bold">
+                    {joinDateStr || '01-01-2024'}
+                  </strong>
+                </div>
+              )}
             </div>
 
-            {/* Joining Date Boundary Notice */}
-            {currentEmp && (
-              <div className="text-xs text-slate-500 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200/70">
-                <span>Joining Date: </span>
-                <strong className="text-slate-800 font-mono">
-                  {joinDateStr || '01-01-2024'}
-                </strong>
-                <span className="text-[10px] text-slate-400 ml-1.5">(Records start from this date)</span>
-              </div>
-            )}
-
             {/* Interactive Month Picker with Calendar Select */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center justify-between sm:justify-end gap-1.5 sm:gap-2">
               <button
                 onClick={prevMonth}
                 title="Previous Month"
-                className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition cursor-pointer"
+                className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition cursor-pointer shrink-0"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
 
               {/* Native Calendar Month Picker */}
-              <div className="relative flex items-center">
-                <Calendar className="w-4 h-4 text-blue-600 absolute left-3 pointer-events-none" />
+              <div className="relative flex items-center flex-1 sm:flex-initial">
+                <Calendar className="w-3.5 h-3.5 text-blue-600 absolute left-2.5 pointer-events-none" />
                 <input
                   type="month"
                   value={currentMonthPickerVal}
@@ -408,7 +410,7 @@ export default function HRAttendance() {
                       setCalendarDate(new Date(y, m - 1, 1));
                     }
                   }}
-                  className="pl-9 pr-3 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 cursor-pointer outline-none focus:ring-2 focus:ring-blue-500 transition"
+                  className="w-full sm:w-36 pl-8 pr-2 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 cursor-pointer outline-none focus:ring-2 focus:ring-blue-500 transition"
                   title="Click to open calendar and select any Month & Year"
                 />
               </div>
@@ -416,14 +418,14 @@ export default function HRAttendance() {
               <button
                 onClick={nextMonth}
                 title="Next Month"
-                className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition cursor-pointer"
+                className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition cursor-pointer shrink-0"
               >
                 <ChevronRight className="w-4 h-4" />
               </button>
 
               <button
                 onClick={() => setCalendarDate(new Date())}
-                className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-xs font-bold transition cursor-pointer"
+                className="px-2.5 sm:px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-[11px] sm:text-xs font-bold transition cursor-pointer whitespace-nowrap shrink-0"
                 title="Jump to Current Month"
               >
                 This Month
@@ -432,54 +434,54 @@ export default function HRAttendance() {
           </div>
 
           {/* 5 Attendance KPI Cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-            <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs text-center">
-              <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Active Days</span>
-              <span className="text-2xl font-black text-slate-900 font-mono">{activeWorkingDaysInMonth}</span>
-              <span className="text-[10px] text-slate-500 block mt-0.5">Eligible Working Days</span>
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 sm:gap-3">
+            <div className="bg-white p-3 sm:p-4 rounded-2xl border border-slate-200/80 shadow-xs text-center">
+              <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">Active Days</span>
+              <span className="text-xl sm:text-2xl font-black text-slate-900 font-mono">{activeWorkingDaysInMonth}</span>
+              <span className="text-[10px] text-slate-500 block mt-0.5 truncate">Working Days</span>
             </div>
 
-            <div className="bg-white p-4 rounded-2xl border border-emerald-100 shadow-xs text-center">
-              <span className="text-[10px] uppercase font-bold text-emerald-600 block mb-1">Present</span>
-              <span className="text-2xl font-black text-emerald-600 font-mono">{presentDays}</span>
-              <span className="text-[10px] text-slate-500 block mt-0.5">On Schedule</span>
+            <div className="bg-white p-3 sm:p-4 rounded-2xl border border-emerald-100 shadow-xs text-center">
+              <span className="text-[10px] uppercase font-bold text-emerald-600 block mb-0.5">Present</span>
+              <span className="text-xl sm:text-2xl font-black text-emerald-600 font-mono">{presentDays}</span>
+              <span className="text-[10px] text-slate-500 block mt-0.5 truncate">On Schedule</span>
             </div>
 
-            <div className="bg-white p-4 rounded-2xl border border-amber-100 shadow-xs text-center">
-              <span className="text-[10px] uppercase font-bold text-amber-600 block mb-1">Late</span>
-              <span className="text-2xl font-black text-amber-600 font-mono">{lateDays}</span>
-              <span className="text-[10px] text-slate-500 block mt-0.5">Grace Exceeded</span>
+            <div className="bg-white p-3 sm:p-4 rounded-2xl border border-amber-100 shadow-xs text-center">
+              <span className="text-[10px] uppercase font-bold text-amber-600 block mb-0.5">Late</span>
+              <span className="text-xl sm:text-2xl font-black text-amber-600 font-mono">{lateDays}</span>
+              <span className="text-[10px] text-slate-500 block mt-0.5 truncate">Over Grace</span>
             </div>
 
-            <div className="bg-white p-4 rounded-2xl border border-rose-100 shadow-xs text-center">
-              <span className="text-[10px] uppercase font-bold text-rose-600 block mb-1">Absent</span>
-              <span className="text-2xl font-black text-rose-600 font-mono">{absentDays}</span>
-              <span className="text-[10px] text-slate-500 block mt-0.5">Unexcused</span>
+            <div className="bg-white p-3 sm:p-4 rounded-2xl border border-rose-100 shadow-xs text-center">
+              <span className="text-[10px] uppercase font-bold text-rose-600 block mb-0.5">Absent</span>
+              <span className="text-xl sm:text-2xl font-black text-rose-600 font-mono">{absentDays}</span>
+              <span className="text-[10px] text-slate-500 block mt-0.5 truncate">Unexcused</span>
             </div>
 
-            <div className="bg-white p-4 rounded-2xl border border-blue-100 shadow-xs text-center col-span-2 sm:col-span-1">
-              <span className="text-[10px] uppercase font-bold text-blue-600 block mb-1">On Leave</span>
-              <span className="text-2xl font-black text-blue-600 font-mono">{onLeaveDays}</span>
-              <span className="text-[10px] text-slate-500 block mt-0.5">Approved</span>
+            <div className="bg-white p-3 sm:p-4 rounded-2xl border border-blue-100 shadow-xs text-center col-span-2 sm:col-span-1">
+              <span className="text-[10px] uppercase font-bold text-blue-600 block mb-0.5">On Leave</span>
+              <span className="text-xl sm:text-2xl font-black text-blue-600 font-mono">{onLeaveDays}</span>
+              <span className="text-[10px] text-slate-500 block mt-0.5 truncate">Approved</span>
             </div>
           </div>
 
-          {/* Monthly Calendar Grid with Joining Date Boundary */}
-          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-5">
+          {/* Monthly Calendar Grid with App-Like Responsive Cells */}
+          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-3 sm:p-5">
             {/* Weekday headers */}
-            <div className="grid grid-cols-7 gap-2 mb-2">
+            <div className="grid grid-cols-7 gap-1 sm:gap-2 mb-1.5 sm:mb-2">
               {dayHeaders.map((dh) => (
-                <div key={dh} className="text-center font-bold text-xs text-slate-500 py-1">
+                <div key={dh} className="text-center font-bold text-[11px] sm:text-xs text-slate-500 py-1 uppercase tracking-tight">
                   {dh}
                 </div>
               ))}
             </div>
 
             {/* Calendar Days Cells */}
-            <div className="grid grid-cols-7 gap-2">
+            <div className="grid grid-cols-7 gap-1 sm:gap-2">
               {/* Empty leading slots */}
               {Array.from({ length: firstDayIndex }).map((_, i) => (
-                <div key={`empty-${i}`} className="h-16 sm:h-20 bg-slate-50/40 rounded-xl" />
+                <div key={`empty-${i}`} className="aspect-square sm:aspect-auto sm:h-20 bg-slate-50/40 rounded-xl sm:rounded-2xl border border-transparent" />
               ))}
 
               {/* Day cells */}
@@ -492,126 +494,237 @@ export default function HRAttendance() {
                 const isToday = cellDateStr === todayStr;
                 const isFuture = cellDateStr > todayStr;
                 const rec = recordsByDay[dayNum];
+                const isSelected = selectedDay === dayNum;
 
                 let statusBadge = null;
-                let bgStyle = 'bg-slate-50/70 border-slate-200/70';
+                let statusDot = null;
+                let bgStyle = 'bg-slate-50/70 border-slate-200/80 text-slate-800';
 
                 if (isPreJoining) {
-                  // Days before joining date have NO previous data and cannot be marked
-                  bgStyle = 'bg-slate-50/50 border-dashed border-slate-200 text-slate-300 opacity-40 cursor-not-allowed';
+                  bgStyle = 'bg-slate-50/40 border-dashed border-slate-200 text-slate-300 opacity-40 cursor-not-allowed';
                   statusBadge = (
-                    <span className="text-[9px] text-slate-400 font-medium italic" title={`Joined on ${joinDateStr}`}>
-                      Pre-Joining
+                    <span className="text-[9px] text-slate-400 font-medium italic truncate" title={`Joined on ${joinDateStr}`}>
+                      Pre-Join
                     </span>
                   );
+                  statusDot = <span className="text-[8px] text-slate-300 font-mono leading-none">-</span>;
                 } else if (isSunday) {
                   bgStyle = 'bg-slate-100/60 border-slate-200 text-slate-400';
-                  statusBadge = <span className="text-[9px] font-semibold text-slate-400">Weekly Off</span>;
+                  statusBadge = <span className="text-[9px] font-semibold text-slate-500 truncate">Weekly Off</span>;
+                  statusDot = <span className="w-1.5 h-1.5 rounded-full bg-slate-400/80" title="Weekly Off" />;
                 } else if (rec) {
                   if (rec.status === 'Present') {
-                    bgStyle = 'bg-emerald-50/70 border-emerald-200';
+                    bgStyle = 'bg-emerald-50/80 border-emerald-200 text-emerald-950';
                     statusBadge = (
-                      <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-100 text-emerald-800">
+                      <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-100 text-emerald-800 truncate">
                         Present
                       </span>
                     );
+                    statusDot = <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-xs" title="Present" />;
                   } else if (rec.status === 'Late') {
-                    bgStyle = 'bg-amber-50/70 border-amber-200';
+                    bgStyle = 'bg-amber-50/80 border-amber-200 text-amber-950';
                     statusBadge = (
-                      <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-800">
+                      <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-800 truncate">
                         Late
                       </span>
                     );
+                    statusDot = <span className="w-2 h-2 rounded-full bg-amber-500 shadow-xs" title="Late" />;
                   } else if (rec.status === 'Half Day' || rec.status === 'Half-day') {
-                    bgStyle = 'bg-orange-50/70 border-orange-200';
+                    bgStyle = 'bg-orange-50/80 border-orange-200 text-orange-950';
                     statusBadge = (
-                      <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-orange-100 text-orange-800">
+                      <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-orange-100 text-orange-800 truncate">
                         Half Day
                       </span>
                     );
+                    statusDot = <span className="w-2 h-2 rounded-full bg-orange-500 shadow-xs" title="Half Day" />;
                   } else if (rec.status === 'On Leave') {
-                    bgStyle = 'bg-blue-50/70 border-blue-200';
+                    bgStyle = 'bg-blue-50/80 border-blue-200 text-blue-950';
                     statusBadge = (
-                      <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-100 text-blue-800">
+                      <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-100 text-blue-800 truncate">
                         Leave
                       </span>
                     );
+                    statusDot = <span className="w-2 h-2 rounded-full bg-blue-500 shadow-xs" title="Leave" />;
                   } else if (rec.status === 'Absent' || rec.status === 'Incomplete') {
-                    bgStyle = 'bg-rose-50/70 border-rose-200';
+                    bgStyle = 'bg-rose-50/80 border-rose-200 text-rose-950';
                     statusBadge = (
-                      <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-100 text-rose-800">
+                      <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-100 text-rose-800 truncate">
                         Absent
                       </span>
                     );
+                    statusDot = <span className="w-2 h-2 rounded-full bg-rose-500 shadow-xs" title="Absent" />;
                   }
                 } else if (isToday) {
-                  bgStyle = 'bg-blue-50/50 border-blue-200';
+                  bgStyle = 'bg-blue-50/60 border-blue-300 text-blue-900';
                   statusBadge = (
-                    <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-100 text-blue-700">
+                    <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-100 text-blue-700 truncate">
                       Today
                     </span>
                   );
+                  statusDot = <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" title="Today" />;
                 } else if (isFuture) {
-                  bgStyle = 'bg-slate-50/40 border-slate-100 text-slate-300';
+                  bgStyle = 'bg-slate-50/30 border-slate-100 text-slate-300';
                   statusBadge = null;
+                  statusDot = null;
                 } else {
-                  // Past day during active employment without punch in
                   bgStyle = 'bg-slate-100/50 border-slate-200 text-slate-400';
                   statusBadge = (
-                    <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-slate-200 text-slate-600">
+                    <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-slate-200 text-slate-600 truncate">
                       Unmarked
                     </span>
                   );
+                  statusDot = <span className="w-1.5 h-1.5 rounded-full bg-slate-300" title="Unmarked" />;
                 }
 
                 return (
                   <div
                     key={dayNum}
-                    className={`h-16 sm:h-20 p-2 rounded-xl border flex flex-col justify-between transition hover:shadow-xs ${bgStyle}`}
+                    onClick={() => setSelectedDay(dayNum)}
+                    className={`aspect-square sm:aspect-auto sm:h-20 p-1 sm:p-2 rounded-xl sm:rounded-2xl border flex flex-col justify-between items-center sm:items-stretch transition cursor-pointer select-none ${bgStyle} ${
+                      isSelected ? 'ring-2 ring-blue-600 ring-offset-1 shadow-sm' : 'hover:border-slate-300'
+                    }`}
                   >
-                    <div className="flex items-center justify-between">
-                      <span className={`text-xs font-bold ${isPreJoining ? 'text-slate-300' : 'text-slate-800'}`}>
+                    <div className="flex items-center justify-between w-full">
+                      <span className={`text-[11px] sm:text-xs font-bold ${
+                        isToday
+                          ? 'w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center font-black mx-auto sm:mx-0'
+                          : isPreJoining
+                          ? 'text-slate-300'
+                          : 'text-slate-800'
+                      }`}>
                         {dayNum}
                       </span>
                       {isToday && (
-                        <span className="w-1.5 h-1.5 rounded-full bg-blue-600" title="Today" />
+                        <span className="hidden sm:inline-block w-1.5 h-1.5 rounded-full bg-blue-600" title="Today" />
                       )}
                     </div>
-                    <div className="flex items-center justify-end">{statusBadge}</div>
+
+                    {/* Mobile Dot Indicator */}
+                    <div className="flex items-center justify-center mt-0.5 sm:hidden">
+                      {statusDot}
+                    </div>
+
+                    {/* Desktop Full Badge */}
+                    <div className="hidden sm:flex items-center justify-end w-full">
+                      {statusBadge}
+                    </div>
                   </div>
                 );
               })}
             </div>
 
+            {/* Selected Active Day Inspection Strip (App-like experience) */}
+            {(() => {
+              const selDateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(selectedDay).padStart(2, '0')}`;
+              const selDateObj = new Date(year, month, selectedDay);
+              const selIsSunday = selDateObj.getDay() === 0;
+              const selIsPreJoin = joinDateStr && selDateStr < joinDateStr;
+              const selRec = recordsByDay[selectedDay];
+              const selIsFuture = selDateStr > todayStr;
+
+              let statusLabel = 'Unmarked';
+              let statusPillClass = 'bg-slate-100 text-slate-700';
+
+              if (selIsPreJoin) {
+                statusLabel = 'Pre-Joining (Not Active)';
+                statusPillClass = 'bg-slate-100 text-slate-400 border border-dashed border-slate-300';
+              } else if (selIsSunday) {
+                statusLabel = 'Weekly Off';
+                statusPillClass = 'bg-slate-100 text-slate-600 border border-slate-200';
+              } else if (selRec) {
+                statusLabel = selRec.status;
+                if (selRec.status === 'Present') statusPillClass = 'bg-emerald-100 text-emerald-800 font-bold';
+                else if (selRec.status === 'Late') statusPillClass = 'bg-amber-100 text-amber-800 font-bold';
+                else if (selRec.status === 'Half Day') statusPillClass = 'bg-orange-100 text-orange-800 font-bold';
+                else if (selRec.status === 'On Leave') statusPillClass = 'bg-blue-100 text-blue-800 font-bold';
+                else statusPillClass = 'bg-rose-100 text-rose-800 font-bold';
+              } else if (selIsFuture) {
+                statusLabel = 'Upcoming';
+                statusPillClass = 'bg-slate-50 text-slate-400';
+              }
+
+              return (
+                <div className="mt-4 p-3 sm:p-3.5 bg-slate-50/80 rounded-2xl border border-slate-200/90 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 shadow-2xs flex flex-col items-center justify-center font-bold shrink-0">
+                      <span className="text-sm font-black text-slate-900 leading-tight">{selectedDay}</span>
+                      <span className="text-[9px] uppercase font-bold text-slate-400 leading-none">
+                        {selDateObj.toLocaleDateString('en-US', { weekday: 'short' })}
+                      </span>
+                    </div>
+
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-slate-900 text-xs sm:text-sm">
+                          {selDateObj.toLocaleDateString('en-IN', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })}
+                        </span>
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${statusPillClass}`}>
+                          {statusLabel}
+                        </span>
+                      </div>
+
+                      <div className="text-[11px] text-slate-500 mt-0.5">
+                        {selIsPreJoin
+                          ? `Employment started on ${joinDateStr}. Prior days are completely free from penalties.`
+                          : selRec?.punchIn
+                          ? `Punch In: ${new Date(selRec.punchIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • Punch Out: ${selRec.punchOut ? new Date(selRec.punchOut).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'In Progress'} • ${selRec.actualWorkingHours || 0} hrs`
+                          : selIsSunday
+                          ? 'Scheduled weekly holiday.'
+                          : selIsFuture
+                          ? 'Future work day.'
+                          : 'No biometric/web punch-in recorded.'}
+                      </div>
+                    </div>
+                  </div>
+
+                  {!selIsPreJoin && (
+                    <button
+                      onClick={() => {
+                        const targetRec = selRec || {
+                          employee: currentEmp,
+                          date: selDateStr,
+                          status: 'Present'
+                        };
+                        openManualOverride(targetRec);
+                      }}
+                      className="w-full sm:w-auto px-3.5 py-1.5 bg-white hover:bg-slate-100 border border-slate-200 text-slate-800 rounded-xl text-xs font-bold transition shadow-2xs cursor-pointer text-center"
+                    >
+                      Audit / Correct Day
+                    </button>
+                  )}
+                </div>
+              );
+            })()}
+
             {/* Color Legend */}
-            <div className="flex flex-wrap items-center justify-center gap-6 mt-6 pt-4 border-t border-slate-100 text-xs text-slate-600">
-              <div className="flex items-center gap-2">
-                <span className="w-3 h-3 rounded bg-emerald-500" />
+            <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-6 mt-4 pt-4 border-t border-slate-100 text-[11px] sm:text-xs text-slate-600">
+              <div className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
                 <span>Present</span>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="w-3 h-3 rounded bg-amber-500" />
+              <div className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
                 <span>Late</span>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="w-3 h-3 rounded bg-orange-500" />
+              <div className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-orange-500" />
                 <span>Half Day</span>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="w-3 h-3 rounded bg-rose-500" />
+              <div className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-rose-500" />
                 <span>Absent</span>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="w-3 h-3 rounded bg-blue-500" />
+              <div className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-blue-500" />
                 <span>Leave</span>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="w-3 h-3 rounded bg-slate-300" />
+              <div className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-slate-400" />
                 <span>Weekly Off</span>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="w-3 h-3 rounded bg-slate-100 border border-dashed border-slate-300" />
-                <span>Pre-Joining (No Data)</span>
+              <div className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-slate-200 border border-dashed border-slate-400" />
+                <span>Pre-Joining</span>
               </div>
             </div>
           </div>
@@ -667,8 +780,93 @@ export default function HRAttendance() {
             </div>
           </div>
 
-          {/* Records Table */}
-          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+          {/* Mobile Card View (App-like for phones) */}
+          <div className="block md:hidden space-y-2.5">
+            {records.length === 0 ? (
+              <div className="p-8 text-center text-slate-400 bg-white rounded-2xl border border-slate-200 text-xs">
+                No attendance records for the selected filters
+              </div>
+            ) : (
+              records.map((att) => {
+                const isLate = att.lateMinutes > 0;
+                return (
+                  <div
+                    key={att._id}
+                    className="p-3.5 bg-white rounded-2xl border border-slate-200/80 shadow-2xs space-y-2.5"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="font-bold text-slate-900 text-xs">
+                          {att.employee?.fullName}
+                        </div>
+                        <div className="font-mono text-[10px] text-emerald-600 font-semibold">
+                          {att.employee?.employeeId} • {att.employee?.department}
+                        </div>
+                      </div>
+
+                      <span
+                        className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                          att.status === 'Present'
+                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                            : att.status === 'Late'
+                            ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                            : att.status === 'Half Day'
+                            ? 'bg-orange-50 text-orange-700 border border-orange-200'
+                            : 'bg-rose-50 text-rose-700 border border-rose-200'
+                        }`}
+                      >
+                        {att.status}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-[11px] bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                      <div>
+                        <span className="text-slate-400 block text-[9px] uppercase font-bold">Punch In</span>
+                        <span className="font-semibold text-slate-800">
+                          {att.punchIn ? new Date(att.punchIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}
+                        </span>
+                        {isLate && (
+                          <span className="text-[9px] text-amber-600 font-bold block">+{att.lateMinutes}m late</span>
+                        )}
+                      </div>
+
+                      <div>
+                        <span className="text-slate-400 block text-[9px] uppercase font-bold">Punch Out</span>
+                        <span className="font-semibold text-slate-800">
+                          {att.punchOut ? new Date(att.punchOut).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'In progress'}
+                        </span>
+                        <span className="text-[9px] text-slate-500 block">
+                          {att.actualWorkingHours ? `${att.actualWorkingHours} hrs` : '—'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-1">
+                      <div className="text-[11px]">
+                        {att.dailyReport ? (
+                          <span className="text-emerald-600 font-semibold flex items-center gap-1">
+                            <CheckCircle className="w-3.5 h-3.5" /> Report Filed
+                          </span>
+                        ) : (
+                          <span className="text-slate-400 italic">No daily report</span>
+                        )}
+                      </div>
+
+                      <button
+                        onClick={() => openOverride(att)}
+                        className="px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg text-xs font-bold transition cursor-pointer"
+                      >
+                        Audit Correction
+                      </button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          {/* Desktop Records Table */}
+          <div className="hidden md:block bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse text-xs">
                 <thead>

@@ -217,9 +217,73 @@ export default function HRTasksReports() {
         )}
       </div>
 
-      {/* TAB 1: DAILY TASK REPORTS TABLE matching hrpanelD.png #8 */}
+      {/* TAB 1: DAILY TASK REPORTS (Mobile Cards + Desktop Table) */}
       {activeTab === 'reports' && (
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+        <div className="space-y-3">
+          {/* Mobile Cards Feed for Reports */}
+          <div className="block md:hidden space-y-2.5">
+            {reports.length === 0 ? (
+              <div className="p-8 text-center text-slate-400 bg-white rounded-2xl border border-slate-200 text-xs">
+                <FileText className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+                No daily work reports submitted for {reportDate}
+              </div>
+            ) : (
+              reports.map((report) => (
+                <div
+                  key={report._id}
+                  className="p-3.5 bg-white rounded-2xl border border-slate-200/80 shadow-2xs space-y-2.5"
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="font-bold text-slate-900 text-xs">
+                        {report.employee?.fullName}
+                      </div>
+                      <div className="font-mono text-[10px] text-emerald-600 font-semibold">
+                        {report.employee?.employeeId} • {report.employee?.department}
+                      </div>
+                    </div>
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      Submitted
+                    </span>
+                  </div>
+
+                  <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100 text-[11px] space-y-1">
+                    <span className="text-slate-400 block text-[9px] uppercase font-bold">Key Work Summary</span>
+                    {report.summaryBullets?.slice(0, 2).map((bullet, bIdx) => (
+                      <div key={bIdx} className="text-slate-700 truncate flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                        <span className="truncate">{bullet}</span>
+                      </div>
+                    ))}
+                    {report.summaryBullets?.length > 2 && (
+                      <span className="text-[10px] text-blue-600 font-semibold block pt-0.5">
+                        +{report.summaryBullets.length - 2} more tasks
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between pt-1">
+                    <span className="text-[11px] text-slate-500">
+                      {new Date(report.submittedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+
+                    <button
+                      onClick={() => {
+                        setSelectedReport(report);
+                        setShowReportModal(true);
+                      }}
+                      className="px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg text-xs font-bold transition cursor-pointer"
+                    >
+                      View Report
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Desktop Reports Table */}
+          <div className="hidden md:block bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
@@ -298,6 +362,7 @@ export default function HRTasksReports() {
               </tbody>
             </table>
           </div>
+        </div>
         </div>
       )}
 
