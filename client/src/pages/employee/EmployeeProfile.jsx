@@ -162,10 +162,13 @@ export default function EmployeeProfile() {
     }
   };
 
-  // Format date of joining nicely: e.g. "12 Jan 2024"
-  const formattedJoiningDate = emp.joiningDate
-    ? new Date(emp.joiningDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
-    : '12 Jan 2024';
+  // Format date of joining dynamically
+  const rawJoinDate = emp.joiningDate || emp.createdAt || new Date();
+  const formattedJoiningDate = new Date(rawJoinDate).toLocaleDateString('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric'
+  });
 
   const shiftDisplay = emp.assignedShift?.startTime && emp.assignedShift?.endTime
     ? `${emp.assignedShift.startTime} - ${emp.assignedShift.endTime}`

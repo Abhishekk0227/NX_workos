@@ -499,7 +499,7 @@ export default function HREmployees() {
                     </td>
 
                     <td className="py-3.5 px-4 text-slate-600 font-medium">
-                      {emp.joiningDate ? new Date(emp.joiningDate).toLocaleDateString() : '01/01/2024'}
+                      {emp.joiningDate ? new Date(emp.joiningDate).toLocaleDateString() : emp.createdAt ? new Date(emp.createdAt).toLocaleDateString() : new Date().toLocaleDateString()}
                     </td>
 
                     <td className="py-3.5 px-4 text-right">
@@ -859,7 +859,11 @@ export default function HREmployees() {
                         <Calendar className="w-3.5 h-3.5" /> Joining Date
                       </span>
                       <span className="font-semibold text-slate-800">
-                        {selectedEmployee.joiningDate ? new Date(selectedEmployee.joiningDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '12 Jan 2024'}
+                        {selectedEmployee.joiningDate
+                          ? new Date(selectedEmployee.joiningDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+                          : selectedEmployee.createdAt
+                          ? new Date(selectedEmployee.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+                          : new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
                       </span>
                     </div>
 

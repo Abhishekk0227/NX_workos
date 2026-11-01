@@ -24,7 +24,7 @@ export default function EmployeeTasks() {
   // Active Tab: 'my' | 'hr'
   const [activeTab, setActiveTab] = useState('my');
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('All');
+  const [statusFilter, setStatusFilter] = useState('New'); // Default filter is 'New'
   const [priorityFilter, setPriorityFilter] = useState('All');
 
   // Modal State
@@ -142,6 +142,11 @@ export default function EmployeeTasks() {
   };
 
   const handleDelete = async (taskId) => {
+    const targetTask = currentList.find((t) => t._id === taskId);
+    if (targetTask?.taskType === 'HR_Assigned' && user?.role !== 'HR') {
+      alert('Tasks assigned by HR administrators cannot be deleted by employees.');
+      return;
+    }
     if (!window.confirm('Delete this task?')) return;
     try {
       await api.delete(`/tasks/${taskId}`);
@@ -156,7 +161,16 @@ export default function EmployeeTasks() {
 
   const filteredTasks = currentList.filter((t) => {
     const matchesSearch = t.title.toLowerCase().includes(search.toLowerCase());
-    const matchesStatus = statusFilter === 'All' || t.status === statusFilter;
+    let matchesStatus = true;
+    if (statusFilter === 'New') {
+      matchesStatus = t.status === 'New';
+    } else if (statusFilter === 'Pending') {
+      matchesStatus = t.status === 'Pending' || t.status === 'In Progress';
+    } else if (statusFilter === 'Completed') {
+      matchesStatus = t.status === 'Completed';
+    } else {
+      matchesStatus = true; // 'All'
+    }
     const matchesPriority = priorityFilter === 'All' || t.priority === priorityFilter;
     return matchesSearch && matchesStatus && matchesPriority;
   });
@@ -182,11 +196,11 @@ export default function EmployeeTasks() {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 font-medium focus:outline-none"
+            className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 font-semibold focus:outline-none cursor-pointer"
           >
+            <option value="New">New</option>
             <option value="All">All Status</option>
             <option value="Pending">Pending</option>
-            <option value="In Progress">In Progress</option>
             <option value="Completed">Completed</option>
           </select>
 
@@ -203,7 +217,7 @@ export default function EmployeeTasks() {
 
           <button
             onClick={openCreateModal}
-            className="flex items-center gap-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-xs transition"
+            className="flex items-center gap-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-xs transition cursor-pointer"
           >
             <Plus className="w-4 h-4" /> Add Task
           </button>
@@ -214,7 +228,7 @@ export default function EmployeeTasks() {
       <div className="bg-slate-100 p-1 rounded-2xl flex max-w-sm">
         <button
           onClick={() => setActiveTab('my')}
-          className={`flex-1 py-2 text-xs font-bold rounded-xl transition ${
+          className={`flex-1 py-2 text-xs font-bold rounded-xl transition cursor-pointer ${
             activeTab === 'my'
               ? 'bg-blue-600 text-white shadow-xs'
               : 'text-slate-600 hover:text-slate-900'
@@ -225,7 +239,7 @@ export default function EmployeeTasks() {
 
         <button
           onClick={() => setActiveTab('hr')}
-          className={`flex-1 py-2 text-xs font-bold rounded-xl transition ${
+          className={`flex-1 py-2 text-xs font-bold rounded-xl transition cursor-pointer ${
             activeTab === 'hr'
               ? 'bg-blue-600 text-white shadow-xs'
               : 'text-slate-600 hover:text-slate-900'
@@ -235,19 +249,20 @@ export default function EmployeeTasks() {
         </button>
       </div>
 
-      {/* Filter Chips matching EppanelM.png #2 */}
+      {/* Filter Chips: New | All | Pending | Completed (Default: New) */}
       <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
         {[
+          { id: 'New', label: `New (${currentList.filter((t) => t.status === 'New').length})` },
           { id: 'All', label: `All (${currentList.length})` },
-          { id: 'Pending', label: `Pending (${currentList.filter(t => t.status === 'Pending').length})` },
-          { id: 'In Progress', label: `In Progress (${currentList.filter(t => t.status === 'In Progress').length})` }
+          { id: 'Pending', label: `Pending (${currentList.filter((t) => t.status === 'Pending' || t.status === 'In Progress').length})` },
+          { id: 'Completed', label: `Completed (${currentList.filter((t) => t.status === 'Completed').length})` }
         ].map((chip) => (
           <button
             key={chip.id}
             onClick={() => setStatusFilter(chip.id)}
-            className={`px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition cursor-pointer ${
+            className={`px-3.5 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition cursor-pointer ${
               statusFilter === chip.id
-                ? 'bg-blue-50 text-blue-700 border border-blue-200 shadow-2xs'
+                ? 'bg-blue-600 text-white shadow-xs'
                 : 'bg-white text-slate-600 border border-slate-200/80 hover:bg-slate-50'
             }`}
           >
@@ -310,16 +325,27 @@ export default function EmployeeTasks() {
                   </span>
                   <button
                     onClick={() => openEditModal(t)}
-                    className="p-1 text-slate-400 hover:text-slate-600"
+                    className="p-1 text-slate-400 hover:text-slate-600 cursor-pointer"
+                    title="Edit Task"
                   >
                     <Edit2 className="w-3.5 h-3.5" />
                   </button>
-                  <button
-                    onClick={() => handleDelete(t._id)}
-                    className="p-1 text-slate-400 hover:text-red-500"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
+                  {t.taskType === 'HR_Assigned' && user?.role !== 'HR' ? (
+                    <span
+                      className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-500 border border-slate-200"
+                      title="Tasks assigned by HR cannot be deleted by employees"
+                    >
+                      HR Locked
+                    </span>
+                  ) : (
+                    <button
+                      onClick={() => handleDelete(t._id)}
+                      className="p-1 text-slate-400 hover:text-red-500 cursor-pointer"
+                      title="Delete Task"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                 </div>
               </div>
             );
@@ -429,18 +455,27 @@ export default function EmployeeTasks() {
                         <div className="flex items-center justify-end gap-1.5">
                           <button
                             onClick={() => openEditModal(t)}
-                            className="p-1.5 text-slate-400 hover:text-blue-600 rounded-lg hover:bg-blue-50 transition"
+                            className="p-1.5 text-slate-400 hover:text-blue-600 rounded-lg hover:bg-blue-50 transition cursor-pointer"
                             title="Edit Task"
                           >
                             <Edit2 className="w-3.5 h-3.5" />
                           </button>
-                          <button
-                            onClick={() => handleDelete(t._id)}
-                            className="p-1.5 text-slate-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition"
-                            title="Delete Task"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                          {t.taskType === 'HR_Assigned' && user?.role !== 'HR' ? (
+                            <span
+                              className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-500 border border-slate-200"
+                              title="Tasks assigned by HR cannot be deleted by employees"
+                            >
+                              HR Locked
+                            </span>
+                          ) : (
+                            <button
+                              onClick={() => handleDelete(t._id)}
+                              className="p-1.5 text-slate-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition cursor-pointer"
+                              title="Delete Task"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>

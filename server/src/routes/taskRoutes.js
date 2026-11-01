@@ -58,7 +58,7 @@ router.post('/personal', protect, async (req, res, next) => {
       priority: priority || 'Medium',
       taskType: assignedType,
       employee: req.user.employee._id,
-      status: 'Pending'
+      status: 'New'
     });
 
     res.status(201).json({
@@ -79,7 +79,7 @@ router.patch('/:id/status', protect, async (req, res, next) => {
   try {
     const { status } = req.body;
 
-    if (!['Pending', 'In Progress', 'Completed'].includes(status)) {
+    if (!['New', 'Pending', 'In Progress', 'Completed'].includes(status)) {
       return res.status(400).json({ success: false, message: 'Invalid status' });
     }
 
@@ -110,7 +110,7 @@ router.patch('/:id/status', protect, async (req, res, next) => {
 
 /**
  * DELETE /api/tasks/:id
- * Delete personal task
+ * Delete personal task (Employees cannot delete HR assigned tasks)
  */
 router.delete('/:id', protect, async (req, res, next) => {
   try {
@@ -119,8 +119,11 @@ router.delete('/:id', protect, async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Task not found' });
     }
 
-    if (task.taskType === 'HR_Assigned' && req.user.role !== 'HR' && task.assignedBy && task.assignedBy.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ success: false, message: 'Employees cannot delete tasks assigned by HR administrators' });
+    if (task.taskType === 'HR_Assigned' && req.user.role !== 'HR') {
+      return res.status(403).json({
+        success: false,
+        message: 'Employees cannot delete tasks assigned by HR administrators'
+      });
     }
 
     if (req.user.role === 'Employee' && task.employee.toString() !== req.user.employee._id.toString()) {
@@ -230,7 +233,7 @@ router.post('/assign', protect, authorize('HR'), async (req, res, next) => {
       taskType: 'HR_Assigned',
       employee: employee._id,
       assignedBy: req.user._id,
-      status: 'Pending'
+      status: 'New'
     });
 
     // Notify employee

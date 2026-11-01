@@ -382,7 +382,7 @@ export default function HRAttendance() {
                 <div className="text-[11px] text-slate-500 bg-slate-50 px-2.5 py-1.5 rounded-xl border border-slate-200/70 inline-flex items-center gap-1">
                   <span>Joined:</span>
                   <strong className="text-slate-800 font-mono font-bold">
-                    {joinDateStr || '01-01-2024'}
+                    {joinDateStr || (currentEmp?.createdAt ? new Date(currentEmp.createdAt).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10))}
                   </strong>
                 </div>
               )}

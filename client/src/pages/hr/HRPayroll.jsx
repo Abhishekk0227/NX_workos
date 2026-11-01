@@ -28,7 +28,8 @@ import api from '../../api/client';
 export default function HRPayroll() {
   const [activeTab, setActiveTab] = useState('preview'); // 'preview' | 'leaves' | 'history'
 
-  const currentMonthStr = '2025-06'; // June 2025 default matching mockup
+  const now = new Date();
+  const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   const [selectedMonth, setSelectedMonth] = useState(currentMonthStr);
   const [previews, setPreviews] = useState([]);
   const [missingProfiles, setMissingProfiles] = useState([]);
@@ -166,12 +167,12 @@ export default function HRPayroll() {
   };
 
   // Calculations
-  const totalEmployeesCount = previews.length > 0 ? previews.length : 28;
-  const totalGross = previews.reduce((acc, p) => acc + (p.grossSalary || 0), 0) || 892000;
-  const totalDeductions = previews.reduce((acc, p) => acc + (p.totalDeductions || p.lwpDeduction || 0), 0) || 12500;
-  const totalNet = previews.reduce((acc, p) => acc + (p.netPayable || 0), 0) || 879500;
+  const totalEmployeesCount = previews.length;
+  const totalGross = previews.reduce((acc, p) => acc + (p.grossSalary || 0), 0);
+  const totalDeductions = previews.reduce((acc, p) => acc + (p.totalDeductions || p.lwpDeduction || 0), 0);
+  const totalNet = previews.reduce((acc, p) => acc + (p.netPayable || 0), 0);
 
-  const processedCount = previews.filter(p => p.savedStatus === 'Finalized' || p.savedStatus === 'Review' || p.savedStatus === 'Draft').length || 26;
+  const processedCount = previews.filter(p => p.savedStatus === 'Finalized' || p.savedStatus === 'Review' || p.savedStatus === 'Draft').length;
   const pendingCount = Math.max(0, totalEmployeesCount - processedCount);
 
   return (

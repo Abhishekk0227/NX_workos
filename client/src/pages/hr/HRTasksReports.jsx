@@ -32,7 +32,7 @@ export default function HRTasksReports() {
   const [employees, setEmployees] = useState([]);
   const [tasksLoading, setTasksLoading] = useState(true);
   const [selectedEmpFilter, setSelectedEmpFilter] = useState('All');
-  const [selectedStatusFilter, setSelectedStatusFilter] = useState('All');
+  const [selectedStatusFilter, setSelectedStatusFilter] = useState('New');
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [assignForm, setAssignForm] = useState({
     employeeId: '',
@@ -206,8 +206,9 @@ export default function HRTasksReports() {
             <select
               value={selectedStatusFilter}
               onChange={(e) => setSelectedStatusFilter(e.target.value)}
-              className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-700 outline-none"
+              className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 outline-none cursor-pointer"
             >
+              <option value="New">New</option>
               <option value="All">All Statuses</option>
               <option value="Pending">Pending</option>
               <option value="In Progress">In Progress</option>
