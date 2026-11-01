@@ -148,11 +148,11 @@ export default function HRTasksReports() {
       </div>
 
       {/* Segmented Tab Switcher */}
-      <div className="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between flex-wrap gap-3">
-        <div className="flex bg-slate-200/70 p-1 rounded-xl">
+      <div className="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+        <div className="flex bg-slate-200/70 p-1 rounded-xl w-full md:w-auto">
           <button
             onClick={() => setActiveTab('reports')}
-            className={`px-4 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+            className={`flex-1 md:flex-initial text-center px-3 sm:px-4 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
               activeTab === 'reports'
                 ? 'bg-white text-slate-900 shadow-xs'
                 : 'text-slate-600 hover:text-slate-900'
@@ -162,7 +162,7 @@ export default function HRTasksReports() {
           </button>
           <button
             onClick={() => setActiveTab('tasks')}
-            className={`px-4 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+            className={`flex-1 md:flex-initial text-center px-3 sm:px-4 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
               activeTab === 'tasks'
                 ? 'bg-white text-slate-900 shadow-xs'
                 : 'text-slate-600 hover:text-slate-900'
@@ -173,17 +173,17 @@ export default function HRTasksReports() {
         </div>
 
         {activeTab === 'reports' ? (
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full md:w-auto">
             <input
               type="date"
               value={reportDate}
               onChange={(e) => setReportDate(e.target.value)}
-              className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-700 outline-none"
+              className="w-full sm:w-auto px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-700 outline-none"
             />
             <select
               value={reportEmpFilter}
               onChange={(e) => setReportEmpFilter(e.target.value)}
-              className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-700 outline-none"
+              className="w-full sm:w-auto min-w-0 max-w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-700 outline-none truncate"
             >
               <option value="All">All Staff</option>
               {employees.map((e) => (
@@ -192,11 +192,11 @@ export default function HRTasksReports() {
             </select>
           </div>
         ) : (
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full md:w-auto">
             <select
               value={selectedEmpFilter}
               onChange={(e) => setSelectedEmpFilter(e.target.value)}
-              className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-700 outline-none"
+              className="w-full sm:w-auto min-w-0 max-w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-700 outline-none truncate"
             >
               <option value="All">All Employees</option>
               {employees.map((e) => (
@@ -206,7 +206,7 @@ export default function HRTasksReports() {
             <select
               value={selectedStatusFilter}
               onChange={(e) => setSelectedStatusFilter(e.target.value)}
-              className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 outline-none cursor-pointer"
+              className="w-full sm:w-auto px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 outline-none cursor-pointer"
             >
               <option value="New">New</option>
               <option value="All">All Statuses</option>
@@ -500,8 +500,8 @@ export default function HRTasksReports() {
 
       {/* ASSIGN TASK MODAL */}
       {showAssignModal && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-start sm:items-center justify-center p-2 sm:p-4 pt-4 sm:pt-6 pb-20 sm:pb-8">
+          <div className="w-full max-w-md bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-100 overflow-hidden my-auto sm:my-8 animate-in fade-in zoom-in-95 duration-150">
             <div className="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
               <div>
                 <h3 className="font-bold text-base">Assign Directive Task</h3>

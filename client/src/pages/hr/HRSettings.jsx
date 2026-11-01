@@ -178,7 +178,7 @@ export default function HRSettings() {
 
       {/* Segmented Navigation Tabs */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
-        <div className="p-2.5 bg-slate-50 border-b border-slate-200/80 flex items-center gap-1.5 overflow-x-auto">
+        <div className="p-2 sm:p-2.5 bg-slate-50 border-b border-slate-200/80 flex items-center gap-1.5 overflow-x-auto w-full max-w-full">
           {[
             { id: 'shifts', label: 'Shift & Hours', icon: Clock },
             { id: 'policy', label: 'Attendance & Leave Policy', icon: ShieldCheck },

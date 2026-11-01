@@ -236,8 +236,8 @@ export default function HRMoreMenu() {
 
       {/* Change Password Modal */}
       {showPasswordModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="w-full max-w-sm bg-white rounded-3xl p-6 shadow-2xl border border-slate-100 space-y-4 animate-in fade-in zoom-in-95">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-start sm:items-center justify-center p-2 sm:p-4 pt-4 sm:pt-6 pb-20 sm:pb-8">
+          <div className="w-full max-w-sm bg-white rounded-2xl sm:rounded-3xl p-6 shadow-2xl border border-slate-100 space-y-4 my-auto sm:my-8 animate-in fade-in zoom-in-95">
             <div className="flex items-center justify-between pb-2 border-b border-slate-100">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
@@ -325,8 +325,8 @@ export default function HRMoreMenu() {
 
       {/* Profile Details Modal */}
       {showProfileModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="w-full max-w-sm bg-white rounded-3xl p-6 shadow-2xl border border-slate-100 space-y-4">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-start sm:items-center justify-center p-2 sm:p-4 pt-4 sm:pt-6 pb-20 sm:pb-8">
+          <div className="w-full max-w-sm bg-white rounded-2xl sm:rounded-3xl p-6 shadow-2xl border border-slate-100 space-y-4 my-auto sm:my-8 animate-in fade-in zoom-in-95">
             <div className="flex items-center justify-between pb-2 border-b border-slate-100">
               <h3 className="text-sm font-bold text-slate-900">HR Administrator Profile</h3>
               <button onClick={() => setShowProfileModal(false)} className="text-slate-400">
@@ -366,8 +366,8 @@ export default function HRMoreMenu() {
 
       {/* Help Modal */}
       {showHelpModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="w-full max-w-sm bg-white rounded-3xl p-6 shadow-2xl border border-slate-100 space-y-3">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-start sm:items-center justify-center p-2 sm:p-4 pt-4 sm:pt-6 pb-20 sm:pb-8">
+          <div className="w-full max-w-sm bg-white rounded-2xl sm:rounded-3xl p-6 shadow-2xl border border-slate-100 space-y-3 my-auto sm:my-8 animate-in fade-in zoom-in-95">
             <div className="flex items-center justify-between pb-2 border-b border-slate-100">
               <h3 className="text-sm font-bold text-slate-900">Help & Support</h3>
               <button onClick={() => setShowHelpModal(false)} className="text-slate-400">
@@ -393,8 +393,8 @@ export default function HRMoreMenu() {
 
       {/* About Modal */}
       {showAboutModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="w-full max-w-sm bg-white rounded-3xl p-6 shadow-2xl border border-slate-100 space-y-3">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-start sm:items-center justify-center p-2 sm:p-4 pt-4 sm:pt-6 pb-20 sm:pb-8">
+          <div className="w-full max-w-sm bg-white rounded-2xl sm:rounded-3xl p-6 shadow-2xl border border-slate-100 space-y-3 my-auto sm:my-8 animate-in fade-in zoom-in-95">
             <div className="flex items-center justify-between pb-2 border-b border-slate-100">
               <h3 className="text-sm font-bold text-slate-900">About NX Work OS</h3>
               <button onClick={() => setShowAboutModal(false)} className="text-slate-400">

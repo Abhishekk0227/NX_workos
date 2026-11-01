@@ -46,7 +46,7 @@ export default function HRLayout() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#f8f9fa] flex flex-col md:flex-row pb-16 md:pb-0">
+    <div className="min-h-screen bg-[#f8f9fa] flex flex-col md:flex-row pb-16 md:pb-0 overflow-x-hidden w-full max-w-full">
       {/* Desktop Left Sidebar (Matching hrpanelD.png) */}
       <aside
         className="hidden md:sticky md:flex top-0 left-0 z-50 h-screen w-60 bg-[#0f172a] text-slate-300 flex-col border-r border-slate-800"
@@ -90,7 +90,7 @@ export default function HRLayout() {
       </aside>
 
       {/* Main Viewport */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 w-full overflow-x-hidden">
         {/* Mobile Top Header (matching HrpanelMui.png) */}
         <div className="md:hidden sticky top-0 z-30 bg-[#0f172a] text-white px-4 py-3 flex items-center justify-between shadow-sm">
           <Link to="/hr/dashboard" className="flex items-center gap-2.5">
@@ -133,7 +133,7 @@ export default function HRLayout() {
         </div>
 
         {/* Main Content Area */}
-        <main className="flex-1 p-2.5 sm:p-6 md:p-8 max-w-7xl w-full mx-auto">
+        <main className="flex-1 p-2.5 sm:p-6 md:p-8 max-w-7xl w-full mx-auto overflow-x-hidden">
           <Outlet />
         </main>
       </div>

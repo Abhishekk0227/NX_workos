@@ -197,14 +197,14 @@ export default function HRLeave() {
       </div>
 
       {/* Filter Tabs Bar matching Mockup */}
-      <div className="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between flex-wrap gap-3">
+      <div className="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
         {/* Status Filter Tabs: All | Pending | Approved | Rejected */}
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
           {['All', 'Pending', 'Approved', 'Rejected'].map((status) => (
             <button
               key={status}
               onClick={() => setStatusFilter(status)}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+              className={`flex-1 sm:flex-initial text-center px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer shrink-0 ${
                 statusFilter === status
                   ? 'bg-slate-900 text-white shadow-xs'
                   : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
@@ -216,12 +216,12 @@ export default function HRLeave() {
         </div>
 
         {/* Type Filter */}
-        <div className="flex items-center gap-2">
-          <label className="text-[11px] font-bold text-slate-500">Classification:</label>
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <label className="text-[11px] font-bold text-slate-500 whitespace-nowrap">Classification:</label>
           <select
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value)}
-            className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 outline-none"
+            className="w-full sm:w-auto px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 outline-none"
           >
             <option value="All">All Types</option>
             <option value="CL">Casual Leave (CL)</option>
@@ -463,8 +463,8 @@ export default function HRLeave() {
 
       {/* LEDGER MODAL */}
       {showLedgerModal && ledgerTarget && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-start sm:items-center justify-center p-2 sm:p-4 pt-4 sm:pt-6 pb-20 sm:pb-8">
+          <div className="w-full max-w-2xl bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-100 overflow-hidden my-auto sm:my-8 animate-in fade-in zoom-in-95 duration-150">
             <div className="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
               <div>
                 <h3 className="font-bold text-base">Employee Leave Ledger & Balance</h3>
@@ -526,8 +526,8 @@ export default function HRLeave() {
 
       {/* POLICY MODAL */}
       {showPolicyModal && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-start sm:items-center justify-center p-2 sm:p-4 pt-4 sm:pt-6 pb-20 sm:pb-8">
+          <div className="w-full max-w-md bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-100 overflow-hidden my-auto sm:my-8 animate-in fade-in zoom-in-95 duration-150">
             <div className="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
               <div>
                 <h3 className="font-bold text-base">Leave Policy Configuration</h3>

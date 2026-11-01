@@ -46,7 +46,7 @@ export default function EmployeeLayout() {
   const displayInitials = emp?.fullName ? emp.fullName.split(' ').map(n => n[0]).join('') : 'RS';
 
   return (
-    <div className="min-h-screen bg-[#f8f9fa] flex flex-col md:flex-row pb-16 md:pb-0">
+    <div className="min-h-screen bg-[#f8f9fa] flex flex-col md:flex-row pb-16 md:pb-0 overflow-x-hidden w-full max-w-full">
       {/* Mobile Drawer Backdrop */}
       {mobileDrawerOpen && (
         <div
@@ -104,7 +104,7 @@ export default function EmployeeLayout() {
       </aside>
 
       {/* Main Viewport Container */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 w-full overflow-x-hidden">
         {/* Top Mobile Bar matching EppanelM.png */}
         <div className="md:hidden sticky top-0 z-30 bg-[#0f172a] text-white px-4 py-3 flex items-center justify-between shadow-sm">
           <button
@@ -152,7 +152,7 @@ export default function EmployeeLayout() {
         </div>
 
         {/* Content Area */}
-        <main className="flex-1 p-2.5 sm:p-6 md:p-8 max-w-6xl w-full mx-auto">
+        <main className="flex-1 p-2.5 sm:p-6 md:p-8 max-w-6xl w-full mx-auto overflow-x-hidden">
           <Outlet />
         </main>
       </div>

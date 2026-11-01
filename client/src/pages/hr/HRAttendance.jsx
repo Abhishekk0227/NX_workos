@@ -277,10 +277,10 @@ export default function HRAttendance() {
         </div>
 
         {/* Segmented View Switch: Monthly Calendar vs Daily Log */}
-        <div className="flex bg-slate-200/70 p-1 rounded-xl">
+        <div className="flex bg-slate-200/70 p-1 rounded-xl w-full sm:w-auto">
           <button
             onClick={() => setViewMode('calendar')}
-            className={`px-4 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+            className={`flex-1 sm:flex-initial text-center px-4 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
               viewMode === 'calendar'
                 ? 'bg-white text-slate-900 shadow-xs'
                 : 'text-slate-600 hover:text-slate-900'
@@ -290,7 +290,7 @@ export default function HRAttendance() {
           </button>
           <button
             onClick={() => setViewMode('log')}
-            className={`px-4 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+            className={`flex-1 sm:flex-initial text-center px-4 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
               viewMode === 'log'
                 ? 'bg-white text-slate-900 shadow-xs'
                 : 'text-slate-600 hover:text-slate-900'
@@ -711,23 +711,23 @@ export default function HRAttendance() {
       {viewMode === 'log' && (
         <div className="space-y-4">
           {/* Filters Bar */}
-          <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex flex-wrap items-center gap-3">
-            <div>
+          <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+            <div className="w-full sm:w-auto">
               <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Date</label>
               <input
                 type="date"
                 value={selectedDate}
                 onChange={(e) => setSelectedDate(e.target.value)}
-                className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-700 outline-none"
+                className="w-full sm:w-auto px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-700 outline-none"
               />
             </div>
 
-            <div>
+            <div className="w-full sm:w-auto flex-1 min-w-0">
               <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Employee</label>
               <select
                 value={selectedEmployee}
                 onChange={(e) => setSelectedEmployee(e.target.value)}
-                className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-700 outline-none min-w-40"
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-700 outline-none truncate"
               >
                 <option value="All">All Staff</option>
                 {employees.map((emp) => (
@@ -738,12 +738,12 @@ export default function HRAttendance() {
               </select>
             </div>
 
-            <div>
+            <div className="w-full sm:w-auto">
               <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Status</label>
               <select
                 value={selectedStatus}
                 onChange={(e) => setSelectedStatus(e.target.value)}
-                className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-700 outline-none"
+                className="w-full sm:w-auto px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-700 outline-none"
               >
                 <option value="All">All Statuses</option>
                 <option value="Present">Present</option>
@@ -958,8 +958,8 @@ export default function HRAttendance() {
 
       {/* MANUAL CORRECTION MODAL */}
       {showOverrideModal && overrideTarget && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-start sm:items-center justify-center p-2 sm:p-4 pt-4 sm:pt-6 pb-20 sm:pb-8">
+          <div className="w-full max-w-lg bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-100 overflow-hidden my-auto sm:my-8 animate-in fade-in zoom-in-95 duration-150">
             <div className="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
               <div>
                 <h3 className="font-bold text-base">HR Attendance Correction</h3>
