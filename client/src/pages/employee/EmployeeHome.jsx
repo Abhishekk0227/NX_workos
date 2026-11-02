@@ -23,6 +23,7 @@ import PunchInModal from '../../components/modals/PunchInModal';
 import PunchOutModal from '../../components/modals/PunchOutModal';
 
 import { HomeShimmer } from '../../components/common/Shimmer';
+import { formatWorkingHours } from '../../utils/timeUtils';
 
 export default function EmployeeHome() {
   const { user } = useAuth();
@@ -117,16 +118,13 @@ export default function EmployeeHome() {
         const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
         setLiveWorkingHours(`${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`);
       } else if (attendance?.punchIn && attendance?.punchOut) {
-        if (attendance.actualWorkingHours) {
-          const totalMinutes = Math.round(attendance.actualWorkingHours * 60);
-          const hours = Math.floor(totalMinutes / 60);
-          const minutes = totalMinutes % 60;
-          setLiveWorkingHours(`${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`);
+        if (attendance.workingHoursFormatted && attendance.workingHoursFormatted !== '0:00') {
+          setLiveWorkingHours(attendance.workingHoursFormatted);
         } else {
           const diffMs = Math.max(0, new Date(attendance.punchOut).getTime() - new Date(attendance.punchIn).getTime());
           const hours = Math.floor(diffMs / (1000 * 60 * 60));
           const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-          setLiveWorkingHours(`${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`);
+          setLiveWorkingHours(`${hours}:${String(minutes).padStart(2, '0')}`);
         }
       } else {
         setLiveWorkingHours('00:00');
@@ -252,7 +250,7 @@ export default function EmployeeHome() {
         ) : (
           <div className="w-full py-3 px-4 bg-emerald-50 border border-emerald-200 text-emerald-800 font-bold text-xs sm:text-sm rounded-2xl text-center flex items-center justify-center gap-2 shadow-2xs">
             <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
-            <span>Shift Completed ({attendance?.actualWorkingHours || 8}h recorded)</span>
+            <span>Shift Completed ({formatWorkingHours(attendance)} recorded)</span>
           </div>
         )}
       </div>

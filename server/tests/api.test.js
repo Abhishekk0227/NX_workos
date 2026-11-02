@@ -46,7 +46,7 @@ test('PayrollService: Days in month calculation', () => {
   assert.equal(PayrollService.getDaysInMonth('2026-11'), 30, 'November 2026 has 30 days');
 });
 
-test('AttendanceService: Timezone-safe working hours and shift clamping (User Report Case)', () => {
+test('AttendanceService: Timezone-safe direct working hours calculation (punchOut - punchIn)', () => {
   const shift = {
     startTime: '10:00',
     endTime: '18:00',
@@ -68,13 +68,13 @@ test('AttendanceService: Timezone-safe working hours and shift clamping (User Re
   assert.equal(metrics.earlyMinutes, 8, 'Punch out at 17:52 PM is 8m early before 18:00');
   assert.equal(metrics.status, 'Late', 'Status should be Late, NOT Half Day');
 
-  // Early arrival (09:30 AM IST = 04:00 UTC) should clamp to 10:00 AM IST
-  const earlyPunchIn = '2026-11-02T04:00:00.000Z';
-  const normalPunchOut = '2026-11-02T12:30:00.000Z'; // 18:00 IST
-  const metricsClamped = AttendanceService.calculateAttendanceMetrics(earlyPunchIn, normalPunchOut, shift, settings);
-  assert.equal(metricsClamped.actualWorkingHours, 8, 'Early arrival clamped to shift start gives exactly 8 hrs');
-  assert.equal(metricsClamped.lateMinutes, 0, 'On-time arrival has 0 late minutes');
-  assert.equal(metricsClamped.earlyMinutes, 0, 'On-time departure has 0 early minutes');
-  assert.equal(metricsClamped.status, 'Present', 'Status should be Present');
+  // User Specific Case: 9:58 AM IST punch in (04:28 UTC), 7:20 PM IST punch out (13:50 UTC) -> 9:22 hours
+  const userPunchIn = '2026-11-02T04:28:00.000Z'; // 09:58 AM IST
+  const userPunchOut = '2026-11-02T13:50:00.000Z'; // 19:20 (07:20 PM) IST
+  const userMetrics = AttendanceService.calculateAttendanceMetrics(userPunchIn, userPunchOut, shift, settings);
+  assert.equal(userMetrics.workingHoursFormatted, '9:22', 'Working hours formatted must be exactly 9:22');
+  assert.equal(userMetrics.actualWorkingHours, 9.37, 'Working hours decimal must be 9.37 hrs (562 minutes / 60)');
+  assert.equal(userMetrics.lateMinutes, 0, 'Arrival at 09:58 AM is on-time for 10:00 AM shift');
+  assert.equal(userMetrics.status, 'Present', 'Status should be Present');
 });
 

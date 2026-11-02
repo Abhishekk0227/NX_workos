@@ -51,6 +51,10 @@ const attendanceSchema = new mongoose.Schema(
       type: Number,
       default: 0
     },
+    workingHoursFormatted: {
+      type: String,
+      default: '0:00'
+    },
     lateMinutes: {
       type: Number,
       default: 0

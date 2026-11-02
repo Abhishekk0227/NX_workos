@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, LogOut, Plus, Trash2, CheckCircle2, AlertCircle, FileText } from 'lucide-react';
 import api from '../../api/client';
+import { formatWorkingHours } from '../../utils/timeUtils';
 
 export default function PunchOutModal({ isOpen, onClose, onSuccess, punchIn }) {
   const [bullets, setBullets] = useState(['']);
@@ -102,7 +103,7 @@ export default function PunchOutModal({ isOpen, onClose, onSuccess, punchIn }) {
               <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 text-xs text-slate-700 space-y-1">
                 <div className="flex justify-between">
                   <span>Actual Working Hours:</span>
-                  <strong className="text-blue-700 text-sm">{successData.attendance?.actualWorkingHours} hrs</strong>
+                  <strong className="text-blue-700 text-sm font-semibold">{formatWorkingHours(successData.attendance)}</strong>
                 </div>
                 <div className="flex justify-between">
                   <span>Final Status:</span>

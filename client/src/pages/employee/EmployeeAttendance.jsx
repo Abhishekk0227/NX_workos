@@ -17,6 +17,7 @@ import api from '../../api/client';
 import PunchInModal from '../../components/modals/PunchInModal';
 import PunchOutModal from '../../components/modals/PunchOutModal';
 import { AttendanceShimmer } from '../../components/common/Shimmer';
+import { formatTime24, formatWorkingHours } from '../../utils/timeUtils';
 
 export default function EmployeeAttendance() {
   const [activeTab, setActiveTab] = useState('details'); // 'details' | 'calendar' | 'history'
@@ -235,8 +236,8 @@ export default function EmployeeAttendance() {
               {!todayAttendance?.punchIn
                 ? "You haven't marked your attendance yet."
                 : isWorking
-                ? `Punched in at ${new Date(todayAttendance.punchIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
-                : `Completed today. Working hours: ${todayAttendance.actualWorkingHours} hrs`}
+                ? `Punched in at ${formatTime24(todayAttendance.punchIn)}`
+                : `Completed today. Working hours: ${formatWorkingHours(todayAttendance)}`}
             </p>
 
             {!todayAttendance?.punchIn ? (
@@ -277,7 +278,7 @@ export default function EmployeeAttendance() {
               <div className="flex justify-between py-1.5 border-b border-slate-100">
                 <span className="text-slate-500">Working Hours</span>
                 <span className="font-bold text-slate-800">
-                  {todayAttendance?.actualWorkingHours ? `${todayAttendance.actualWorkingHours} hours` : '8 hours'}
+                  {todayAttendance?.actualWorkingHours ? formatWorkingHours(todayAttendance) : '8 hours'}
                 </span>
               </div>
               <div className="flex justify-between py-1.5">
@@ -383,8 +384,9 @@ export default function EmployeeAttendance() {
                       {matchedRecord ? (
                         <>
                           Status: <strong className="text-slate-800">{matchedRecord.status}</strong> •
-                          Punch: {matchedRecord.punchIn ? new Date(matchedRecord.punchIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}
-                          {matchedRecord.actualWorkingHours ? ` (${matchedRecord.actualWorkingHours} hrs)` : ''}
+                          Punch: {matchedRecord.punchIn ? formatTime24(matchedRecord.punchIn) : '—'}
+                          {matchedRecord.punchOut ? ` – ${formatTime24(matchedRecord.punchOut)}` : ''}
+                          {` (${formatWorkingHours(matchedRecord)})`}
                         </>
                       ) : (
                         <span>Status: <strong>{selectedItem.status || 'No record'}</strong></span>
@@ -467,10 +469,10 @@ export default function EmployeeAttendance() {
 
                     <div>
                       <div className="font-bold text-slate-800">
-                        {att.punchIn ? `${new Date(att.punchIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} – ${att.punchOut ? new Date(att.punchOut).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'In progress'}` : 'Not Marked'}
+                        {att.punchIn ? `${formatTime24(att.punchIn)} – ${att.punchOut ? formatTime24(att.punchOut) : 'In progress'}` : 'Not Marked'}
                       </div>
                       <div className="text-[11px] text-slate-400 mt-0.5">
-                        Working Hours: {att.actualWorkingHours ? `${att.actualWorkingHours} hrs` : '-'}
+                        Working Hours: {att.punchOut ? formatWorkingHours(att) : '-'}
                       </div>
                     </div>
                   </div>

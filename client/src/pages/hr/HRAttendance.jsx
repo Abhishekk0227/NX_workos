@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import api from '../../api/client';
 import { TableShimmer, AttendanceShimmer, CardListShimmer } from '../../components/common/Shimmer';
+import { formatTime24, formatWorkingHours } from '../../utils/timeUtils';
 
 export default function HRAttendance() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -727,7 +728,7 @@ export default function HRAttendance() {
                         {selIsPreJoin
                           ? `Employment started on ${joinDateStr}. Prior days are completely free from penalties.`
                           : selRec?.punchIn
-                          ? `Punch In: ${new Date(selRec.punchIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • Punch Out: ${selRec.punchOut ? new Date(selRec.punchOut).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'In Progress'} • ${selRec.actualWorkingHours || 0} hrs`
+                          ? `Punch In: ${formatTime24(selRec.punchIn)} • Punch Out: ${selRec.punchOut ? formatTime24(selRec.punchOut) : 'In Progress'} • ${formatWorkingHours(selRec)}`
                           : selIsSunday
                           ? 'Scheduled weekly holiday.'
                           : selIsFuture
@@ -884,9 +885,9 @@ export default function HRAttendance() {
 
                     <div className="grid grid-cols-2 gap-2 text-[11px] bg-slate-50 p-2.5 rounded-xl border border-slate-100">
                       <div>
-                        <span className="text-slate-400 block text-[9px] uppercase font-bold">Punch In</span>
+                        <span className="text-slate-400 block text-[9px] uppercase font-bold">Punch In (24h)</span>
                         <span className="font-semibold text-slate-800">
-                          {att.punchIn ? new Date(att.punchIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}
+                          {formatTime24(att.punchIn)}
                         </span>
                         {isLate && (
                           <span className="text-[9px] text-amber-600 font-bold block">+{att.lateMinutes}m late</span>
@@ -894,12 +895,12 @@ export default function HRAttendance() {
                       </div>
 
                       <div>
-                        <span className="text-slate-400 block text-[9px] uppercase font-bold">Punch Out</span>
+                        <span className="text-slate-400 block text-[9px] uppercase font-bold">Punch Out (24h)</span>
                         <span className="font-semibold text-slate-800">
-                          {att.punchOut ? new Date(att.punchOut).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'In progress'}
+                          {att.punchOut ? formatTime24(att.punchOut) : 'In progress'}
                         </span>
-                        <span className="text-[9px] text-slate-500 block">
-                          {att.actualWorkingHours ? `${att.actualWorkingHours} hrs` : '—'}
+                        <span className="text-[9px] text-blue-600 font-bold block">
+                          {att.punchOut ? formatWorkingHours(att) : '—'}
                         </span>
                       </div>
                     </div>
@@ -940,8 +941,8 @@ export default function HRAttendance() {
                 <thead>
                   <tr className="bg-slate-50/80 border-b border-slate-200/80 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                     <th className="py-3.5 px-4">Employee</th>
-                    <th className="py-3.5 px-4">Punch In</th>
-                    <th className="py-3.5 px-4">Punch Out</th>
+                    <th className="py-3.5 px-4">Punch In (24h)</th>
+                    <th className="py-3.5 px-4">Punch Out (24h)</th>
                     <th className="py-3.5 px-4">Working Hours</th>
                     <th className="py-3.5 px-4">Status</th>
                     <th className="py-3.5 px-4">Daily Report</th>
@@ -973,8 +974,8 @@ export default function HRAttendance() {
                           <td className="py-3.5 px-4">
                             {att.punchIn ? (
                               <div>
-                                <span className="font-semibold text-slate-900">
-                                  {new Date(att.punchIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                <span className="font-semibold text-slate-900 font-mono">
+                                  {formatTime24(att.punchIn)}
                                 </span>
                                 {isLate && (
                                   <div className="text-[10px] text-amber-600 font-medium">
@@ -987,10 +988,10 @@ export default function HRAttendance() {
                             )}
                           </td>
 
-                          <td className="py-3.5 px-4">
+                          <td className="py-3.5 px-4 font-mono">
                             {att.punchOut ? (
                               <span className="font-semibold text-slate-900">
-                                {new Date(att.punchOut).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                {formatTime24(att.punchOut)}
                               </span>
                             ) : (
                               <span className="text-slate-400 italic">In progress</span>
@@ -998,8 +999,8 @@ export default function HRAttendance() {
                           </td>
 
                           <td className="py-3.5 px-4">
-                            <span className="font-mono font-semibold text-slate-800">
-                              {att.actualWorkingHours ? `${att.actualWorkingHours} hrs` : '—'}
+                            <span className="font-mono font-bold text-slate-900">
+                              {att.punchOut ? formatWorkingHours(att) : '—'}
                             </span>
                           </td>
 
@@ -1084,13 +1085,14 @@ export default function HRAttendance() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Punch Out Time</label>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Punch Out Time (24h Clock)</label>
                   <input
                     type="datetime-local"
                     value={overrideData.punchOut}
                     onChange={(e) => setOverrideData({ ...overrideData, punchOut: e.target.value })}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none"
                   />
+                  <span className="text-[10px] text-slate-400 mt-0.5 block">24h format (e.g. 19:20 for 7:20 PM)</span>
                 </div>
               </div>
 

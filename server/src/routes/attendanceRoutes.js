@@ -187,6 +187,7 @@ router.post('/punch-out', protect, async (req, res, next) => {
     attendance.punchOut = now;
     attendance.dailyReport = report._id;
     attendance.actualWorkingHours = metrics.actualWorkingHours;
+    attendance.workingHoursFormatted = metrics.workingHoursFormatted;
     attendance.lateMinutes = metrics.lateMinutes;
     attendance.earlyMinutes = metrics.earlyMinutes;
     attendance.status = metrics.status;
@@ -486,6 +487,7 @@ router.post('/review-correction', protect, authorize('HR'), async (req, res, nex
       );
 
       attendance.actualWorkingHours = metrics.actualWorkingHours;
+      attendance.workingHoursFormatted = metrics.workingHoursFormatted;
       attendance.lateMinutes = metrics.lateMinutes;
       attendance.earlyMinutes = metrics.earlyMinutes;
       attendance.status = metrics.status;
@@ -597,6 +599,7 @@ router.post('/manual-correct', protect, authorize('HR'), async (req, res, next) 
         settings
       );
       attendance.actualWorkingHours = metrics.actualWorkingHours;
+      attendance.workingHoursFormatted = metrics.workingHoursFormatted;
       attendance.lateMinutes = metrics.lateMinutes;
       attendance.earlyMinutes = metrics.earlyMinutes;
       attendance.status = (!status || status === 'Auto') ? metrics.status : status;
@@ -611,6 +614,7 @@ router.post('/manual-correct', protect, authorize('HR'), async (req, res, next) 
       );
       attendance.lateMinutes = metrics.lateMinutes;
       attendance.actualWorkingHours = 0;
+      attendance.workingHoursFormatted = '0:00';
       attendance.status = (!status || status === 'Auto') ? metrics.status : status;
     } else if (status && status !== 'Auto') {
       attendance.status = status;

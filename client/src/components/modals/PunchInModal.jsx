@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, LogIn, AlertCircle, ShieldCheck, CheckCircle2 } from 'lucide-react';
 import api from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
+import { formatTime24 } from '../../utils/timeUtils';
 
 export default function PunchInModal({ isOpen, onClose, onSuccess }) {
   const { user } = useAuth();
@@ -75,7 +76,7 @@ export default function PunchInModal({ isOpen, onClose, onSuccess }) {
               <p className="text-sm text-slate-600">{successData.message}</p>
               <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 text-xs text-slate-700 flex justify-between">
                 <span>Status: <strong className="text-blue-600">{successData.attendance?.status}</strong></span>
-                <span>Time: <strong>{new Date(successData.attendance?.punchIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</strong></span>
+                <span>Time: <strong>{formatTime24(successData.attendance?.punchIn)}</strong></span>
               </div>
               <button
                 onClick={handleClose}

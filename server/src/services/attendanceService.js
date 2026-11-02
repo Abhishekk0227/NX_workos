@@ -108,6 +108,7 @@ class AttendanceService {
         lateMinutes: 0,
         earlyMinutes: 0,
         actualWorkingHours: 0,
+        workingHoursFormatted: '0:00',
         status: 'Absent'
       };
     }
@@ -146,6 +147,7 @@ class AttendanceService {
         lateMinutes,
         earlyMinutes: 0,
         actualWorkingHours: 0,
+        workingHoursFormatted: '0:00',
         status: 'Working'
       };
     }
@@ -156,22 +158,18 @@ class AttendanceService {
       earlyMinutes = shiftEndMinutes - punchOutMinutes;
     }
 
-    // Conditions 11 & 12: Working hours calculate strictly within allotted shift boundaries (No extra/overtime counting)
+    // Direct punchOut - punchIn difference (No shift clamping)
     const pInDate = new Date(punchIn);
     const pOutDate = new Date(punchOut);
-
-    const shiftStartDate = this.getTimestampForTimeInTimezone(pInDate, activeShift.startTime || '09:00', timezone);
-    let shiftEndDate = this.getTimestampForTimeInTimezone(pInDate, activeShift.endTime || '18:00', timezone);
-    if (shiftEndMinutes < shiftStartMinutes) {
-      shiftEndDate = new Date(shiftEndDate.getTime() + 24 * 60 * 60 * 1000);
-    }
-
-    const clampedIn = Math.max(pInDate.getTime(), shiftStartDate.getTime());
-    const clampedOut = Math.min(pOutDate.getTime(), shiftEndDate.getTime());
-    const durationMs = Math.max(0, clampedOut - clampedIn);
+    const durationMs = Math.max(0, pOutDate.getTime() - pInDate.getTime());
+    let workingHoursFormatted = '0:00';
 
     if (durationMs > 0) {
       actualWorkingHours = parseFloat((durationMs / (1000 * 60 * 60)).toFixed(2));
+      const totalMinutes = Math.round(durationMs / (1000 * 60));
+      const hours = Math.floor(totalMinutes / 60);
+      const minutes = totalMinutes % 60;
+      workingHoursFormatted = `${hours}:${String(minutes).padStart(2, '0')}`;
     }
 
     // Half-Day Threshold check (Conditions 15, 16)
@@ -188,6 +186,7 @@ class AttendanceService {
       lateMinutes,
       earlyMinutes,
       actualWorkingHours,
+      workingHoursFormatted,
       status
     };
   }
