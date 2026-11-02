@@ -228,12 +228,16 @@ export default function HRAttendance() {
 
     const rec = recordsByDay[d];
     if (rec) {
-      if (rec.status === 'Present') presentDays++;
-      else if (rec.status === 'Late') {
-        presentDays++;
-        lateDays++;
-      } else if (rec.status === 'Half Day' || rec.status === 'Half-day') {
-        halfDays++;
+      if (rec.status === 'Present' || rec.status === 'Working' || rec.punchIn) {
+        if (rec.status === 'Late' || rec.lateMinutes > 0) {
+          presentDays++;
+          lateDays++;
+        } else if (rec.status === 'Half Day' || rec.status === 'Half-day') {
+          halfDays++;
+          presentDays += 0.5;
+        } else {
+          presentDays++;
+        }
       } else if (rec.status === 'Absent' || rec.status === 'Incomplete') {
         absentDays++;
       } else if (rec.status === 'On Leave') {
@@ -489,14 +493,14 @@ export default function HRAttendance() {
                   statusBadge = <span className="text-[9px] font-semibold text-slate-500 truncate">Weekly Off</span>;
                   statusDot = <span className="w-1.5 h-1.5 rounded-full bg-slate-400/80" title="Weekly Off" />;
                 } else if (rec) {
-                  if (rec.status === 'Present') {
+                  if (rec.status === 'Present' || rec.status === 'Working') {
                     bgStyle = 'bg-emerald-50/80 border-emerald-200 text-emerald-950';
                     statusBadge = (
                       <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-100 text-emerald-800 truncate">
-                        Present
+                        {rec.status === 'Working' ? 'Working' : 'Present'}
                       </span>
                     );
-                    statusDot = <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-xs" title="Present" />;
+                    statusDot = <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-xs" title={rec.status === 'Working' ? 'Working (Present)' : 'Present'} />;
                   } else if (rec.status === 'Late') {
                     bgStyle = 'bg-amber-50/80 border-amber-200 text-amber-950';
                     statusBadge = (
@@ -609,7 +613,7 @@ export default function HRAttendance() {
                 statusPillClass = 'bg-slate-100 text-slate-600 border border-slate-200';
               } else if (selRec) {
                 statusLabel = selRec.status;
-                if (selRec.status === 'Present') statusPillClass = 'bg-emerald-100 text-emerald-800 font-bold';
+                if (selRec.status === 'Present' || selRec.status === 'Working') statusPillClass = 'bg-emerald-100 text-emerald-800 font-bold';
                 else if (selRec.status === 'Late') statusPillClass = 'bg-amber-100 text-amber-800 font-bold';
                 else if (selRec.status === 'Half Day') statusPillClass = 'bg-orange-100 text-orange-800 font-bold';
                 else if (selRec.status === 'On Leave') statusPillClass = 'bg-blue-100 text-blue-800 font-bold';
@@ -782,7 +786,7 @@ export default function HRAttendance() {
 
                       <span
                         className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                          att.status === 'Present'
+                          att.status === 'Present' || att.status === 'Working'
                             ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                             : att.status === 'Late'
                             ? 'bg-amber-50 text-amber-700 border border-amber-200'
@@ -914,7 +918,7 @@ export default function HRAttendance() {
                           <td className="py-3.5 px-4">
                             <span
                               className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                                att.status === 'Present'
+                                att.status === 'Present' || att.status === 'Working'
                                   ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                                   : att.status === 'Late'
                                   ? 'bg-amber-50 text-amber-700 border border-amber-200'

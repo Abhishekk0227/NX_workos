@@ -67,13 +67,19 @@ export default function HRDashboard() {
       let onLeaveCount = 0;
 
       attendance.forEach((att) => {
-        if (att.status === 'Present') presentCount++;
-        else if (att.status === 'Late') {
-          presentCount++;
-          lateCount++;
-        } else if (att.status === 'Half Day' || att.status === 'Half-day') {
-          presentCount += 0.5;
-        } else if (att.status === 'On Leave') onLeaveCount++;
+        // Anyone who has punched in today or has status Present/Working is counted as Present
+        if (att.status === 'Present' || att.status === 'Working' || att.punchIn) {
+          if (att.status === 'Late' || att.lateMinutes > 0) {
+            presentCount++;
+            lateCount++;
+          } else if (att.status === 'Half Day' || att.status === 'Half-day') {
+            presentCount += 0.5;
+          } else {
+            presentCount++;
+          }
+        } else if (att.status === 'On Leave') {
+          onLeaveCount++;
+        }
       });
 
       const totalActive = employees.length;

@@ -93,6 +93,20 @@ router.post('/punch-in', protect, async (req, res, next) => {
     // Populate shift before responding
     await attendance.populate('shift');
 
+    // Notify HR of Employee Punch In
+    try {
+      const lateAlert = metrics.lateMinutes > 0 ? ` [Late by ${metrics.lateMinutes} mins]` : ' on time';
+      await NotificationService.send({
+        targetRole: 'HR',
+        title: 'Employee Punched In',
+        message: `${employee.fullName} (${employee.employeeId}) punched in at ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}${lateAlert}.`,
+        type: 'Attendance',
+        link: '/hr/attendance'
+      });
+    } catch (notifErr) {
+      console.warn('[Notification Error - Punch In]:', notifErr.message);
+    }
+
     res.status(201).json({
       success: true,
       message: `Punched in successfully at ${now.toLocaleTimeString()}`,
@@ -179,14 +193,18 @@ router.post('/punch-out', protect, async (req, res, next) => {
 
     await attendance.save();
 
-    // Notify HR of daily report submission
-    await NotificationService.send({
-      targetRole: 'HR',
-      title: 'Daily Report Submitted',
-      message: `${req.user.employee.fullName || 'Employee'} submitted daily report and punched out.`,
-      type: 'Attendance',
-      link: '/hr/attendance'
-    });
+    // Notify HR of Employee Punch Out with Daily Report
+    try {
+      await NotificationService.send({
+        targetRole: 'HR',
+        title: 'Employee Punched Out',
+        message: `${req.user.employee.fullName || 'Employee'} (${req.user.employee.employeeId || ''}) punched out at ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} with Daily Work Report (${metrics.actualWorkingHours} hrs logged).`,
+        type: 'Attendance',
+        link: '/hr/attendance'
+      });
+    } catch (notifErr) {
+      console.warn('[Notification Error - Punch Out]:', notifErr.message);
+    }
 
     const halfDayNote = metrics.status === 'Half Day' ? ' (Marked as Half Day — under 6 working hours)' : '';
     res.json({
@@ -328,7 +346,11 @@ router.get('/all', protect, authorize('HR'), async (req, res, next) => {
     }
 
     if (status && status !== 'All') {
-      filter.status = status;
+      if (status === 'Present') {
+        filter.status = { $in: ['Present', 'Working'] };
+      } else {
+        filter.status = status;
+      }
     }
 
     const records = await Attendance.find(filter)

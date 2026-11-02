@@ -46,13 +46,13 @@ export default function HRLayout() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#f8f9fa] flex flex-col md:flex-row pb-16 md:pb-0 overflow-x-hidden w-full max-w-full">
-      {/* Desktop Left Sidebar (Matching hrpanelD.png) */}
+    <div className="min-h-screen md:h-screen md:overflow-hidden bg-[#f8f9fa] flex flex-col md:flex-row pb-16 md:pb-0 w-full max-w-full">
+      {/* Desktop Left Sidebar (Matching hrpanelD.png) - Fixed Height & Fixed Position */}
       <aside
-        className="hidden md:sticky md:flex top-0 left-0 z-50 h-screen w-60 bg-[#0f172a] text-slate-300 flex-col border-r border-slate-800"
+        className="hidden md:flex md:sticky top-0 left-0 z-40 h-screen w-60 bg-[#0f172a] text-slate-300 flex-col border-r border-slate-800 shrink-0"
       >
         {/* Brand Logo */}
-        <div className="p-4 border-b border-slate-800/80 flex items-center justify-between">
+        <div className="p-4 border-b border-slate-800/80 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-md shadow-blue-500/20 font-black text-sm">
               NX
@@ -90,7 +90,7 @@ export default function HRLayout() {
       </aside>
 
       {/* Main Viewport */}
-      <div className="flex-1 flex flex-col min-w-0 w-full overflow-x-hidden">
+      <div className="flex-1 flex flex-col min-w-0 w-full h-full md:h-screen md:overflow-hidden">
         {/* Mobile Top Header (matching HrpanelMui.png) */}
         <div className="md:hidden sticky top-0 z-30 bg-[#0f172a] text-white px-4 py-3 flex items-center justify-between shadow-sm">
           <Link to="/hr/dashboard" className="flex items-center gap-2.5">
@@ -125,15 +125,15 @@ export default function HRLayout() {
           </div>
         </div>
 
-        {/* Desktop Top Header matching hrpanelD.png */}
-        <div className="hidden md:block">
+        {/* Desktop Top Header matching hrpanelD.png - Fixed at Top */}
+        <div className="hidden md:block shrink-0 sticky top-0 z-30 bg-white">
           <Header
             searchPlaceholder="Search..."
           />
         </div>
 
-        {/* Main Content Area */}
-        <main className="flex-1 p-2.5 sm:p-6 md:p-8 max-w-7xl w-full mx-auto overflow-x-hidden">
+        {/* Main Content Area - Scrollable */}
+        <main className="flex-1 p-2.5 sm:p-6 md:p-8 max-w-7xl w-full mx-auto overflow-x-hidden md:overflow-y-auto">
           <Outlet />
         </main>
       </div>

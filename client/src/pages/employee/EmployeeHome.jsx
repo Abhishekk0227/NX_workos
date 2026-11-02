@@ -144,19 +144,28 @@ export default function EmployeeHome() {
     <div className="space-y-4 max-w-lg mx-auto sm:max-w-2xl lg:max-w-4xl pb-6">
       {/* Active Broadcast Alert (If any) */}
       {broadcasts.length > 0 && (
-        <div className="bg-linear-to-r from-blue-600 to-indigo-600 text-white p-3.5 rounded-2xl shadow-md flex items-center justify-between gap-3 animate-in fade-in">
+        <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 text-white p-3.5 rounded-2xl shadow-md flex items-center justify-between gap-3 animate-in fade-in">
           <div className="flex items-center gap-2.5 min-w-0">
-            <Megaphone className="w-5 h-5 text-amber-300 shrink-0 animate-bounce" />
+            <div className="w-8 h-8 rounded-xl bg-white/20 backdrop-blur-xs flex items-center justify-center shrink-0">
+              <Megaphone className="w-4 h-4 text-amber-300 animate-bounce" />
+            </div>
             <div className="min-w-0">
-              <span className="text-[10px] font-black uppercase tracking-wider bg-white/20 px-2 py-0.5 rounded-full">
-                Notice
-              </span>
-              <p className="text-xs font-bold truncate mt-0.5">{broadcasts[0].title}</p>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-black uppercase tracking-wider bg-white/25 px-2 py-0.5 rounded-full text-white">
+                  Notice
+                </span>
+                {broadcasts[0].category && (
+                  <span className="text-[10px] text-blue-100 font-medium">
+                    • {broadcasts[0].category}
+                  </span>
+                )}
+              </div>
+              <p className="text-xs font-bold text-white truncate mt-0.5">{broadcasts[0].title}</p>
             </div>
           </div>
           <Link
             to="/employee/notices"
-            className="text-xs font-bold text-white underline shrink-0 hover:text-amber-200"
+            className="text-xs font-bold text-white bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded-xl shrink-0 transition"
           >
             Read
           </Link>
@@ -175,7 +184,7 @@ export default function EmployeeHome() {
                   className="w-full h-full min-w-full min-h-full max-w-full max-h-full object-cover rounded-full"
                 />
               ) : (
-                <div className="w-full h-full bg-linear-to-tr from-slate-800 to-slate-900 text-white flex items-center justify-center font-bold text-base">
+                <div className="w-full h-full bg-gradient-to-tr from-slate-800 to-slate-900 text-white flex items-center justify-center font-bold text-base">
                   {displayInitials}
                 </div>
               )}

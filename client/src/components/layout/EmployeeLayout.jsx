@@ -46,7 +46,7 @@ export default function EmployeeLayout() {
   const displayInitials = emp?.fullName ? emp.fullName.split(' ').map(n => n[0]).join('') : 'RS';
 
   return (
-    <div className="min-h-screen bg-[#f8f9fa] flex flex-col md:flex-row pb-16 md:pb-0 overflow-x-hidden w-full max-w-full">
+    <div className="min-h-screen md:h-screen md:overflow-hidden bg-[#f8f9fa] flex flex-col md:flex-row pb-16 md:pb-0 w-full max-w-full">
       {/* Mobile Drawer Backdrop */}
       {mobileDrawerOpen && (
         <div
@@ -55,14 +55,14 @@ export default function EmployeeLayout() {
         />
       )}
 
-      {/* Desktop Left Sidebar (Matching EppanelD.png) */}
+      {/* Desktop Left Sidebar (Matching EppanelD.png) - Fixed Height & Fixed Position */}
       <aside
-        className={`fixed md:sticky top-0 left-0 z-50 h-screen w-60 bg-[#0f172a] text-slate-300 flex flex-col border-r border-slate-800 transition-transform duration-300 ease-in-out ${
+        className={`fixed md:sticky top-0 left-0 z-50 h-screen w-60 bg-[#0f172a] text-slate-300 flex flex-col border-r border-slate-800 shrink-0 transition-transform duration-300 ease-in-out ${
           mobileDrawerOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
         }`}
       >
         {/* Brand Logo */}
-        <div className="p-4 border-b border-slate-800/80 flex items-center justify-between">
+        <div className="p-4 border-b border-slate-800/80 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-md shadow-blue-500/20 font-black text-sm">
               NX
@@ -104,7 +104,7 @@ export default function EmployeeLayout() {
       </aside>
 
       {/* Main Viewport Container */}
-      <div className="flex-1 flex flex-col min-w-0 w-full overflow-x-hidden">
+      <div className="flex-1 flex flex-col min-w-0 w-full h-full md:h-screen md:overflow-hidden">
         {/* Top Mobile Bar matching EppanelM.png */}
         <div className="md:hidden sticky top-0 z-30 bg-[#0f172a] text-white px-4 py-3 flex items-center justify-between shadow-sm">
           <button
@@ -143,16 +143,16 @@ export default function EmployeeLayout() {
           </div>
         </div>
 
-        {/* Desktop Top Header (Search + Profile) */}
-        <div className="hidden md:block">
+        {/* Desktop Top Header (Search + Profile) - Fixed at Top */}
+        <div className="hidden md:block shrink-0 sticky top-0 z-30 bg-white">
           <Header
             searchPlaceholder="Search anything..."
             onToggleMobileNav={() => setMobileDrawerOpen(true)}
           />
         </div>
 
-        {/* Content Area */}
-        <main className="flex-1 p-2.5 sm:p-6 md:p-8 max-w-6xl w-full mx-auto overflow-x-hidden">
+        {/* Content Area - Scrollable */}
+        <main className="flex-1 p-2.5 sm:p-6 md:p-8 max-w-6xl w-full mx-auto overflow-x-hidden md:overflow-y-auto">
           <Outlet />
         </main>
       </div>
