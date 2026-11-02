@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import api from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
+import { TasksShimmer } from '../../components/common/Shimmer';
 
 export default function EmployeeTasks() {
   const { user } = useAuth();
@@ -196,6 +197,10 @@ export default function EmployeeTasks() {
   const inProgressCount = currentList.filter((t) => t.status === 'In Progress').length;
   const pendingCount = currentList.filter((t) => t.status === 'Pending').length;
   const completedCount = currentList.filter((t) => t.status === 'Completed').length;
+
+  if (loading) {
+    return <TasksShimmer />;
+  }
 
   return (
     <div className="space-y-4 max-w-lg mx-auto sm:max-w-2xl lg:max-w-4xl pb-12">

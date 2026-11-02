@@ -16,6 +16,7 @@ import {
 import api from '../../api/client';
 import PunchInModal from '../../components/modals/PunchInModal';
 import PunchOutModal from '../../components/modals/PunchOutModal';
+import { AttendanceShimmer } from '../../components/common/Shimmer';
 
 export default function EmployeeAttendance() {
   const [activeTab, setActiveTab] = useState('details'); // 'details' | 'calendar' | 'history'
@@ -152,6 +153,10 @@ export default function EmployeeAttendance() {
     });
     setShowCorrectionModal(true);
   };
+
+  if (loading) {
+    return <AttendanceShimmer />;
+  }
 
   return (
     <div className="space-y-4">

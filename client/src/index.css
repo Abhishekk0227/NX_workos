@@ -30,3 +30,31 @@
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
 }
+
+/* Shimmer wave animation */
+@keyframes shimmerWave {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    #f1f5f9 0%,
+    #e2e8f0 25%,
+    #ffffff 50%,
+    #e2e8f0 75%,
+    #f1f5f9 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmerWave 1.6s ease-in-out infinite;
+}
+
+.shimmer-card {
+  @apply bg-white rounded-3xl border border-slate-100 shadow-sm;
+}
+

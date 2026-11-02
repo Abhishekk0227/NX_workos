@@ -28,17 +28,14 @@ import EmployeeAttendance from './pages/employee/EmployeeAttendance';
 import EmployeeLeave from './pages/employee/EmployeeLeave';
 import EmployeeProfile from './pages/employee/EmployeeProfile';
 import EmployeeNotices from './pages/employee/EmployeeNotices';
+import { FullScreenLoader } from './components/common/Shimmer';
 
 // Route Guard Component
 const ProtectedRoute = ({ children, allowedRoles }) => {
   const { user, loading } = useAuth();
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
+    return <FullScreenLoader />;
   }
 
   if (!user) {
@@ -61,11 +58,7 @@ const RootRedirector = () => {
   const { user, loading } = useAuth();
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
+    return <FullScreenLoader />;
   }
 
   if (!user) return <Navigate to="/login" replace />;

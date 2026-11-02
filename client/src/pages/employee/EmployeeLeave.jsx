@@ -20,6 +20,7 @@ import {
   ArrowLeft
 } from 'lucide-react';
 import api from '../../api/client';
+import { LeaveShimmer } from '../../components/common/Shimmer';
 
 export default function EmployeeLeave() {
   const [requests, setRequests] = useState([]);
@@ -112,6 +113,10 @@ export default function EmployeeLeave() {
     const diffTime = Math.abs(end - start);
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
   };
+
+  if (loading) {
+    return <LeaveShimmer />;
+  }
 
   return (
     <div className="space-y-6">

@@ -16,6 +16,7 @@ import {
   Check
 } from 'lucide-react';
 import api from '../../api/client';
+import { TableShimmer, CardListShimmer } from '../../components/common/Shimmer';
 
 export default function HRTasksReports() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -272,7 +273,9 @@ export default function HRTasksReports() {
         <div className="space-y-3">
           {/* Mobile Cards Feed for Reports */}
           <div className="block md:hidden space-y-2.5">
-            {reports.length === 0 ? (
+            {reportsLoading ? (
+              <CardListShimmer count={4} />
+            ) : reports.length === 0 ? (
               <div className="p-8 text-center text-slate-400 bg-white rounded-2xl border border-slate-200 text-xs">
                 <FileText className="w-8 h-8 mx-auto mb-2 text-slate-300" />
                 No daily work reports submitted for {reportDate}
@@ -333,7 +336,12 @@ export default function HRTasksReports() {
           </div>
 
           {/* Desktop Reports Table */}
-          <div className="hidden md:block bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+          {reportsLoading ? (
+            <div className="hidden md:block">
+              <TableShimmer cols={6} rows={6} />
+            </div>
+          ) : (
+            <div className="hidden md:block bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
@@ -413,12 +421,16 @@ export default function HRTasksReports() {
             </table>
           </div>
         </div>
-        </div>
       )}
+    </div>
+  )}
 
       {/* TAB 2: ASSIGNED TASKS TABLE */}
       {activeTab === 'tasks' && (
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+        tasksLoading ? (
+          <TableShimmer cols={5} rows={6} />
+        ) : (
+          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
@@ -491,6 +503,7 @@ export default function HRTasksReports() {
             </table>
           </div>
         </div>
+        )
       )}
 
       {/* VIEW REPORT MODAL */}

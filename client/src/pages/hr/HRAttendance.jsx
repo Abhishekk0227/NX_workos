@@ -20,6 +20,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import api from '../../api/client';
+import { TableShimmer, AttendanceShimmer, CardListShimmer } from '../../components/common/Shimmer';
 
 export default function HRAttendance() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -343,6 +344,10 @@ export default function HRAttendance() {
     hour12: true,
     timeZone: 'Asia/Kolkata'
   })} IST`;
+
+  if (loading && employees.length === 0) {
+    return <AttendanceShimmer />;
+  }
 
   return (
     <div className="space-y-6">
@@ -838,7 +843,9 @@ export default function HRAttendance() {
 
           {/* Mobile Card View (App-like for phones) */}
           <div className="block md:hidden space-y-2.5">
-            {records.length === 0 ? (
+            {loading ? (
+              <CardListShimmer count={4} />
+            ) : records.length === 0 ? (
               <div className="p-8 text-center text-slate-400 bg-white rounded-2xl border border-slate-200 text-xs">
                 No attendance records for the selected filters
               </div>
@@ -922,7 +929,12 @@ export default function HRAttendance() {
           </div>
 
           {/* Desktop Records Table */}
-          <div className="hidden md:block bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+          {loading ? (
+            <div className="hidden md:block">
+              <TableShimmer cols={7} rows={6} />
+            </div>
+          ) : (
+            <div className="hidden md:block bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
@@ -1033,6 +1045,7 @@ export default function HRAttendance() {
               </table>
             </div>
           </div>
+        )}
         </div>
       )}
 

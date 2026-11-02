@@ -19,6 +19,7 @@ import {
   ChevronRight
 } from 'lucide-react';
 import api from '../../api/client';
+import { HRDashboardShimmer } from '../../components/common/Shimmer';
 
 export default function HRDashboard() {
   const [loading, setLoading] = useState(true);
@@ -126,6 +127,10 @@ export default function HRDashboard() {
   }, []);
 
   const attendancePercent = stats.totalEmployees > 0 ? Math.round((stats.presentToday / stats.totalEmployees) * 100) : 0;
+
+  if (loading) {
+    return <HRDashboardShimmer />;
+  }
 
   return (
     <div className="space-y-4 sm:space-y-6">

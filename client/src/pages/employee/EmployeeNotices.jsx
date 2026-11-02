@@ -14,6 +14,7 @@ import {
   RefreshCw
 } from 'lucide-react';
 import api from '../../api/client';
+import { NoticeShimmer } from '../../components/common/Shimmer';
 
 export default function EmployeeNotices() {
   const [notices, setNotices] = useState([]);
@@ -140,10 +141,7 @@ export default function EmployeeNotices() {
 
       {/* Notices List */}
       {loading ? (
-        <div className="bg-white p-12 rounded-2xl border border-slate-200 text-center">
-          <div className="w-8 h-8 border-3 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-          <p className="text-xs text-slate-500 font-medium">Loading official notices...</p>
-        </div>
+        <NoticeShimmer count={3} />
       ) : filteredNotices.length === 0 ? (
         <div className="bg-white p-12 rounded-2xl border border-slate-200 text-center space-y-2">
           <div className="w-12 h-12 rounded-full bg-slate-50 text-slate-400 flex items-center justify-center mx-auto">

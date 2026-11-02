@@ -18,6 +18,7 @@ import {
   Check
 } from 'lucide-react';
 import api from '../../api/client';
+import { TableShimmer, CardListShimmer } from '../../components/common/Shimmer';
 
 export default function HRLeave() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -263,7 +264,9 @@ export default function HRLeave() {
 
       {/* Leave Requests - Mobile Cards Feed */}
       <div className="block md:hidden space-y-2.5">
-        {filteredRequests.length === 0 ? (
+        {loading ? (
+          <CardListShimmer count={4} />
+        ) : filteredRequests.length === 0 ? (
           <div className="p-8 text-center text-slate-400 bg-white rounded-2xl border border-slate-200 text-xs">
             <CalendarOff className="w-8 h-8 mx-auto mb-2 text-slate-300" />
             No leave applications matching the filters
@@ -359,7 +362,12 @@ export default function HRLeave() {
       </div>
 
       {/* Desktop Leave Requests Table */}
-      <div className="hidden md:block bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+      {loading ? (
+        <div className="hidden md:block">
+          <TableShimmer cols={8} rows={6} />
+        </div>
+      ) : (
+        <div className="hidden md:block bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse text-xs">
             <thead>
@@ -490,6 +498,7 @@ export default function HRLeave() {
           </table>
         </div>
       </div>
+    )}
 
       {/* LEDGER MODAL */}
       {showLedgerModal && ledgerTarget && (

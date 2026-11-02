@@ -30,6 +30,7 @@ import {
   Lock
 } from 'lucide-react';
 import api from '../../api/client';
+import { TableShimmer, CardListShimmer } from '../../components/common/Shimmer';
 
 export default function HREmployees() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -312,7 +313,9 @@ export default function HREmployees() {
 
       {/* MOBILE CARD VIEW matching Image Screen 2 (Employees List) */}
       <div className="block md:hidden space-y-2.5">
-        {filteredEmployees.length === 0 ? (
+        {loading ? (
+          <CardListShimmer count={5} />
+        ) : filteredEmployees.length === 0 ? (
           <div className="p-8 text-center text-slate-400 bg-white rounded-2xl border border-slate-200 text-xs">
             No employees found
           </div>
@@ -427,7 +430,12 @@ export default function HREmployees() {
       </div>
 
       {/* DESKTOP TABLE VIEW matching hrpanelD.png #2 */}
-      <div className="hidden md:block bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+      {loading ? (
+        <div className="hidden md:block">
+          <TableShimmer cols={8} rows={7} />
+        </div>
+      ) : (
+        <div className="hidden md:block bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse text-xs">
             <thead>
@@ -557,6 +565,7 @@ export default function HREmployees() {
           </table>
         </div>
       </div>
+    )}
 
       {/* ADD EMPLOYEE MODAL (2-Column Form matching hrpanelD.png #3) */}
       {showCreateModal && (

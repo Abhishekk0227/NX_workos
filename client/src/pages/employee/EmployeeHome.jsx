@@ -22,6 +22,8 @@ import { useAuth } from '../../context/AuthContext';
 import PunchInModal from '../../components/modals/PunchInModal';
 import PunchOutModal from '../../components/modals/PunchOutModal';
 
+import { HomeShimmer } from '../../components/common/Shimmer';
+
 export default function EmployeeHome() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -136,10 +138,12 @@ export default function EmployeeHome() {
     return () => clearInterval(timer);
   }, [attendance]);
 
-
-
   const displayTasks = tasks.slice(0, 4);
   const totalTasksCount = tasks.length;
+
+  if (loading) {
+    return <HomeShimmer />;
+  }
 
   return (
     <div className="space-y-4 max-w-lg mx-auto sm:max-w-2xl lg:max-w-4xl pb-6">

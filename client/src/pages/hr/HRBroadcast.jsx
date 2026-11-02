@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import api from '../../api/client';
 import { showPushNotification } from '../../services/pushNotification';
+import { NoticeShimmer } from '../../components/common/Shimmer';
 
 export default function HRBroadcast() {
   const [broadcasts, setBroadcasts] = useState([]);
@@ -284,7 +285,9 @@ export default function HRBroadcast() {
 
       {/* Broadcast List Cards */}
       <div className="space-y-3">
-        {filteredBroadcasts.length === 0 ? (
+        {loading ? (
+          <NoticeShimmer count={4} />
+        ) : filteredBroadcasts.length === 0 ? (
           <div className="bg-white p-12 rounded-2xl border border-slate-200/80 text-center text-slate-400">
             <Megaphone className="w-10 h-10 mx-auto mb-2 opacity-30" />
             <p className="text-xs font-medium">No broadcast notices found in this filter</p>
