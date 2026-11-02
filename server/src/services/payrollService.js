@@ -3,6 +3,7 @@ const SalaryProfile = require('../models/SalaryProfile');
 const Attendance = require('../models/Attendance');
 const LeaveRequest = require('../models/LeaveRequest');
 const Employee = require('../models/Employee');
+const ShiftTemplate = require('../models/ShiftTemplate');
 const SystemSetting = require('../models/SystemSetting');
 
 class PayrollService {

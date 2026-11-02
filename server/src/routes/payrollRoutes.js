@@ -3,6 +3,7 @@ const router = express.Router();
 const PayrollRecord = require('../models/PayrollRecord');
 const Employee = require('../models/Employee');
 const SalaryProfile = require('../models/SalaryProfile');
+const ShiftTemplate = require('../models/ShiftTemplate');
 const AuditLog = require('../models/AuditLog');
 const LeaveRequest = require('../models/LeaveRequest');
 const LeaveService = require('../services/leaveService');
@@ -33,29 +34,31 @@ router.get('/preview', async (req, res, next) => {
     const previews = [];
     const missingProfiles = [];
 
-    for (const emp of employees) {
-      try {
-        const preview = await PayrollService.calculateEmployeePayroll(emp._id, month);
+    await Promise.all(
+      employees.map(async (emp) => {
+        try {
+          const preview = await PayrollService.calculateEmployeePayroll(emp._id, month);
 
-        // Check if a saved record already exists
-        const existingRecord = await PayrollRecord.findOne({
-          employee: emp._id,
-          month
-        });
+          // Check if a saved record already exists
+          const existingRecord = await PayrollRecord.findOne({
+            employee: emp._id,
+            month
+          });
 
-        previews.push({
-          ...preview,
-          savedStatus: existingRecord ? existingRecord.status : 'Unprocessed',
-          existingRecordId: existingRecord ? existingRecord._id : null
-        });
-      } catch (err) {
-        missingProfiles.push({
-          employeeId: emp.employeeId,
-          fullName: emp.fullName,
-          reason: err.message
-        });
-      }
-    }
+          previews.push({
+            ...preview,
+            savedStatus: existingRecord ? existingRecord.status : 'Unprocessed',
+            existingRecordId: existingRecord ? existingRecord._id : null
+          });
+        } catch (err) {
+          missingProfiles.push({
+            employeeId: emp.employeeId,
+            fullName: emp.fullName,
+            reason: err.message
+          });
+        }
+      })
+    );
 
     res.json({
       success: true,
@@ -92,72 +95,84 @@ router.post('/generate', async (req, res, next) => {
     const savedRecords = [];
     const errors = [];
 
-    for (const emp of employees) {
-      try {
-        // Check if existing record is already finalized
-        const existing = await PayrollRecord.findOne({ employee: emp._id, month });
-        if (existing && existing.status === 'Finalized') {
-          errors.push(`Payroll for ${emp.employeeId} is already finalized and locked.`);
-          continue;
-        }
+    await Promise.all(
+      employees.map(async (emp) => {
+        try {
+          // Check if existing record is already finalized
+          const existing = await PayrollRecord.findOne({ employee: emp._id, month });
+          if (existing && existing.status === 'Finalized') {
+            errors.push(`Payroll for ${emp.employeeId} is already finalized and locked.`);
+            return;
+          }
 
-        const calculated = await PayrollService.calculateEmployeePayroll(emp._id, month);
+          const calculated = await PayrollService.calculateEmployeePayroll(emp._id, month);
 
-        let record;
-        if (existing) {
-          existing.grossSalary = calculated.grossSalary;
-          existing.payableDays = calculated.payableDays;
-          existing.calendarDays = calculated.calendarDays;
-          existing.presentDays = calculated.presentDays;
-          existing.paidLeaveDays = calculated.paidLeaveDays;
-          existing.weeklyOffDays = calculated.weeklyOffDays;
-          existing.lwpDays = calculated.lwpDays;
-          existing.unmarkedDays = calculated.unmarkedDays;
-          existing.incompleteDays = calculated.incompleteDays;
-          existing.perDayRate = calculated.perDayRate;
-          existing.perMinuteRate = calculated.perMinuteRate;
-          existing.lateMinutes = calculated.lateMinutes;
-          existing.lateDeduction = calculated.lateDeduction;
-          existing.halfDays = calculated.halfDays;
-          existing.halfDayDeduction = calculated.halfDayDeduction;
-          existing.shortfallDeduction = calculated.shortfallDeduction;
-          existing.lwpDeduction = calculated.lwpDeduction;
-          existing.deductionBreakdown = calculated.deductionBreakdown;
-          existing.netPayable = calculated.netPayable;
-          existing.status = 'Review';
-          record = await existing.save();
-        } else {
-          record = await PayrollRecord.create({
-            month,
-            employee: emp._id,
-            salaryProfile: calculated.salaryProfile,
-            grossSalary: calculated.grossSalary,
-            dailyRateBasis: calculated.dailyRateBasis,
-            calendarDays: calculated.calendarDays,
-            payableDays: calculated.payableDays,
-            presentDays: calculated.presentDays,
-            paidLeaveDays: calculated.paidLeaveDays,
-            weeklyOffDays: calculated.weeklyOffDays,
-            lwpDays: calculated.lwpDays,
-            unmarkedDays: calculated.unmarkedDays,
-            incompleteDays: calculated.incompleteDays,
-            perDayRate: calculated.perDayRate,
-            perMinuteRate: calculated.perMinuteRate,
-            lateMinutes: calculated.lateMinutes,
-            lateDeduction: calculated.lateDeduction,
-            halfDays: calculated.halfDays,
-            halfDayDeduction: calculated.halfDayDeduction,
-            shortfallDeduction: calculated.shortfallDeduction,
-            lwpDeduction: calculated.lwpDeduction,
-            deductionBreakdown: calculated.deductionBreakdown,
-            netPayable: calculated.netPayable,
-            status: 'Review'
-          });
+          let record;
+          if (existing) {
+            existing.grossSalary = calculated.grossSalary;
+            existing.dailyRateBasis = calculated.dailyRateBasis;
+            existing.salaryProfile = calculated.salaryProfile;
+            existing.payableDays = calculated.payableDays;
+            existing.calendarDays = calculated.calendarDays;
+            existing.presentDays = calculated.presentDays;
+            existing.paidLeaveDays = calculated.paidLeaveDays;
+            existing.weeklyOffDays = calculated.weeklyOffDays;
+            existing.lwpDays = calculated.lwpDays;
+            existing.unmarkedDays = calculated.unmarkedDays;
+            existing.incompleteDays = calculated.incompleteDays;
+            existing.perDayRate = calculated.perDayRate;
+            existing.perMinuteRate = calculated.perMinuteRate;
+            existing.lateMinutes = calculated.lateMinutes;
+            existing.lateDeduction = calculated.lateDeduction;
+            existing.halfDays = calculated.halfDays;
+            existing.halfDayDeduction = calculated.halfDayDeduction;
+            existing.shortfallDeduction = calculated.shortfallDeduction;
+            existing.lwpDeduction = calculated.lwpDeduction;
+            existing.deductionBreakdown = calculated.deductionBreakdown;
+            existing.netPayable = calculated.netPayable;
+            existing.status = 'Review';
+            record = await existing.save();
+          } else {
+            record = await PayrollRecord.create({
+              month,
+              employee: emp._id,
+              salaryProfile: calculated.salaryProfile,
+              grossSalary: calculated.grossSalary,
+              dailyRateBasis: calculated.dailyRateBasis,
+              calendarDays: calculated.calendarDays,
+              payableDays: calculated.payableDays,
+              presentDays: calculated.presentDays,
+              paidLeaveDays: calculated.paidLeaveDays,
+              weeklyOffDays: calculated.weeklyOffDays,
+              lwpDays: calculated.lwpDays,
+              unmarkedDays: calculated.unmarkedDays,
+              incompleteDays: calculated.incompleteDays,
+              perDayRate: calculated.perDayRate,
+              perMinuteRate: calculated.perMinuteRate,
+              lateMinutes: calculated.lateMinutes,
+              lateDeduction: calculated.lateDeduction,
+              halfDays: calculated.halfDays,
+              halfDayDeduction: calculated.halfDayDeduction,
+              shortfallDeduction: calculated.shortfallDeduction,
+              lwpDeduction: calculated.lwpDeduction,
+              deductionBreakdown: calculated.deductionBreakdown,
+              netPayable: calculated.netPayable,
+              status: 'Review'
+            });
+          }
+          savedRecords.push(record);
+        } catch (err) {
+          errors.push(`${emp.fullName} (${emp.employeeId}): ${err.message}`);
         }
-        savedRecords.push(record);
-      } catch (err) {
-        errors.push(`${emp.fullName} (${emp.employeeId}): ${err.message}`);
-      }
+      })
+    );
+
+    if (savedRecords.length === 0 && errors.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `Payroll generation failed: ${errors.join(', ')}`,
+        errors
+      });
     }
 
     res.json({

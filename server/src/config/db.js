@@ -27,6 +27,24 @@ const connectDB = async () => {
     });
     const conn = await cachedPromise;
     console.log(`[MongoDB] Connected: ${conn.connection.host}/${conn.connection.name}`);
+
+    // Pre-register all Mongoose models so .populate() never throws MissingSchemaError
+    require('../models/ShiftTemplate');
+    require('../models/Employee');
+    require('../models/SalaryProfile');
+    require('../models/PayrollRecord');
+    require('../models/Attendance');
+    require('../models/DailyReport');
+    require('../models/LeaveRequest');
+    require('../models/LeavePolicy');
+    require('../models/LeaveLedger');
+    require('../models/SystemSetting');
+    require('../models/Task');
+    require('../models/User');
+    require('../models/Broadcast');
+    require('../models/AuditLog');
+    require('../models/Notification');
+
     return conn;
   } catch (error) {
     cachedPromise = null;

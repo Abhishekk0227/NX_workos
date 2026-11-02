@@ -100,15 +100,24 @@ export default function HRPayroll() {
   }, [selectedMonth, activeTab]);
 
   const handleGeneratePayroll = async () => {
+    if (!selectedMonth) {
+      alert('Please select a valid month first.');
+      return;
+    }
     setProcessing(true);
     try {
       const res = await api.post('/payroll/generate', { month: selectedMonth });
       if (res.data?.success) {
-        alert(res.data.message || 'Payroll generated successfully!');
-        fetchPayrollPreview();
+        if (res.data.savedCount === 0 && res.data.errors?.length > 0) {
+          alert(`Payroll generation issue:\n${res.data.errors.join('\n')}`);
+        } else {
+          alert(res.data.message || 'Payroll generated successfully!');
+          fetchPayrollPreview();
+        }
       }
     } catch (err) {
-      alert(err.response?.data?.message || 'Payroll generation failed');
+      const errorMsg = err.response?.data?.message || err.message || 'Payroll generation failed';
+      alert(`Payroll Generation Failed: ${errorMsg}`);
     } finally {
       setProcessing(false);
     }
