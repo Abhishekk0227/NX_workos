@@ -63,7 +63,7 @@ export default function EmployeeProfile() {
     emp.profilePicture ||
     'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=240&auto=format&fit=crop&q=80';
 
-  // Handle local file selection
+  // Handle local file selection with auto client-side image compression
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -73,15 +73,42 @@ export default function EmployeeProfile() {
       return;
     }
 
-    if (file.size > 5 * 1024 * 1024) {
-      setPhotoFeedback({ type: 'error', message: 'Image size should be less than 5 MB.' });
-      return;
-    }
-
     const reader = new FileReader();
-    reader.onloadend = () => {
-      setSelectedPhoto(reader.result);
-      setPhotoFeedback({ type: '', message: '' });
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        // Resize to standard avatar dimension (max 400x400)
+        const canvas = document.createElement('canvas');
+        const maxDim = 400;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > maxDim) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          }
+        } else {
+          if (height > maxDim) {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+
+        const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.88);
+        setSelectedPhoto(compressedDataUrl);
+        setPhotoFeedback({ type: '', message: '' });
+      };
+      img.onerror = () => {
+        setSelectedPhoto(event.target.result);
+        setPhotoFeedback({ type: '', message: '' });
+      };
+      img.src = event.target.result;
     };
     reader.readAsDataURL(file);
   };
@@ -178,12 +205,14 @@ export default function EmployeeProfile() {
     <div className="max-w-md mx-auto space-y-4 pb-6">
       {/* 1. Header Profile Card (Matching Screen 10 of EppanelM.png) */}
       <div className="flex flex-col items-center justify-center pt-2 pb-1">
-        <div className="relative">
-          <img
-            src={currentDisplayPhoto}
-            alt={emp.fullName || 'Rahul Sharma'}
-            className="w-24 h-24 rounded-full object-cover border-3 border-white shadow-md shadow-slate-200"
-          />
+        <div className="relative w-24 h-24 min-w-[96px] min-h-[96px] max-w-[96px] max-h-[96px] shrink-0">
+          <div className="w-24 h-24 min-w-[96px] min-h-[96px] max-w-[96px] max-h-[96px] rounded-full overflow-hidden border-3 border-white shadow-md shadow-slate-200 bg-slate-100 flex items-center justify-center">
+            <img
+              src={currentDisplayPhoto}
+              alt={emp.fullName || 'Rahul Sharma'}
+              className="w-full h-full min-w-full min-h-full max-w-full max-h-full object-cover rounded-full"
+            />
+          </div>
 
           {/* Pencil edit badge -> Opens direct photo upload modal */}
           <button
@@ -193,7 +222,7 @@ export default function EmployeeProfile() {
               setPhotoFeedback({ type: '', message: '' });
               setShowPhotoModal(true);
             }}
-            className="absolute bottom-0 right-0 w-7 h-7 bg-white text-blue-600 rounded-full border border-slate-200 shadow-sm flex items-center justify-center hover:bg-slate-50 transition cursor-pointer active:scale-95"
+            className="absolute bottom-0 right-0 w-7 h-7 bg-white text-blue-600 rounded-full border border-slate-200 shadow-sm flex items-center justify-center hover:bg-slate-50 transition cursor-pointer active:scale-95 z-10"
             title="Update Profile Photo"
           >
             <Pencil className="w-3.5 h-3.5" />
@@ -337,13 +366,15 @@ export default function EmployeeProfile() {
 
               {/* Preview Circle */}
               <div className="flex flex-col items-center justify-center gap-2">
-                <div className="relative">
-                  <img
-                    src={selectedPhoto}
-                    alt="Preview"
-                    className="w-20 h-20 rounded-full object-cover border-2 border-blue-600 shadow-sm"
-                  />
-                  <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center shadow-xs">
+                <div className="relative w-20 h-20 min-w-[80px] min-h-[80px] max-w-[80px] max-h-[80px] shrink-0">
+                  <div className="w-20 h-20 min-w-[80px] min-h-[80px] max-w-[80px] max-h-[80px] rounded-full overflow-hidden border-2 border-blue-600 shadow-sm bg-slate-100 flex items-center justify-center">
+                    <img
+                      src={selectedPhoto}
+                      alt="Preview"
+                      className="w-full h-full min-w-full min-h-full max-w-full max-h-full object-cover rounded-full"
+                    />
+                  </div>
+                  <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center shadow-xs z-10">
                     <Check className="w-3.5 h-3.5" />
                   </div>
                 </div>
@@ -381,13 +412,13 @@ export default function EmployeeProfile() {
                         setSelectedPhoto(preset);
                         setPhotoFeedback({ type: '', message: '' });
                       }}
-                      className={`relative rounded-full overflow-hidden p-0.5 border-2 transition cursor-pointer ${
+                      className={`relative w-10 h-10 min-w-[40px] min-h-[40px] max-w-[40px] max-h-[40px] rounded-full overflow-hidden p-0.5 border-2 transition cursor-pointer shrink-0 flex items-center justify-center ${
                         selectedPhoto === preset
                           ? 'border-blue-600 ring-2 ring-blue-500/30'
                           : 'border-transparent hover:border-slate-300'
                       }`}
                     >
-                      <img src={preset} alt={`Preset ${idx + 1}`} className="w-9 h-9 rounded-full object-cover" />
+                      <img src={preset} alt={`Preset ${idx + 1}`} className="w-full h-full min-w-full min-h-full max-w-full max-h-full rounded-full object-cover" />
                     </button>
                   ))}
                 </div>

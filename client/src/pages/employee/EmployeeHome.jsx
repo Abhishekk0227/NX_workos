@@ -164,28 +164,30 @@ export default function EmployeeHome() {
       )}
 
       {/* 1. Top Greeting Card matching Screenshot */}
-      <div className="bg-white p-4 sm:p-5 rounded-3xl border border-slate-100 shadow-2xs flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3.5">
-          <div className="relative shrink-0">
-            {emp?.profilePicture ? (
-              <img
-                src={emp.profilePicture}
-                alt={fullName}
-                className="w-13 h-13 rounded-full object-cover shadow-xs border-2 border-white ring-2 ring-slate-100"
-              />
-            ) : (
-              <div className="w-13 h-13 rounded-full bg-linear-to-tr from-slate-800 to-slate-900 text-white flex items-center justify-center font-bold text-base shadow-xs ring-2 ring-slate-100">
-                {displayInitials}
-              </div>
-            )}
-            <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-emerald-500 border-2 border-white rounded-full" />
+      <div className="bg-white p-4 sm:p-5 rounded-3xl border border-slate-100 shadow-2xs flex items-center justify-between gap-3 overflow-hidden">
+        <div className="flex items-center gap-3.5 min-w-0">
+          <div className="relative w-14 h-14 min-w-[56px] min-h-[56px] max-w-[56px] max-h-[56px] shrink-0">
+            <div className="w-14 h-14 min-w-[56px] min-h-[56px] max-w-[56px] max-h-[56px] rounded-full overflow-hidden shadow-xs border-2 border-white ring-2 ring-slate-100 bg-slate-900 flex items-center justify-center">
+              {emp?.profilePicture ? (
+                <img
+                  src={emp.profilePicture}
+                  alt={fullName}
+                  className="w-full h-full min-w-full min-h-full max-w-full max-h-full object-cover rounded-full"
+                />
+              ) : (
+                <div className="w-full h-full bg-linear-to-tr from-slate-800 to-slate-900 text-white flex items-center justify-center font-bold text-base">
+                  {displayInitials}
+                </div>
+              )}
+            </div>
+            <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-emerald-500 border-2 border-white rounded-full z-10" />
           </div>
-          <div>
+          <div className="min-w-0">
             <span className="text-xs text-slate-400 font-medium block leading-tight">Good Morning,</span>
-            <h1 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight flex items-center gap-1.5 mt-0.5">
+            <h1 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight flex items-center gap-1.5 mt-0.5 truncate">
               {fullName} 👋
             </h1>
-            <p className="text-xs text-slate-400 mt-0.5 font-normal">Have a productive day!</p>
+            <p className="text-xs text-slate-400 mt-0.5 font-normal truncate">Have a productive day!</p>
           </div>
         </div>
       </div>

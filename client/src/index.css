@@ -10,6 +10,9 @@
   body {
     @apply bg-[#f8f9fa] text-slate-800 font-sans;
   }
+  img {
+    max-width: 100%;
+  }
 }
 
 /* Custom scrollbars */

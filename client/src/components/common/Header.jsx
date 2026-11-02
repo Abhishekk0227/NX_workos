@@ -68,8 +68,12 @@ export default function Header({ onToggleMobileNav, searchPlaceholder = 'Search 
               onClick={() => setShowUserMenu(!showUserMenu)}
               className="flex items-center gap-2 p-1 sm:px-2.5 sm:py-1.5 rounded-xl hover:bg-slate-100 transition border border-transparent hover:border-slate-200 cursor-pointer"
             >
-              <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center font-bold text-xs ring-2 ring-emerald-500/20 shrink-0">
-                {displayInitials}
+              <div className="w-8 h-8 min-w-[32px] min-h-[32px] max-w-[32px] max-h-[32px] rounded-full bg-slate-900 text-white flex items-center justify-center font-bold text-xs ring-2 ring-emerald-500/20 shrink-0 overflow-hidden">
+                {emp?.profilePicture ? (
+                  <img src={emp.profilePicture} alt={displayName} className="w-full h-full min-w-full min-h-full max-w-full max-h-full object-cover rounded-full" />
+                ) : (
+                  displayInitials
+                )}
               </div>
               <div className="hidden sm:block text-left">
                 <div className="text-xs font-bold text-slate-900 leading-tight">

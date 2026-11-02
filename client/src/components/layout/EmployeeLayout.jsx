@@ -133,9 +133,9 @@ export default function EmployeeLayout() {
                 </span>
               )}
             </button>
-            <NavLink to="/employee/profile" className="w-7 h-7 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-[11px] ring-1 ring-white/20 overflow-hidden">
+            <NavLink to="/employee/profile" className="w-7 h-7 min-w-[28px] min-h-[28px] max-w-[28px] max-h-[28px] shrink-0 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-[11px] ring-1 ring-white/20 overflow-hidden">
               {emp?.profilePicture ? (
-                <img src={emp.profilePicture} alt="Avatar" className="w-full h-full object-cover" />
+                <img src={emp.profilePicture} alt="Avatar" className="w-full h-full min-w-full min-h-full max-w-full max-h-full object-cover rounded-full" />
               ) : (
                 displayInitials
               )}

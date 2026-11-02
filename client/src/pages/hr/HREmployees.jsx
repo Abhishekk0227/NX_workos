@@ -309,9 +309,9 @@ export default function HREmployees() {
                   setShowDetailModal(true);
                 }}
               >
-                <div className="w-11 h-11 rounded-full bg-slate-100 overflow-hidden shrink-0 border border-slate-200/80 flex items-center justify-center font-bold text-slate-700 text-sm">
+                <div className="w-11 h-11 min-w-[44px] min-h-[44px] max-w-[44px] max-h-[44px] rounded-full bg-slate-100 overflow-hidden shrink-0 border border-slate-200/80 flex items-center justify-center font-bold text-slate-700 text-sm">
                   {emp.profilePicture ? (
-                    <img src={emp.profilePicture} alt={emp.fullName} className="w-full h-full object-cover" />
+                    <img src={emp.profilePicture} alt={emp.fullName} className="w-full h-full min-w-full min-h-full max-w-full max-h-full object-cover rounded-full" />
                   ) : (
                     emp.fullName?.charAt(0)
                   )}
@@ -748,9 +748,9 @@ export default function HREmployees() {
             {/* Profile Hero Card matching Screen 4 */}
             <div className="p-5 border-b border-slate-100">
               <div className="flex items-center gap-4">
-                <div className="w-16 h-16 rounded-full bg-slate-100 overflow-hidden shrink-0 border-2 border-slate-200 flex items-center justify-center font-black text-slate-700 text-xl shadow-xs">
+                <div className="w-16 h-16 min-w-[64px] min-h-[64px] max-w-[64px] max-h-[64px] rounded-full bg-slate-100 overflow-hidden shrink-0 border-2 border-slate-200 flex items-center justify-center font-black text-slate-700 text-xl shadow-xs">
                   {selectedEmployee.profilePicture ? (
-                    <img src={selectedEmployee.profilePicture} alt={selectedEmployee.fullName} className="w-full h-full object-cover" />
+                    <img src={selectedEmployee.profilePicture} alt={selectedEmployee.fullName} className="w-full h-full min-w-full min-h-full max-w-full max-h-full object-cover rounded-full" />
                   ) : (
                     selectedEmployee.fullName?.charAt(0)
                   )}
