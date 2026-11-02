@@ -39,6 +39,7 @@ export default function EmployeeTasks() {
   // Modal State
   const [showModal, setShowModal] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
+  const [savingTask, setSavingTask] = useState(false);
   const [form, setForm] = useState({
     title: '',
     description: '',
@@ -118,8 +119,9 @@ export default function EmployeeTasks() {
 
   const handleSaveTask = async (e) => {
     e.preventDefault();
-    if (!form.title.trim()) return;
+    if (!form.title.trim() || savingTask) return;
 
+    setSavingTask(true);
     try {
       if (editingTask) {
         await api.put(`/tasks/${editingTask._id}`, form);
@@ -137,6 +139,8 @@ export default function EmployeeTasks() {
       fetchTasks();
     } catch (err) {
       alert(err.response?.data?.message || 'Failed to save task');
+    } finally {
+      setSavingTask(false);
     }
   };
 
@@ -611,9 +615,10 @@ export default function EmployeeTasks() {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-xs transition"
+                  disabled={savingTask}
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold rounded-xl shadow-xs transition"
                 >
-                  {editingTask ? 'Update Task' : 'Save Task'}
+                  {savingTask ? 'Saving...' : editingTask ? 'Update Task' : 'Save Task'}
                 </button>
               </div>
             </form>

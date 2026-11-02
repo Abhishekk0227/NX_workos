@@ -51,6 +51,20 @@ router.post('/personal', protect, async (req, res, next) => {
 
     const assignedType = taskType === 'HR_Assigned' ? 'HR_Assigned' : 'Personal';
 
+    // Deduplication check: Prevent duplicate submissions within 5 seconds
+    const duplicate = await Task.findOne({
+      employee: req.user.employee._id,
+      title: title.trim(),
+      createdAt: { $gte: new Date(Date.now() - 5000) }
+    });
+    if (duplicate) {
+      return res.status(200).json({
+        success: true,
+        message: `${assignedType === 'HR_Assigned' ? 'HR Assigned' : 'Personal'} task created`,
+        task: duplicate
+      });
+    }
+
     const task = await Task.create({
       title: title.trim(),
       description: description ? description.trim() : '',
@@ -223,6 +237,20 @@ router.post('/assign', protect, authorize('HR'), async (req, res, next) => {
     const employee = await Employee.findById(employeeId);
     if (!employee) {
       return res.status(404).json({ success: false, message: 'Employee not found' });
+    }
+
+    // Deduplication check: Prevent duplicate assignment within 5 seconds
+    const duplicate = await Task.findOne({
+      employee: employee._id,
+      title: title.trim(),
+      createdAt: { $gte: new Date(Date.now() - 5000) }
+    });
+    if (duplicate) {
+      return res.status(200).json({
+        success: true,
+        message: `Task assigned to ${employee.fullName} successfully`,
+        task: duplicate
+      });
     }
 
     const task = await Task.create({

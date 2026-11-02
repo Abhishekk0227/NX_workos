@@ -11,10 +11,10 @@ test('AttendanceService: Time conversion and late arrival calculation', () => {
     gracePeriodMinutes: 15
   };
 
-  // Punch in at 09:10 (within grace period of 15m)
+  // Punch in at 09:10 (10 mins after shift start 09:00)
   const onTimeDate = new Date('2026-10-31T09:10:00');
   const metricsOnTime = AttendanceService.calculateAttendanceMetrics(onTimeDate, null, shift);
-  assert.equal(metricsOnTime.lateMinutes, 0, 'Should not be late within grace period');
+  assert.equal(metricsOnTime.lateMinutes, 10, 'Should record 10 late minutes from shift start');
   assert.equal(metricsOnTime.status, 'Working', 'Status should be Working');
 
   // Punch in at 09:30 (15m past grace period, 30m past shift start)
@@ -22,11 +22,17 @@ test('AttendanceService: Time conversion and late arrival calculation', () => {
   const metricsLate = AttendanceService.calculateAttendanceMetrics(lateDate, null, shift);
   assert.equal(metricsLate.lateMinutes, 30, 'Should calculate 30 late minutes');
 
-  // Punch out at 18:00 (8.5h worked)
+  // Punch out at 18:00 (8.83h worked, 10m late)
   const punchOutDate = new Date('2026-10-31T18:00:00');
   const metricsFull = AttendanceService.calculateAttendanceMetrics(onTimeDate, punchOutDate, shift);
-  assert.equal(metricsFull.status, 'Present', 'Status should be Present');
+  assert.equal(metricsFull.status, 'Late', 'Status should be Late when arrived past shift start');
   assert.equal(metricsFull.actualWorkingHours, 8.83, 'Working hours should be calculated correctly');
+
+  // Pure on-time punch in at 09:00
+  const sharpOnTime = new Date('2026-10-31T09:00:00');
+  const metricsSharp = AttendanceService.calculateAttendanceMetrics(sharpOnTime, punchOutDate, shift);
+  assert.equal(metricsSharp.status, 'Present', 'Status should be Present when arrived on time');
+  assert.equal(metricsSharp.lateMinutes, 0, 'Zero late minutes for on-time arrival');
 
   // Worked less than 6 hours -> Half Day
   const earlyPunchOut = new Date('2026-10-31T12:00:00');

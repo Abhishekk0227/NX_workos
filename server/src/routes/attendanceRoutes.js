@@ -599,9 +599,20 @@ router.post('/manual-correct', protect, authorize('HR'), async (req, res, next) 
       attendance.actualWorkingHours = metrics.actualWorkingHours;
       attendance.lateMinutes = metrics.lateMinutes;
       attendance.earlyMinutes = metrics.earlyMinutes;
-      attendance.status = status || metrics.status;
+      attendance.status = (!status || status === 'Auto') ? metrics.status : status;
       attendance.isIncomplete = attendance.status === 'Incomplete';
-    } else if (status) {
+    } else if (attendance.punchIn && !attendance.punchOut) {
+      const settings = await SystemSetting.findOne();
+      const metrics = AttendanceService.calculateAttendanceMetrics(
+        attendance.punchIn,
+        null,
+        attendance.shift,
+        settings
+      );
+      attendance.lateMinutes = metrics.lateMinutes;
+      attendance.actualWorkingHours = 0;
+      attendance.status = (!status || status === 'Auto') ? metrics.status : status;
+    } else if (status && status !== 'Auto') {
       attendance.status = status;
     }
 

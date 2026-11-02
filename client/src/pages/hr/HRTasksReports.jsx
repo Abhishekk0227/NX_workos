@@ -40,6 +40,7 @@ export default function HRTasksReports() {
   const [tasksLoading, setTasksLoading] = useState(true);
   const [selectedEmpFilter, setSelectedEmpFilter] = useState('All');
   const [selectedStatusFilter, setSelectedStatusFilter] = useState(urlStatus);
+  const [assigningTask, setAssigningTask] = useState(false);
 
   useEffect(() => {
     const t = searchParams.get('tab');
@@ -153,11 +154,14 @@ export default function HRTasksReports() {
 
   const handleAssignTask = async (e) => {
     e.preventDefault();
-    if (!assignForm.employeeId || !assignForm.title.trim()) {
-      alert('Employee and task title are required');
+    if (!assignForm.employeeId || !assignForm.title.trim() || assigningTask) {
+      if (!assignForm.employeeId || !assignForm.title.trim()) {
+        alert('Employee and task title are required');
+      }
       return;
     }
 
+    setAssigningTask(true);
     try {
       const res = await api.post('/tasks/assign', assignForm);
       if (res.data?.success) {
@@ -168,6 +172,8 @@ export default function HRTasksReports() {
       }
     } catch (err) {
       alert(err.response?.data?.message || 'Failed to assign task');
+    } finally {
+      setAssigningTask(false);
     }
   };
 
@@ -657,9 +663,10 @@ export default function HRTasksReports() {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-emerald-600 text-white text-xs font-semibold rounded-xl hover:bg-emerald-700 shadow-xs cursor-pointer"
+                  disabled={assigningTask}
+                  className="px-5 py-2 bg-emerald-600 text-white text-xs font-semibold rounded-xl hover:bg-emerald-700 disabled:opacity-50 shadow-xs cursor-pointer"
                 >
-                  Assign Task
+                  {assigningTask ? 'Assigning...' : 'Assign Task'}
                 </button>
               </div>
             </form>

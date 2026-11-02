@@ -127,14 +127,17 @@ class AttendanceService {
 
     // Grace Period rule (Conditions 5 & 6)
     const isGraceEnabled = activeShift.enableGracePeriod !== false && (settings ? settings.enableGracePeriod !== false : true);
-    const graceMinutes = isGraceEnabled ? (activeShift.gracePeriodMinutes ?? 15) : 0;
+    const graceMinutes = isGraceEnabled ? (activeShift.gracePeriodMinutes ?? 0) : 0;
 
     const punchInMinutes = this.dateToMinutes(punchIn, timezone);
 
-    // Calculate Late Arrival (Conditions 3, 4, 5, 6)
-    if (punchInMinutes > shiftStartMinutes + graceMinutes) {
+    // Calculate Late Arrival: accurately count late minutes from shift start
+    if (punchInMinutes > shiftStartMinutes) {
       lateMinutes = punchInMinutes - shiftStartMinutes;
-      status = 'Late';
+      // If grace period is not enabled or arrival exceeds grace period, mark as Late
+      if (!isGraceEnabled || punchInMinutes > shiftStartMinutes + graceMinutes || graceMinutes === 0) {
+        status = 'Late';
+      }
     }
 
     // If still working (not punched out)

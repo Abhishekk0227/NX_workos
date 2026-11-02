@@ -224,12 +224,19 @@ export default function HRAttendance() {
     }
   };
 
+  const toLocalDatetimeInput = (dateStr) => {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+
   const openOverride = (att) => {
     setOverrideTarget(att);
     setOverrideData({
-      punchIn: att.punchIn ? new Date(att.punchIn).toISOString().slice(0, 16) : '',
-      punchOut: att.punchOut ? new Date(att.punchOut).toISOString().slice(0, 16) : '',
-      status: att.status === 'Absent' ? 'Present' : (att.status || 'Present'),
+      punchIn: toLocalDatetimeInput(att.punchIn),
+      punchOut: toLocalDatetimeInput(att.punchOut),
+      status: 'Auto',
       reason: ''
     });
     setShowOverrideModal(true);
@@ -1081,10 +1088,11 @@ export default function HRAttendance() {
                   onChange={(e) => setOverrideData({ ...overrideData, status: e.target.value })}
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none"
                 >
-                  <option value="Present">Present</option>
-                  <option value="Late">Late</option>
-                  <option value="Half Day">Half Day</option>
-                  <option value="Absent">Absent</option>
+                  <option value="Auto">Auto (Auto-calculate: Present / Late / Half Day)</option>
+                  <option value="Present">Present (Force Present)</option>
+                  <option value="Late">Late (Force Late)</option>
+                  <option value="Half Day">Half Day (Force Half Day)</option>
+                  <option value="Absent">Absent (Force Absent)</option>
                 </select>
               </div>
 
