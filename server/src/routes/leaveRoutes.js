@@ -6,6 +6,8 @@ const LeavePolicy = require('../models/LeavePolicy');
 const Employee = require('../models/Employee');
 const AuditLog = require('../models/AuditLog');
 const LeaveService = require('../services/leaveService');
+const Attendance = require('../models/Attendance');
+const AttendanceService = require('../services/attendanceService');
 const NotificationService = require('../services/notificationService');
 const { protect } = require('../middleware/auth');
 const { authorize } = require('../middleware/rbac');
@@ -85,18 +87,51 @@ router.post('/policies', protect, authorize('HR'), async (req, res, next) => {
  */
 router.get('/balance', protect, async (req, res, next) => {
   try {
+    const todayStr = AttendanceService.formatDate(new Date());
+    const currentMonth = todayStr.slice(0, 7); // 'YYYY-MM'
+
     if (!req.user.employee) {
       return res.json({
         success: true,
-        balances: { clBalance: 0, slBalance: 0, lwpCount: 0 }
+        balances: { clBalance: 0, slBalance: 0, lwpCount: 0 },
+        leavesTakenThisMonth: 0,
+        currentMonth
       });
     }
 
     const balances = await LeaveService.getBalance(req.user.employee._id);
 
+    // Calculate leaves taken in current month
+    const startOfMonth = `${currentMonth}-01`;
+    const endOfMonth = `${currentMonth}-31`;
+
+    const approvedLeaves = await LeaveRequest.find({
+      employee: req.user.employee._id,
+      status: 'Approved',
+      startDate: { $lte: endOfMonth },
+      endDate: { $gte: startOfMonth }
+    });
+
+    let leavesTakenThisMonth = 0;
+    for (const lv of approvedLeaves) {
+      leavesTakenThisMonth += (lv.totalDays || 1);
+    }
+
+    const onLeaveAttendanceCount = await Attendance.countDocuments({
+      employee: req.user.employee._id,
+      date: { $gte: startOfMonth, $lte: endOfMonth },
+      status: 'On Leave'
+    });
+
+    if (onLeaveAttendanceCount > leavesTakenThisMonth) {
+      leavesTakenThisMonth = onLeaveAttendanceCount;
+    }
+
     res.json({
       success: true,
-      balances
+      balances,
+      leavesTakenThisMonth,
+      currentMonth
     });
   } catch (err) {
     next(err);

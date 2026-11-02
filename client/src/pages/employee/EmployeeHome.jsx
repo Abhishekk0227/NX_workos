@@ -28,6 +28,7 @@ export default function EmployeeHome() {
 
   const [attendance, setAttendance] = useState(null);
   const [leaveBalances, setLeaveBalances] = useState({ clBalance: 0, slBalance: 0, lwpCount: 0 });
+  const [leavesTakenThisMonth, setLeavesTakenThisMonth] = useState(0);
   const [tasks, setTasks] = useState([]);
   const [pendingTasksCount, setPendingTasksCount] = useState(0);
   const [broadcasts, setBroadcasts] = useState([]);
@@ -52,6 +53,7 @@ export default function EmployeeHome() {
       }
       if (balRes.status === 'fulfilled') {
         setLeaveBalances(balRes.value.data.balances || { clBalance: 0, slBalance: 0, lwpCount: 0 });
+        setLeavesTakenThisMonth(balRes.value.data.leavesTakenThisMonth ?? 0);
       }
       if (taskRes.status === 'fulfilled') {
         const pTasks = taskRes.value.data.personalTasks || [];
@@ -134,8 +136,7 @@ export default function EmployeeHome() {
     return () => clearInterval(timer);
   }, [attendance]);
 
-  // Leave balance number (CL + SL available)
-  const totalLeaveBalance = (leaveBalances?.clBalance || 0) + (leaveBalances?.slBalance || 0);
+
 
   const displayTasks = tasks.slice(0, 4);
   const totalTasksCount = tasks.length;
@@ -271,7 +272,7 @@ export default function EmployeeHome() {
           </div>
         </Link>
 
-        {/* Card 2: Leave */}
+        {/* Card 2: Leave Taken This Month */}
         <Link
           to="/employee/leave"
           className="bg-white p-4 rounded-3xl border border-slate-100 shadow-2xs flex flex-col justify-between hover:border-rose-300 transition-all group"
@@ -282,9 +283,9 @@ export default function EmployeeHome() {
           <div>
             <span className="text-xs font-semibold text-slate-600 block">Leave</span>
             <div className="text-2xl font-black text-rose-500 leading-tight mt-1">
-              {totalLeaveBalance}
+              {leavesTakenThisMonth}
             </div>
-            <span className="text-[11px] text-slate-400 font-medium block mt-0.5">Balance</span>
+            <span className="text-[11px] text-slate-400 font-medium block mt-0.5">Taken This Month</span>
           </div>
         </Link>
 
