@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   ClipboardList,
   FileText,
@@ -17,12 +18,18 @@ import {
 import api from '../../api/client';
 
 export default function HRTasksReports() {
-  const [activeTab, setActiveTab] = useState('reports'); // 'reports' | 'tasks'
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlTab = searchParams.get('tab') || 'reports';
+  const urlDate = searchParams.get('date');
+  const urlStatus = searchParams.get('status') || 'New';
+
+  const todayStr = new Date().toISOString().split('T')[0];
+  const [activeTab, setActiveTab] = useState(urlTab === 'tasks' ? 'tasks' : 'reports');
 
   // Reports state
   const [reports, setReports] = useState([]);
   const [reportsLoading, setReportsLoading] = useState(false);
-  const [reportDate, setReportDate] = useState(new Date().toISOString().split('T')[0]);
+  const [reportDate, setReportDate] = useState(urlDate || todayStr);
   const [reportEmpFilter, setReportEmpFilter] = useState('All');
   const [selectedReport, setSelectedReport] = useState(null);
   const [showReportModal, setShowReportModal] = useState(false);
@@ -32,7 +39,43 @@ export default function HRTasksReports() {
   const [employees, setEmployees] = useState([]);
   const [tasksLoading, setTasksLoading] = useState(true);
   const [selectedEmpFilter, setSelectedEmpFilter] = useState('All');
-  const [selectedStatusFilter, setSelectedStatusFilter] = useState('New');
+  const [selectedStatusFilter, setSelectedStatusFilter] = useState(urlStatus);
+
+  useEffect(() => {
+    const t = searchParams.get('tab');
+    if (t === 'reports' || t === 'tasks') setActiveTab(t);
+    const d = searchParams.get('date');
+    if (d) setReportDate(d);
+    const s = searchParams.get('status');
+    if (s) setSelectedStatusFilter(s);
+  }, [searchParams]);
+
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+    setSearchParams((prev) => {
+      const p = new URLSearchParams(prev);
+      p.set('tab', tab);
+      return p;
+    }, { replace: true });
+  };
+
+  const handleReportDateChange = (date) => {
+    setReportDate(date);
+    setSearchParams((prev) => {
+      const p = new URLSearchParams(prev);
+      p.set('date', date);
+      return p;
+    }, { replace: true });
+  };
+
+  const handleTaskStatusChange = (status) => {
+    setSelectedStatusFilter(status);
+    setSearchParams((prev) => {
+      const p = new URLSearchParams(prev);
+      p.set('status', status);
+      return p;
+    }, { replace: true });
+  };
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [assignForm, setAssignForm] = useState({
     employeeId: '',
@@ -151,7 +194,7 @@ export default function HRTasksReports() {
       <div className="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
         <div className="flex bg-slate-200/70 p-1 rounded-xl w-full md:w-auto">
           <button
-            onClick={() => setActiveTab('reports')}
+            onClick={() => handleTabChange('reports')}
             className={`flex-1 md:flex-initial text-center px-3 sm:px-4 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
               activeTab === 'reports'
                 ? 'bg-white text-slate-900 shadow-xs'
@@ -161,7 +204,7 @@ export default function HRTasksReports() {
             Daily Task Reports ({reports.length})
           </button>
           <button
-            onClick={() => setActiveTab('tasks')}
+            onClick={() => handleTabChange('tasks')}
             className={`flex-1 md:flex-initial text-center px-3 sm:px-4 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
               activeTab === 'tasks'
                 ? 'bg-white text-slate-900 shadow-xs'
@@ -177,7 +220,7 @@ export default function HRTasksReports() {
             <input
               type="date"
               value={reportDate}
-              onChange={(e) => setReportDate(e.target.value)}
+              onChange={(e) => handleReportDateChange(e.target.value)}
               className="w-full sm:w-auto px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-700 outline-none"
             />
             <select

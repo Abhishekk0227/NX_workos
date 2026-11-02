@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const mongoose = require('mongoose');
 const Attendance = require('../models/Attendance');
 const DailyReport = require('../models/DailyReport');
 const Employee = require('../models/Employee');
@@ -333,6 +334,78 @@ router.post('/request-correction', protect, async (req, res, next) => {
 router.get('/all', protect, authorize('HR'), async (req, res, next) => {
   try {
     const { date, month, employeeId, status } = req.query;
+
+    // Special handling for Absent filter on a given date (e.g. today)
+    if (status === 'Absent' && date) {
+      const empFilter = {
+        $or: [{ employmentStatus: 'Active' }, { status: 'Active' }, { employmentStatus: { $exists: false } }]
+      };
+      if (employeeId && employeeId !== 'All') {
+        empFilter._id = employeeId;
+      }
+
+      const activeEmployees = await Employee.find(empFilter)
+        .select('employeeId fullName department designation joiningDate createdAt employmentStatus')
+        .lean();
+
+      const existingRecords = await Attendance.find({ date })
+        .populate('employee', 'employeeId fullName department designation joiningDate createdAt')
+        .populate('shift')
+        .populate('dailyReport')
+        .lean();
+
+      const attendedEmpIds = new Set();
+      const explicitAbsentRecords = [];
+
+      existingRecords.forEach((rec) => {
+        const empId = rec.employee?._id?.toString() || rec.employee?.toString();
+        if (rec.status === 'Absent') {
+          if (!employeeId || employeeId === 'All' || empId === employeeId) {
+            explicitAbsentRecords.push(rec);
+          }
+        } else if (
+          rec.status === 'Present' ||
+          rec.status === 'Working' ||
+          rec.status === 'Late' ||
+          rec.status === 'Half Day' ||
+          rec.status === 'On Leave' ||
+          rec.punchIn
+        ) {
+          attendedEmpIds.add(empId);
+        }
+      });
+
+      // Find active employees who have no attendance record on this date
+      const unrecordedAbsents = activeEmployees
+        .filter((emp) => {
+          const idStr = emp._id.toString();
+          return (
+            !attendedEmpIds.has(idStr) &&
+            !explicitAbsentRecords.some(
+              (r) => (r.employee?._id?.toString() || r.employee?.toString()) === idStr
+            )
+          );
+        })
+        .map((emp) => ({
+          _id: `absent-${emp._id}-${date}`,
+          employee: emp,
+          date,
+          status: 'Absent',
+          punchIn: null,
+          punchOut: null,
+          actualWorkingHours: 0,
+          isVirtualAbsent: true
+        }));
+
+      const allAbsentRecords = [...explicitAbsentRecords, ...unrecordedAbsents];
+
+      return res.json({
+        success: true,
+        count: allAbsentRecords.length,
+        records: allAbsentRecords
+      });
+    }
+
     const filter = {};
 
     if (date) {
@@ -347,7 +420,10 @@ router.get('/all', protect, authorize('HR'), async (req, res, next) => {
 
     if (status && status !== 'All') {
       if (status === 'Present') {
-        filter.status = { $in: ['Present', 'Working'] };
+        filter.$or = [
+          { status: { $in: ['Present', 'Working'] } },
+          { punchIn: { $ne: null }, status: { $nin: ['Absent', 'Incomplete', 'On Leave'] } }
+        ];
       } else {
         filter.status = status;
       }
@@ -464,7 +540,7 @@ router.post('/review-correction', protect, authorize('HR'), async (req, res, nex
  */
 router.post('/manual-correct', protect, authorize('HR'), async (req, res, next) => {
   try {
-    const { attendanceId, punchIn, punchOut, status, reason } = req.body;
+    const { attendanceId, punchIn, punchOut, status, reason, employeeId, date } = req.body;
 
     if (!reason || !reason.trim()) {
       return res.status(400).json({
@@ -473,12 +549,41 @@ router.post('/manual-correct', protect, authorize('HR'), async (req, res, next) 
       });
     }
 
-    const attendance = await Attendance.findById(attendanceId).populate('shift');
-    if (!attendance) {
-      return res.status(404).json({ success: false, message: 'Attendance record not found' });
+    let attendance = null;
+    let targetEmpId = employeeId;
+    let targetDate = date;
+
+    if (attendanceId && mongoose.Types.ObjectId.isValid(attendanceId)) {
+      attendance = await Attendance.findById(attendanceId).populate('shift');
+    } else if (attendanceId && typeof attendanceId === 'string' && attendanceId.startsWith('absent-')) {
+      const parts = attendanceId.split('-');
+      targetEmpId = targetEmpId || parts[1];
+      targetDate = targetDate || parts.slice(2).join('-');
     }
 
-    const prev = attendance.toObject();
+    if (!attendance) {
+      if (!targetEmpId || !targetDate) {
+        return res.status(404).json({ success: false, message: 'Attendance record or employee/date not found' });
+      }
+
+      // Check if one was created in the meantime
+      attendance = await Attendance.findOne({ employee: targetEmpId, date: targetDate }).populate('shift');
+      if (!attendance) {
+        // Create fresh attendance record
+        const employeeDoc = await Employee.findById(targetEmpId).populate('assignedShift');
+        if (!employeeDoc) {
+          return res.status(404).json({ success: false, message: 'Employee not found' });
+        }
+        attendance = new Attendance({
+          employee: targetEmpId,
+          date: targetDate,
+          shift: employeeDoc.assignedShift?._id,
+          status: status || 'Present'
+        });
+      }
+    }
+
+    const prev = attendance.toObject ? attendance.toObject() : attendance;
 
     if (punchIn) attendance.punchIn = new Date(punchIn);
     if (punchOut) attendance.punchOut = new Date(punchOut);
@@ -500,12 +605,13 @@ router.post('/manual-correct', protect, authorize('HR'), async (req, res, next) 
       attendance.status = status;
     }
 
+    if (!attendance.auditHistory) attendance.auditHistory = [];
     attendance.auditHistory.push({
       action: 'HR_MANUAL_OVERRIDE',
       performedBy: req.user._id,
       performedAt: new Date(),
       reason: reason.trim(),
-      details: { previousStatus: prev.status, newStatus: attendance.status }
+      details: { previousStatus: prev.status || 'None', newStatus: attendance.status }
     });
 
     await attendance.save();

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   CalendarCheck,
   Search,
@@ -21,6 +22,14 @@ import {
 import api from '../../api/client';
 
 export default function HRAttendance() {
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Read URL search params with sensible fallbacks
+  const urlView = searchParams.get('view') || searchParams.get('tab') || 'calendar';
+  const urlDate = searchParams.get('date');
+  const urlStatus = searchParams.get('status') || 'All';
+  const urlEmp = searchParams.get('employeeId') || searchParams.get('employee') || 'All';
+
   const [records, setRecords] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -36,7 +45,7 @@ export default function HRAttendance() {
   }, []);
 
   // View switch: 'calendar' | 'log'
-  const [viewMode, setViewMode] = useState('calendar');
+  const [viewMode, setViewMode] = useState(urlView === 'log' ? 'log' : 'calendar');
 
   // Selected Day in Calendar for mobile & detail inspection
   const [selectedDay, setSelectedDay] = useState(() => new Date().getDate());
@@ -51,9 +60,66 @@ export default function HRAttendance() {
 
   // Daily Log Filters: defaults to real-time current date
   const todayStr = new Date().toISOString().split('T')[0];
-  const [selectedDate, setSelectedDate] = useState(todayStr);
-  const [selectedEmployee, setSelectedEmployee] = useState('All');
-  const [selectedStatus, setSelectedStatus] = useState('All');
+  const [selectedDate, setSelectedDate] = useState(urlDate || todayStr);
+  const [selectedEmployee, setSelectedEmployee] = useState(urlEmp);
+  const [selectedStatus, setSelectedStatus] = useState(urlStatus);
+
+  // Sync state when URL searchParams change dynamically
+  useEffect(() => {
+    const v = searchParams.get('view') || searchParams.get('tab');
+    if (v === 'log' || v === 'calendar') {
+      setViewMode(v);
+    }
+    const d = searchParams.get('date');
+    if (d) {
+      setSelectedDate(d);
+    }
+    const s = searchParams.get('status');
+    if (s) {
+      setSelectedStatus(s);
+    }
+    const emp = searchParams.get('employeeId') || searchParams.get('employee');
+    if (emp) {
+      setSelectedEmployee(emp);
+    }
+  }, [searchParams]);
+
+  // URL state sync helpers
+  const handleViewModeChange = (mode) => {
+    setViewMode(mode);
+    setSearchParams((prev) => {
+      const p = new URLSearchParams(prev);
+      p.set('view', mode);
+      return p;
+    }, { replace: true });
+  };
+
+  const handleDateChange = (newDate) => {
+    setSelectedDate(newDate);
+    setSearchParams((prev) => {
+      const p = new URLSearchParams(prev);
+      p.set('date', newDate);
+      return p;
+    }, { replace: true });
+  };
+
+  const handleStatusChange = (newStatus) => {
+    setSelectedStatus(newStatus);
+    setSearchParams((prev) => {
+      const p = new URLSearchParams(prev);
+      p.set('status', newStatus);
+      return p;
+    }, { replace: true });
+  };
+
+  const handleEmployeeChange = (newEmp) => {
+    setSelectedEmployee(newEmp);
+    setSearchParams((prev) => {
+      const p = new URLSearchParams(prev);
+      p.set('employeeId', newEmp);
+      return p;
+    }, { replace: true });
+  };
 
   // Manual Edit Modal
   const [showOverrideModal, setShowOverrideModal] = useState(false);
@@ -140,6 +206,8 @@ export default function HRAttendance() {
     try {
       const res = await api.post('/attendance/manual-correct', {
         attendanceId: overrideTarget._id,
+        employeeId: overrideTarget.employee?._id || overrideTarget.employee,
+        date: overrideTarget.date || selectedDate,
         punchIn: overrideData.punchIn ? new Date(overrideData.punchIn) : undefined,
         punchOut: overrideData.punchOut ? new Date(overrideData.punchOut) : undefined,
         status: overrideData.status || undefined,
@@ -161,7 +229,7 @@ export default function HRAttendance() {
     setOverrideData({
       punchIn: att.punchIn ? new Date(att.punchIn).toISOString().slice(0, 16) : '',
       punchOut: att.punchOut ? new Date(att.punchOut).toISOString().slice(0, 16) : '',
-      status: att.status || 'Present',
+      status: att.status === 'Absent' ? 'Present' : (att.status || 'Present'),
       reason: ''
     });
     setShowOverrideModal(true);
@@ -283,7 +351,7 @@ export default function HRAttendance() {
         {/* Segmented View Switch: Monthly Calendar vs Daily Log */}
         <div className="flex bg-slate-200/70 p-1 rounded-xl w-full sm:w-auto">
           <button
-            onClick={() => setViewMode('calendar')}
+            onClick={() => handleViewModeChange('calendar')}
             className={`flex-1 sm:flex-initial text-center px-4 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
               viewMode === 'calendar'
                 ? 'bg-white text-slate-900 shadow-xs'
@@ -293,7 +361,7 @@ export default function HRAttendance() {
             Monthly Calendar
           </button>
           <button
-            onClick={() => setViewMode('log')}
+            onClick={() => handleViewModeChange('log')}
             className={`flex-1 sm:flex-initial text-center px-4 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
               viewMode === 'log'
                 ? 'bg-white text-slate-900 shadow-xs'
@@ -721,7 +789,7 @@ export default function HRAttendance() {
               <input
                 type="date"
                 value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
+                onChange={(e) => handleDateChange(e.target.value)}
                 className="w-full sm:w-auto px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-700 outline-none"
               />
             </div>
@@ -730,7 +798,7 @@ export default function HRAttendance() {
               <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Employee</label>
               <select
                 value={selectedEmployee}
-                onChange={(e) => setSelectedEmployee(e.target.value)}
+                onChange={(e) => handleEmployeeChange(e.target.value)}
                 className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-700 outline-none truncate"
               >
                 <option value="All">All Staff</option>
@@ -746,7 +814,7 @@ export default function HRAttendance() {
               <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Status</label>
               <select
                 value={selectedStatus}
-                onChange={(e) => setSelectedStatus(e.target.value)}
+                onChange={(e) => handleStatusChange(e.target.value)}
                 className="w-full sm:w-auto px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-700 outline-none"
               >
                 <option value="All">All Statuses</option>
@@ -754,6 +822,7 @@ export default function HRAttendance() {
                 <option value="Late">Late</option>
                 <option value="Half Day">Half Day</option>
                 <option value="Working">Working</option>
+                <option value="On Leave">On Leave</option>
                 <option value="Incomplete">Incomplete</option>
                 <option value="Absent">Absent</option>
               </select>

@@ -38,6 +38,7 @@ export default function HRDashboard() {
   });
   const [recentLogs, setRecentLogs] = useState([]);
 
+  const todayStr = new Date().toISOString().split('T')[0];
   const todayDateFormatted = new Date().toLocaleDateString('en-US', {
     weekday: 'long',
     year: 'numeric',
@@ -163,7 +164,7 @@ export default function HRDashboard() {
       {/* 4 Top KPI Cards matching HrpanelMui.png Screen 1 (2x2 Grid on mobile) */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {/* Total Employees */}
-        <Link to="/hr/employees" className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-xs hover:border-blue-200 transition-all cursor-pointer group">
+        <Link to="/hr/employees?status=Active" className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-xs hover:border-blue-200 hover:shadow-sm transition-all cursor-pointer group">
           <div className="flex items-center gap-2.5 mb-2">
             <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
               <Users className="w-4 h-4" />
@@ -178,7 +179,7 @@ export default function HRDashboard() {
         </Link>
 
         {/* Present Today */}
-        <Link to="/hr/attendance" className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-xs hover:border-emerald-200 transition-all cursor-pointer group">
+        <Link to={`/hr/attendance?view=log&status=Present&date=${todayStr}&employeeId=All`} className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-xs hover:border-emerald-300 hover:shadow-sm transition-all cursor-pointer group">
           <div className="flex items-center gap-2.5 mb-2">
             <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
               <CalendarCheck className="w-4 h-4" />
@@ -193,7 +194,7 @@ export default function HRDashboard() {
         </Link>
 
         {/* On Leave */}
-        <Link to="/hr/leave" className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-xs hover:border-amber-200 transition-all cursor-pointer group">
+        <Link to={`/hr/attendance?view=log&status=On%20Leave&date=${todayStr}&employeeId=All`} className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-xs hover:border-amber-300 hover:shadow-sm transition-all cursor-pointer group">
           <div className="flex items-center gap-2.5 mb-2">
             <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
               <AlertTriangle className="w-4 h-4" />
@@ -208,7 +209,7 @@ export default function HRDashboard() {
         </Link>
 
         {/* Absent Today */}
-        <Link to="/hr/attendance" className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-xs hover:border-rose-200 transition-all cursor-pointer group">
+        <Link to={`/hr/attendance?view=log&status=Absent&date=${todayStr}&employeeId=All`} className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-xs hover:border-rose-300 hover:shadow-sm transition-all cursor-pointer group">
           <div className="flex items-center gap-2.5 mb-2">
             <div className="w-8 h-8 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
               <UserX className="w-4 h-4" />
@@ -224,8 +225,15 @@ export default function HRDashboard() {
       </div>
 
       {/* Today's Attendance Card matching HrpanelMui.png Screen 1 */}
-      <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs">
-        <h3 className="font-bold text-slate-900 text-sm mb-3">Today's Attendance</h3>
+      <Link
+        to={`/hr/attendance?view=log&status=Present&date=${todayStr}&employeeId=All`}
+        className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs hover:border-blue-300 hover:shadow-sm transition-all cursor-pointer block group"
+        title="View Today's Attendance Log"
+      >
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-bold text-slate-900 text-sm group-hover:text-blue-600 transition">Today's Attendance</h3>
+          <span className="text-xs font-semibold text-blue-600 group-hover:underline">View Log &rarr;</span>
+        </div>
         <div className="flex items-center gap-6">
           <div className="relative w-24 h-24 flex items-center justify-center shrink-0">
             <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
@@ -254,43 +262,43 @@ export default function HRDashboard() {
             <div className="text-2xl font-black text-slate-900">
               {stats.presentToday} / {stats.totalEmployees}
             </div>
-            <div className="text-xs text-slate-500 font-medium mt-0.5">Present</div>
+            <div className="text-xs text-slate-500 font-medium mt-0.5">Present (Click to open Daily Log)</div>
           </div>
         </div>
-      </div>
+      </Link>
 
       {/* Leave Requests Card matching HrpanelMui.png Screen 1 */}
       <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs">
         <div className="flex items-center justify-between mb-3">
           <h3 className="font-bold text-slate-900 text-sm">Leave Requests</h3>
-          <Link to="/hr/leave" className="text-xs font-semibold text-blue-600 hover:text-blue-700">
+          <Link to="/hr/leave?status=All" className="text-xs font-semibold text-blue-600 hover:text-blue-700">
             View All
           </Link>
         </div>
         <div className="grid grid-cols-3 divide-x divide-slate-100 text-center py-1">
-          <div className="px-2">
-            <div className="text-xl font-black text-amber-500">{stats.leavePending}</div>
+          <Link to="/hr/leave?status=Pending" className="px-2 py-1.5 rounded-xl hover:bg-amber-50/70 transition block cursor-pointer group">
+            <div className="text-xl font-black text-amber-500 group-hover:scale-105 transition">{stats.leavePending}</div>
             <div className="text-xs text-slate-500 font-medium mt-0.5">Pending</div>
-          </div>
-          <div className="px-2">
-            <div className="text-xl font-black text-emerald-500">{stats.leaveApproved}</div>
+          </Link>
+          <Link to="/hr/leave?status=Approved" className="px-2 py-1.5 rounded-xl hover:bg-emerald-50/70 transition block cursor-pointer group">
+            <div className="text-xl font-black text-emerald-500 group-hover:scale-105 transition">{stats.leaveApproved}</div>
             <div className="text-xs text-slate-500 font-medium mt-0.5">Approved</div>
-          </div>
-          <div className="px-2">
-            <div className="text-xl font-black text-rose-500">{stats.leaveRejected}</div>
+          </Link>
+          <Link to="/hr/leave?status=Rejected" className="px-2 py-1.5 rounded-xl hover:bg-rose-50/70 transition block cursor-pointer group">
+            <div className="text-xl font-black text-rose-500 group-hover:scale-105 transition">{stats.leaveRejected}</div>
             <div className="text-xs text-slate-500 font-medium mt-0.5">Rejected</div>
-          </div>
+          </Link>
         </div>
       </div>
 
       {/* Bottom Row (Task Reports & Payroll side-by-side matching Screen 1) */}
       <div className="grid grid-cols-2 gap-3 sm:gap-4">
         <Link
-          to="/hr/tasks-reports"
-          className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col justify-between hover:border-blue-200 transition"
+          to={`/hr/tasks-reports?tab=reports&date=${todayStr}`}
+          className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col justify-between hover:border-blue-300 hover:shadow-sm transition group"
         >
           <div>
-            <h3 className="font-bold text-slate-900 text-xs sm:text-sm">Task Reports</h3>
+            <h3 className="font-bold text-slate-900 text-xs sm:text-sm group-hover:text-blue-600 transition">Task Reports</h3>
             <div className="text-2xl sm:text-3xl font-black text-slate-900 mt-2">
               {stats.reportsSubmitted}
             </div>

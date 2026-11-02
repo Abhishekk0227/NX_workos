@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Users,
   MoreVertical,
@@ -31,14 +32,34 @@ import {
 import api from '../../api/client';
 
 export default function HREmployees() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlStatus = searchParams.get('status') || 'All';
+  const urlSearch = searchParams.get('search') || '';
+
   const [employees, setEmployees] = useState([]);
   const [shifts, setShifts] = useState([]);
   const [policies, setPolicies] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('All');
+  const [search, setSearch] = useState(urlSearch);
+  const [statusFilter, setStatusFilter] = useState(urlStatus);
   const [roleFilter, setRoleFilter] = useState('All');
   const [activeMenuId, setActiveMenuId] = useState(null);
+
+  useEffect(() => {
+    const s = searchParams.get('status');
+    if (s && s !== statusFilter) setStatusFilter(s);
+    const q = searchParams.get('search');
+    if (q !== null && q !== search) setSearch(q);
+  }, [searchParams]);
+
+  const handleStatusFilterChange = (newStatus) => {
+    setStatusFilter(newStatus);
+    setSearchParams((prev) => {
+      const p = new URLSearchParams(prev);
+      p.set('status', newStatus);
+      return p;
+    }, { replace: true });
+  };
 
   // Modals state
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -277,7 +298,7 @@ export default function HREmployees() {
         ].map((tab) => (
           <button
             key={tab.id}
-            onClick={() => setStatusFilter(tab.id)}
+            onClick={() => handleStatusFilterChange(tab.id)}
             className={`px-4 py-1.5 rounded-full text-xs font-bold transition cursor-pointer ${
               statusFilter === tab.id
                 ? 'bg-blue-600 text-white shadow-xs'

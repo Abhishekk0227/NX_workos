@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   CalendarOff,
   Search,
@@ -19,11 +20,40 @@ import {
 import api from '../../api/client';
 
 export default function HRLeave() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlStatus = searchParams.get('status') || 'All';
+  const urlType = searchParams.get('type') || 'All';
+
   const [requests, setRequests] = useState([]);
   const [policies, setPolicies] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState('All'); // 'All', 'Pending', 'Approved', 'Rejected'
-  const [typeFilter, setTypeFilter] = useState('All');
+  const [statusFilter, setStatusFilter] = useState(urlStatus); // 'All', 'Pending', 'Approved', 'Rejected'
+  const [typeFilter, setTypeFilter] = useState(urlType);
+
+  useEffect(() => {
+    const s = searchParams.get('status');
+    if (s && s !== statusFilter) setStatusFilter(s);
+    const t = searchParams.get('type');
+    if (t && t !== typeFilter) setTypeFilter(t);
+  }, [searchParams]);
+
+  const handleStatusFilterChange = (status) => {
+    setStatusFilter(status);
+    setSearchParams((prev) => {
+      const p = new URLSearchParams(prev);
+      p.set('status', status);
+      return p;
+    }, { replace: true });
+  };
+
+  const handleTypeFilterChange = (type) => {
+    setTypeFilter(type);
+    setSearchParams((prev) => {
+      const p = new URLSearchParams(prev);
+      p.set('type', type);
+      return p;
+    }, { replace: true });
+  };
 
   // Ledger inspection modal
   const [showLedgerModal, setShowLedgerModal] = useState(false);
@@ -203,7 +233,7 @@ export default function HRLeave() {
           {['All', 'Pending', 'Approved', 'Rejected'].map((status) => (
             <button
               key={status}
-              onClick={() => setStatusFilter(status)}
+              onClick={() => handleStatusFilterChange(status)}
               className={`flex-1 sm:flex-initial text-center px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer shrink-0 ${
                 statusFilter === status
                   ? 'bg-slate-900 text-white shadow-xs'
@@ -220,7 +250,7 @@ export default function HRLeave() {
           <label className="text-[11px] font-bold text-slate-500 whitespace-nowrap">Classification:</label>
           <select
             value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value)}
+            onChange={(e) => handleTypeFilterChange(e.target.value)}
             className="w-full sm:w-auto px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 outline-none"
           >
             <option value="All">All Types</option>
