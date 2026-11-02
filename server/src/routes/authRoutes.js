@@ -14,20 +14,95 @@ const generateToken = (id) => {
 
 /**
  * POST /api/auth/login
- * User login with email and password
+ * User login with Employee ID OR Email and password
  */
 router.post('/login', async (req, res, next) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, loginId, identifier, employeeId } = req.body;
+    const rawId = (email || loginId || identifier || employeeId || '').trim();
 
-    if (!email || !password) {
+    if (!rawId || !password) {
       return res.status(400).json({
         success: false,
-        message: 'Please provide both email and password'
+        message: 'Please provide Employee ID / Email and password'
       });
     }
 
-    const user = await User.findOne({ email: email.toLowerCase() })
+    let user = null;
+    const escapedInput = rawId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+    // 1. If input contains @, try finding by email directly
+    if (rawId.includes('@')) {
+      user = await User.findOne({ email: rawId.toLowerCase() })
+        .select('+password')
+        .populate({
+          path: 'employee',
+          populate: [
+            { path: 'assignedShift' },
+            { path: 'leavePolicy' }
+          ]
+        });
+    }
+
+    // 2. If not found by email or if input is an Employee ID (e.g. "TEST_EMP_80", "NX001")
+    if (!user) {
+      const employee = await Employee.findOne({
+        $or: [
+          { employeeId: { $regex: new RegExp(`^${escapedInput}$`, 'i') } },
+          { officialEmail: rawId.toLowerCase() }
+        ]
+      });
+
+      if (employee) {
+        user = await User.findOne({
+          $or: [
+            { employee: employee._id },
+            { email: employee.officialEmail?.toLowerCase() }
+          ]
+        })
+        .select('+password')
+        .populate({
+          path: 'employee',
+          populate: [
+            { path: 'assignedShift' },
+            { path: 'leavePolicy' }
+          ]
+        });
+
+        // Self-heal: If employee exists in DB but User account was missing
+        if (!user) {
+          user = await User.create({
+            email: employee.officialEmail.toLowerCase(),
+            password: password,
+            role: 'Employee',
+            isActive: true,
+            employee: employee._id
+          });
+          employee.user = user._id;
+          await employee.save();
+
+          user = await User.findById(user._id)
+            .select('+password')
+            .populate({
+              path: 'employee',
+              populate: [
+                { path: 'assignedShift' },
+                { path: 'leavePolicy' }
+              ]
+            });
+        } else if (!employee.user || !user.employee) {
+          employee.user = user._id;
+          user.employee = employee._id;
+          await Promise.all([employee.save(), user.save()]);
+        }
+      }
+    }
+
+    // 3. Fallback: Search email prefix (e.g. 'test80' matching 'test80@...')
+    if (!user && !rawId.includes('@')) {
+      user = await User.findOne({
+        email: { $regex: new RegExp(`^${escapedInput}@`, 'i') }
+      })
       .select('+password')
       .populate({
         path: 'employee',
@@ -36,11 +111,12 @@ router.post('/login', async (req, res, next) => {
           { path: 'leavePolicy' }
         ]
       });
+    }
 
     if (!user) {
       return res.status(401).json({
         success: false,
-        message: 'Invalid email or password'
+        message: 'Invalid Employee ID / Email or password'
       });
     }
 
@@ -55,8 +131,27 @@ router.post('/login', async (req, res, next) => {
     if (!isMatch) {
       return res.status(401).json({
         success: false,
-        message: 'Invalid email or password'
+        message: 'Invalid Employee ID / Email or password'
       });
+    }
+
+    // Auto-link employee object if user is Employee and employee was missing
+    if (user.role === 'Employee' && !user.employee) {
+      const emp = await Employee.findOne({ officialEmail: user.email.toLowerCase() });
+      if (emp) {
+        user.employee = emp._id;
+        emp.user = user._id;
+        await Promise.all([user.save(), emp.save()]);
+        user = await User.findById(user._id)
+          .select('+password')
+          .populate({
+            path: 'employee',
+            populate: [
+              { path: 'assignedShift' },
+              { path: 'leavePolicy' }
+            ]
+          });
+      }
     }
 
     user.lastLogin = new Date();

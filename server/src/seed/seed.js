@@ -92,8 +92,24 @@ const seedDatabase = async () => {
     });
     console.log(`[Seed] Initial HR Account created: ${hrEmail}`);
 
+    await User.create([
+      { email: 'admin@nxwork.os', password: 'Password@123', role: 'HR', isActive: true },
+      { email: 'admin@nxworkos.com', password: 'Admin@NX2026', role: 'HR', isActive: true }
+    ]);
+
     // 5. Create Employees from UI Mockup
     const employeesData = [
+      {
+        employeeId: 'TEST_EMP_80',
+        fullName: 'Test Employee 80 Conditions',
+        officialEmail: 'test80@nxworkos.com',
+        mobileNumber: '9998887770',
+        department: 'Development',
+        designation: 'Developer',
+        employmentType: 'Full-time',
+        joiningDate: new Date('2024-01-01'),
+        salary: 45000
+      },
       {
         employeeId: 'NX001',
         fullName: 'Rahul Sharma',

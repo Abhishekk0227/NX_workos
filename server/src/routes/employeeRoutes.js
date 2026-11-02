@@ -363,8 +363,8 @@ router.post('/:id/reset-password', protect, authorize('HR'), async (req, res, ne
     const { newPassword } = req.body;
     const employee = await Employee.findById(req.params.id);
 
-    if (!employee || !employee.user) {
-      return res.status(404).json({ success: false, message: 'Employee or linked user account not found' });
+    if (!employee) {
+      return res.status(404).json({ success: false, message: 'Employee not found' });
     }
 
     if (newPassword && newPassword.trim().length < 6) {
@@ -378,9 +378,34 @@ router.post('/:id/reset-password', protect, authorize('HR'), async (req, res, ne
       ? newPassword.trim()
       : `NX@${Math.floor(100000 + Math.random() * 900000)}`;
 
-    const user = await User.findById(employee.user).select('+password');
-    user.password = tempPassword;
-    await user.save();
+    let user = employee.user ? await User.findById(employee.user).select('+password') : null;
+    if (!user) {
+      user = await User.findOne({
+        $or: [
+          { employee: employee._id },
+          { email: employee.officialEmail?.toLowerCase() }
+        ]
+      }).select('+password');
+    }
+
+    if (!user) {
+      user = await User.create({
+        email: employee.officialEmail.toLowerCase(),
+        password: tempPassword,
+        role: 'Employee',
+        isActive: true,
+        employee: employee._id
+      });
+      employee.user = user._id;
+      await employee.save();
+    } else {
+      user.password = tempPassword;
+      await user.save();
+      if (!employee.user) {
+        employee.user = user._id;
+        await employee.save();
+      }
+    }
 
     await AuditLog.create({
       action: 'PASSWORD_RESET_BY_HR',
