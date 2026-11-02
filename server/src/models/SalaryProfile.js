@@ -28,7 +28,7 @@ const salaryProfileSchema = new mongoose.Schema(
     dailyRateBasis: {
       type: String,
       enum: ['CalendarDays', 'WorkingDays', '30DaysFixed'],
-      default: 'CalendarDays'
+      default: 'WorkingDays'
     },
     effectiveFrom: {
       type: Date,

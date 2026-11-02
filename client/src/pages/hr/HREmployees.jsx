@@ -94,7 +94,7 @@ export default function HREmployees() {
     leavePolicy: '',
     initialPassword: 'Employee@123',
     monthlyGrossSalary: '75000',
-    dailyRateBasis: 'CalendarDays'
+    dailyRateBasis: 'WorkingDays'
   });
 
   // Salary form state
@@ -103,7 +103,7 @@ export default function HREmployees() {
     basicSalary: '',
     hra: '',
     specialAllowance: '',
-    dailyRateBasis: 'CalendarDays',
+    dailyRateBasis: 'WorkingDays',
     effectiveFrom: new Date().toISOString().split('T')[0],
     notes: ''
   });
@@ -205,7 +205,7 @@ export default function HREmployees() {
             basicSalary: current.basicSalary || '',
             hra: current.hra || '',
             specialAllowance: current.specialAllowance || '',
-            dailyRateBasis: current.dailyRateBasis || 'CalendarDays',
+            dailyRateBasis: current.dailyRateBasis || 'WorkingDays',
             effectiveFrom: new Date().toISOString().split('T')[0],
             notes: ''
           });

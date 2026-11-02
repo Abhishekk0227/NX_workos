@@ -88,7 +88,7 @@ router.post('/', protect, authorize('HR'), async (req, res, next) => {
       leavePolicy,
       initialPassword = 'Employee@123',
       monthlyGrossSalary,
-      dailyRateBasis = 'CalendarDays'
+      dailyRateBasis = 'WorkingDays'
     } = req.body;
 
     if (!fullName || !officialEmail || !mobileNumber || !department || !designation) {
@@ -476,7 +476,7 @@ router.post('/:id/salary', protect, authorize('HR'), async (req, res, next) => {
       basicSalary: Number(basicSalary) || 0,
       hra: Number(hra) || 0,
       specialAllowance: Number(specialAllowance) || 0,
-      dailyRateBasis: dailyRateBasis || 'CalendarDays',
+      dailyRateBasis: dailyRateBasis || 'WorkingDays',
       effectiveFrom: effectiveFrom || new Date(),
       isCurrent: true,
       configuredBy: req.user._id,

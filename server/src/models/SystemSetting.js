@@ -92,12 +92,12 @@ const systemSettingSchema = new mongoose.Schema(
     },
     defaultRequiredHours: {
       type: Number,
-      default: 9
+      default: 8
     },
     dailyRateBasis: {
       type: String,
       enum: ['CalendarDays', 'WorkingDays', '30DaysFixed'],
-      default: 'CalendarDays'
+      default: 'WorkingDays'
     }
   },
   {

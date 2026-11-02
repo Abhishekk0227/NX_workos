@@ -48,8 +48,8 @@ export default function HRSettings() {
     monthlyClAllowance: 1,
     yearlyClTotal: 12,
     yearlySlTotal: 12,
-    defaultRequiredHours: 8.5,
-    dailyRateBasis: 'CalendarDays'
+    defaultRequiredHours: 8,
+    dailyRateBasis: 'WorkingDays'
   });
 
   const [loading, setLoading] = useState(true);

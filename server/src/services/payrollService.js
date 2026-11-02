@@ -15,6 +15,31 @@ class PayrollService {
   }
 
   /**
+   * Helper to count Sundays in a date range within a month (YYYY-MM)
+   */
+  static getSundaysInRange(monthStr, startDay = 1, endDay = null) {
+    const [year, month] = monthStr.split('-').map(Number);
+    const totalDays = endDay || new Date(year, month, 0).getDate();
+    let sundays = 0;
+    for (let day = startDay; day <= totalDays; day++) {
+      const dt = new Date(year, month - 1, day);
+      if (dt.getDay() === 0) { // 0 = Sunday
+        sundays++;
+      }
+    }
+    return sundays;
+  }
+
+  /**
+   * Helper to get working days (All days - Sundays) in a month
+   */
+  static getWorkingDaysInMonth(monthStr) {
+    const calendarDays = this.getDaysInMonth(monthStr);
+    const sundays = this.getSundaysInRange(monthStr, 1, calendarDays);
+    return Math.max(1, calendarDays - sundays);
+  }
+
+  /**
    * Calculate payroll for a single employee for a specific month (YYYY-MM)
    * Integrates Conditions 11-24, 47-66, and Employee Joining Date boundary
    */
@@ -34,7 +59,7 @@ class PayrollService {
         salaryProfile = await SalaryProfile.create({
           employee: employee._id,
           monthlyGrossSalary: employee.salary,
-          dailyRateBasis: 'CalendarDays',
+          dailyRateBasis: 'WorkingDays',
           isCurrent: true,
           effectiveFrom: employee.joiningDate || new Date()
         });
@@ -118,8 +143,11 @@ class PayrollService {
         incompleteDays++;
       }
 
-      if (att.lateMinutes > 0) {
-        totalLateMinutes += att.lateMinutes;
+      // Late minutes are deducted if not already deducted as half day
+      if (att.status !== 'Half Day' && att.status !== 'Half-day') {
+        if (att.lateMinutes > 0) {
+          totalLateMinutes += att.lateMinutes;
+        }
       }
     }
 
@@ -143,70 +171,65 @@ class PayrollService {
       lwpDays += lwp;
     }
 
-    // Calculate weekly offs only for active employment duration
-    const [year, mNum] = month.split('-').map(Number);
-    let weeklyOffDays = 0;
-    const weeklyOffNames = employee.weeklyOff || ['Sunday'];
-    const daysMap = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    // Policy Rule: Full month salary is based on "all days - sundays" (WorkingDays)
+    const totalMonthSundays = this.getSundaysInRange(month, 1, calendarDays);
+    const totalMonthWorkingDays = Math.max(1, calendarDays - totalMonthSundays);
 
-    for (let day = activeStartDay; day <= calendarDays; day++) {
-      const dt = new Date(year, mNum - 1, day);
-      const dayName = daysMap[dt.getDay()];
-      if (weeklyOffNames.includes(dayName)) {
-        weeklyOffDays++;
-      }
-    }
+    // Active employment Sundays and active working days (for mid-month joiners)
+    const activeSundays = this.getSundaysInRange(month, activeStartDay, calendarDays);
+    const activeWorkingDays = Math.max(0, effectiveActiveDays - activeSundays);
+    const weeklyOffDays = activeSundays;
 
-    // Calculate unmarked / unexcused days during active employment duration only
-    const totalAccountedDays = presentDays + halfDays + incompleteDays + paidLeaveDays + lwpDays + weeklyOffDays;
-    const unmarkedDays = Math.max(0, effectiveActiveDays - totalAccountedDays);
+    // Calculate unmarked / unexcused days during active employment duration
+    const totalAccountedDays = presentDays + halfDays + incompleteDays + paidLeaveDays + lwpDays;
+    const unmarkedDays = Math.max(0, activeWorkingDays - totalAccountedDays);
 
-    // Compute Base Rates
+    // Compute Base Rates: Company standard is "all days - sundays" (WorkingDays)
     const fullMonthlyGross = salaryProfile.monthlyGrossSalary;
     let perDayRate = 0;
 
-    if (salaryProfile.dailyRateBasis === '30DaysFixed') {
+    const rateBasis = salaryProfile.dailyRateBasis || settings?.dailyRateBasis || 'WorkingDays';
+    if (rateBasis === '30DaysFixed') {
       perDayRate = parseFloat((fullMonthlyGross / 30).toFixed(2));
-    } else if (salaryProfile.dailyRateBasis === 'WorkingDays') {
-      const workingDays = Math.max(1, calendarDays - weeklyOffDays);
-      perDayRate = parseFloat((fullMonthlyGross / workingDays).toFixed(2));
-    } else {
-      // Default: CalendarDays
+    } else if (rateBasis === 'CalendarDays') {
       perDayRate = parseFloat((fullMonthlyGross / calendarDays).toFixed(2));
+    } else {
+      // Default & Standard Policy: WorkingDays (all days - sundays)
+      perDayRate = parseFloat((fullMonthlyGross / totalMonthWorkingDays).toFixed(2));
     }
 
-    // If mid-month joiner, gross is prorated for active days of the month
+    // Mid-month joiner prorated gross (based on active working days vs total working days)
     const grossSalary = isMidMonthJoiner
-      ? parseFloat(((fullMonthlyGross / calendarDays) * effectiveActiveDays).toFixed(2))
+      ? parseFloat(((fullMonthlyGross / totalMonthWorkingDays) * activeWorkingDays).toFixed(2))
       : fullMonthlyGross;
 
-    // Shift Hours & Per-Minute Rate (Condition 23, 55)
+    // Shift Hours & Per-Minute Rate (10:00 to 18:00 = 8 hours = 480 mins)
     const shiftHours = employee.assignedShift?.requiredHours || settings?.defaultRequiredHours || 8;
     const shiftMinutes = Math.max(60, shiftHours * 60);
     const perMinuteRate = parseFloat((perDayRate / shiftMinutes).toFixed(4));
 
-    // Deduction 1: Late Arrival (Conditions 19, 20, 56)
+    // Deduction 1: Late Arrival (Per-minute rate deduction)
     const enableLateDeduction = settings ? settings.enableLateDeduction !== false : true;
     const lateDeduction = enableLateDeduction && totalLateMinutes > 0
       ? parseFloat((totalLateMinutes * perMinuteRate).toFixed(2))
       : 0;
 
-    // Deduction 2: Half-Day Deduction (Conditions 21, 22, 57)
+    // Deduction 2: Half-Day Deduction (< 6 hours worked = 50% day salary deduction)
     const halfDayDeductionPct = settings?.halfDayDeductionPercentage || 50;
     const halfDayRate = perDayRate * (halfDayDeductionPct / 100);
     const halfDayDeduction = halfDays > 0
       ? parseFloat((halfDays * halfDayRate).toFixed(2))
       : 0;
 
-    // Deduction 3: LWP / Unpaid Leaves (Condition 60)
+    // Deduction 3: LWP / Unpaid Leaves
     const lwpDeduction = lwpDays > 0
       ? parseFloat((lwpDays * perDayRate).toFixed(2))
       : 0;
 
-    // Deduction 4: Shortfall Deduction (Condition 17, 58)
+    // Overtime (> 8 hours): No extra salary added (per user policy)
     const shortfallDeduction = 0;
 
-    // Build Itemized Deduction Breakdown (Condition 62, 65)
+    // Build Itemized Deduction Breakdown
     const deductionBreakdown = [];
     if (lateDeduction > 0) {
       deductionBreakdown.push({
@@ -218,7 +241,7 @@ class PayrollService {
     if (halfDayDeduction > 0) {
       deductionBreakdown.push({
         type: 'Half_Day',
-        description: `Half Day (${halfDays} days @ ${halfDayDeductionPct}% per day)`,
+        description: `Half Day (${halfDays} days @ ${halfDayDeductionPct}% of ₹${perDayRate.toFixed(2)}/day)`,
         amount: halfDayDeduction
       });
     }
@@ -248,8 +271,11 @@ class PayrollService {
       },
       salaryProfile: salaryProfile._id,
       grossSalary,
-      dailyRateBasis: salaryProfile.dailyRateBasis,
+      dailyRateBasis: rateBasis,
       calendarDays,
+      workingDays: totalMonthWorkingDays,
+      sundaysInMonth: totalMonthSundays,
+      activeWorkingDays,
       effectiveActiveDays,
       payableDays,
       presentDays,
@@ -258,7 +284,7 @@ class PayrollService {
       totalLateMinutes,
       perMinuteRate,
       paidLeaveDays,
-      weeklyOffDays,
+      weeklyOffDays: totalMonthSundays,
       lwpDays,
       unmarkedDays,
       incompleteDays,

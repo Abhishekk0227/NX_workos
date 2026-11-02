@@ -40,10 +40,34 @@ test('AttendanceService: Time conversion and late arrival calculation', () => {
   assert.equal(metricsHalfDay.status, 'Half Day', 'Status should be Half Day if worked under 6 hours');
 });
 
-test('PayrollService: Days in month calculation', () => {
+test('PayrollService: Days in month and All Days - Sundays calculation', () => {
   assert.equal(PayrollService.getDaysInMonth('2026-02'), 28, 'February 2026 has 28 days');
   assert.equal(PayrollService.getDaysInMonth('2026-10'), 31, 'October 2026 has 31 days');
   assert.equal(PayrollService.getDaysInMonth('2026-11'), 30, 'November 2026 has 30 days');
+
+  // November 2026 has 5 Sundays (Nov 1, 8, 15, 22, 29) -> 30 - 5 = 25 working days
+  const sundaysNov = PayrollService.getSundaysInRange('2026-11', 1, 30);
+  assert.equal(sundaysNov, 5, 'November 2026 has exactly 5 Sundays');
+  const workingDaysNov = PayrollService.getWorkingDaysInMonth('2026-11');
+  assert.equal(workingDaysNov, 25, 'November 2026 has 25 working days (All days - Sundays)');
+
+  // Policy formula validation
+  const monthlyGross = 3000;
+  const perDayRate = parseFloat((monthlyGross / workingDaysNov).toFixed(2));
+  assert.equal(perDayRate, 120, 'Per day rate must be 3000 / 25 = ₹120.00');
+
+  const shiftMinutes = 8 * 60; // 480 mins for 10-6
+  const perMinuteRate = parseFloat((perDayRate / shiftMinutes).toFixed(4));
+  assert.equal(perMinuteRate, 0.25, 'Per minute rate must be 120 / 480 = ₹0.25/min');
+
+  // 8 minutes late deduction
+  const lateMinutes = 8;
+  const lateDeduction = parseFloat((lateMinutes * perMinuteRate).toFixed(2));
+  assert.equal(lateDeduction, 2.00, '8m late should deduct exactly ₹2.00');
+
+  // Half day deduction (< 6 hrs worked = 50% day salary)
+  const halfDayDeduction = parseFloat((0.5 * perDayRate).toFixed(2));
+  assert.equal(halfDayDeduction, 60.00, 'Half day deduction must be ₹60.00');
 });
 
 test('AttendanceService: Timezone-safe direct working hours calculation (punchOut - punchIn)', () => {

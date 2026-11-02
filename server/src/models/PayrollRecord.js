@@ -46,7 +46,7 @@ const payrollRecordSchema = new mongoose.Schema(
     dailyRateBasis: {
       type: String,
       enum: ['CalendarDays', 'WorkingDays', '30DaysFixed'],
-      default: 'CalendarDays'
+      default: 'WorkingDays'
     },
     calendarDays: {
       type: Number,
