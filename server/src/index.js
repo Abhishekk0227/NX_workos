@@ -7,6 +7,9 @@ const errorHandler = require('./middleware/errorHandler');
 // Load environment variables
 dotenv.config();
 
+// Ensure process default timezone is Asia/Kolkata
+process.env.TZ = process.env.TZ || 'Asia/Kolkata';
+
 const app = express();
 
 // Middleware

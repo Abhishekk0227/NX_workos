@@ -2,31 +2,96 @@ const SystemSetting = require('../models/SystemSetting');
 
 class AttendanceService {
   /**
+   * Helper to retrieve company timezone from settings or env
+   */
+  static getTimezone(settings = null) {
+    return settings?.companyTimezone || process.env.TIMEZONE || process.env.COMPANY_TIMEZONE || 'Asia/Kolkata';
+  }
+
+  /**
    * Parse "HH:mm" to minutes from start of day
    */
   static timeToMinutes(timeStr) {
     if (!timeStr) return 0;
     const [h, m] = timeStr.split(':').map(Number);
-    return h * 60 + m;
+    return (h || 0) * 60 + (m || 0);
   }
 
   /**
-   * Get minutes from midnight for a Date object in local time
+   * Get minutes from midnight for a Date object in the specified timezone (default 'Asia/Kolkata')
    */
-  static dateToMinutes(date) {
+  static dateToMinutes(date, timezone = 'Asia/Kolkata') {
+    if (!date) return 0;
     const d = new Date(date);
-    return d.getHours() * 60 + d.getMinutes();
+    const formatter = new Intl.DateTimeFormat('en-GB', {
+      timeZone: timezone,
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    });
+    const parts = formatter.formatToParts(d);
+    let hour = 0, minute = 0;
+    for (const p of parts) {
+      if (p.type === 'hour') hour = parseInt(p.value, 10);
+      if (p.type === 'minute') minute = parseInt(p.value, 10);
+    }
+    if (hour === 24) hour = 0;
+    return hour * 60 + minute;
   }
 
   /**
-   * Format a Date into 'YYYY-MM-DD'
+   * Format a Date into 'YYYY-MM-DD' in the specified timezone (default 'Asia/Kolkata')
    */
-  static formatDate(date = new Date()) {
+  static formatDate(date = new Date(), timezone = 'Asia/Kolkata') {
+    if (!date) return '';
     const d = new Date(date);
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: timezone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).format(d);
+  }
+
+  /**
+   * Build a UTC Date object representing a specific time string ("HH:mm") on the same day as `dateObj` in `timezone`
+   */
+  static getTimestampForTimeInTimezone(dateObj, timeStr, timezone = 'Asia/Kolkata') {
+    const dateStr = this.formatDate(dateObj, timezone);
+    const [h = '00', m = '00', s = '00'] = (timeStr || '00:00').split(':');
+    const hh = String(h).padStart(2, '0');
+    const mm = String(m).padStart(2, '0');
+    const ss = String(s).padStart(2, '0');
+
+    const naiveUtc = new Date(`${dateStr}T${hh}:${mm}:${ss}Z`);
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      year: 'numeric',
+      month: 'numeric',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: 'numeric',
+      second: 'numeric',
+      hour12: false
+    }).formatToParts(naiveUtc);
+
+    const p = {};
+    for (const part of parts) {
+      p[part.type] = part.value;
+    }
+    let hour = parseInt(p.hour, 10);
+    if (hour === 24) hour = 0;
+    const inTzUtc = Date.UTC(
+      parseInt(p.year, 10),
+      parseInt(p.month, 10) - 1,
+      parseInt(p.day, 10),
+      hour,
+      parseInt(p.minute, 10),
+      parseInt(p.second, 10)
+    );
+
+    const offsetMs = inTzUtc - naiveUtc.getTime();
+    return new Date(naiveUtc.getTime() - offsetMs);
   }
 
   /**
@@ -55,6 +120,7 @@ class AttendanceService {
       breakDurationMinutes: 60
     };
 
+    const timezone = this.getTimezone(settings);
     const activeShift = shift || defaultShift;
     const shiftStartMinutes = this.timeToMinutes(activeShift.startTime);
     const shiftEndMinutes = this.timeToMinutes(activeShift.endTime);
@@ -63,7 +129,7 @@ class AttendanceService {
     const isGraceEnabled = activeShift.enableGracePeriod !== false && (settings ? settings.enableGracePeriod !== false : true);
     const graceMinutes = isGraceEnabled ? (activeShift.gracePeriodMinutes ?? 15) : 0;
 
-    const punchInMinutes = this.dateToMinutes(punchIn);
+    const punchInMinutes = this.dateToMinutes(punchIn, timezone);
 
     // Calculate Late Arrival (Conditions 3, 4, 5, 6)
     if (punchInMinutes > shiftStartMinutes + graceMinutes) {
@@ -82,7 +148,7 @@ class AttendanceService {
     }
 
     // Punched out calculations
-    const punchOutMinutes = this.dateToMinutes(punchOut);
+    const punchOutMinutes = this.dateToMinutes(punchOut, timezone);
     if (punchOutMinutes < shiftEndMinutes) {
       earlyMinutes = shiftEndMinutes - punchOutMinutes;
     }
@@ -91,13 +157,11 @@ class AttendanceService {
     const pInDate = new Date(punchIn);
     const pOutDate = new Date(punchOut);
 
-    const shiftStartDate = new Date(pInDate);
-    const [shStartHour, shStartMin] = (activeShift.startTime || '09:00').split(':').map(Number);
-    shiftStartDate.setHours(shStartHour, shStartMin, 0, 0);
-
-    const shiftEndDate = new Date(pInDate);
-    const [shEndHour, shEndMin] = (activeShift.endTime || '18:00').split(':').map(Number);
-    shiftEndDate.setHours(shEndHour, shEndMin, 0, 0);
+    const shiftStartDate = this.getTimestampForTimeInTimezone(pInDate, activeShift.startTime || '09:00', timezone);
+    let shiftEndDate = this.getTimestampForTimeInTimezone(pInDate, activeShift.endTime || '18:00', timezone);
+    if (shiftEndMinutes < shiftStartMinutes) {
+      shiftEndDate = new Date(shiftEndDate.getTime() + 24 * 60 * 60 * 1000);
+    }
 
     const clampedIn = Math.max(pInDate.getTime(), shiftStartDate.getTime());
     const clampedOut = Math.min(pOutDate.getTime(), shiftEndDate.getTime());

@@ -168,7 +168,7 @@ class LeaveService {
       }
 
       const now = new Date();
-      const currentMinutes = now.getHours() * 60 + now.getMinutes();
+      const currentMinutes = AttendanceService.dateToMinutes(now, settings?.companyTimezone);
 
       if (currentMinutes > cutOffMinutes) {
         isLateApplication = true;

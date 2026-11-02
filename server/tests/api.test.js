@@ -39,3 +39,36 @@ test('PayrollService: Days in month calculation', () => {
   assert.equal(PayrollService.getDaysInMonth('2026-10'), 31, 'October 2026 has 31 days');
   assert.equal(PayrollService.getDaysInMonth('2026-11'), 30, 'November 2026 has 30 days');
 });
+
+test('AttendanceService: Timezone-safe working hours and shift clamping (User Report Case)', () => {
+  const shift = {
+    startTime: '10:00',
+    endTime: '18:00',
+    requiredHours: 8,
+    gracePeriodMinutes: 10
+  };
+  const settings = {
+    companyTimezone: 'Asia/Kolkata',
+    halfDayThresholdHours: 6
+  };
+
+  // 10:39 AM IST punch in, 05:52 PM IST punch out
+  const punchInUTC = '2026-11-02T05:09:29.294Z';
+  const punchOutUTC = '2026-11-02T12:22:21.247Z';
+
+  const metrics = AttendanceService.calculateAttendanceMetrics(punchInUTC, punchOutUTC, shift, settings);
+  assert.equal(metrics.actualWorkingHours, 7.21, 'Working hours must be ~7.21 hrs, NOT 2.37 hrs');
+  assert.equal(metrics.lateMinutes, 39, 'Punch in at 10:39 AM is 39m late for 10:00 shift');
+  assert.equal(metrics.earlyMinutes, 8, 'Punch out at 17:52 PM is 8m early before 18:00');
+  assert.equal(metrics.status, 'Late', 'Status should be Late, NOT Half Day');
+
+  // Early arrival (09:30 AM IST = 04:00 UTC) should clamp to 10:00 AM IST
+  const earlyPunchIn = '2026-11-02T04:00:00.000Z';
+  const normalPunchOut = '2026-11-02T12:30:00.000Z'; // 18:00 IST
+  const metricsClamped = AttendanceService.calculateAttendanceMetrics(earlyPunchIn, normalPunchOut, shift, settings);
+  assert.equal(metricsClamped.actualWorkingHours, 8, 'Early arrival clamped to shift start gives exactly 8 hrs');
+  assert.equal(metricsClamped.lateMinutes, 0, 'On-time arrival has 0 late minutes');
+  assert.equal(metricsClamped.earlyMinutes, 0, 'On-time departure has 0 early minutes');
+  assert.equal(metricsClamped.status, 'Present', 'Status should be Present');
+});
+
