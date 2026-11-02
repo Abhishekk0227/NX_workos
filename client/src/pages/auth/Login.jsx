@@ -10,7 +10,6 @@ import {
   Download
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import AppInstallModal from '../../components/modals/AppInstallModal';
 import { requestPushPermission } from '../../services/pushNotification';
 
 export default function Login() {
@@ -23,9 +22,8 @@ export default function Login() {
   const navigate = useNavigate();
 
   // PWA Install State
-  const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const [deferredPrompt, setDeferredPrompt] = useState(() => window.__deferredPrompt || null);
   const [isInstalled, setIsInstalled] = useState(false);
-  const [showInstallModal, setShowInstallModal] = useState(false);
 
   useEffect(() => {
     // Detect standalone PWA mode
@@ -41,16 +39,28 @@ export default function Login() {
       }, 1000);
     }
 
-    // Capture beforeinstallprompt for 1-click install
+    if (window.__deferredPrompt) {
+      setDeferredPrompt(window.__deferredPrompt);
+    }
+
+    // Capture beforeinstallprompt for direct 1-click install
     const handleBeforeInstallPrompt = (e) => {
       e.preventDefault();
+      window.__deferredPrompt = e;
       setDeferredPrompt(e);
+    };
+
+    const handlePromptReady = () => {
+      if (window.__deferredPrompt) {
+        setDeferredPrompt(window.__deferredPrompt);
+      }
     };
 
     // When app is installed, automatically prompt for push notifications
     const handleAppInstalled = () => {
       setIsInstalled(true);
       setDeferredPrompt(null);
+      window.__deferredPrompt = null;
       if ('Notification' in window && Notification.permission === 'default') {
         setTimeout(() => {
           requestPushPermission(true);
@@ -59,30 +69,42 @@ export default function Login() {
     };
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    window.addEventListener('pwa-prompt-ready', handlePromptReady);
     window.addEventListener('appinstalled', handleAppInstalled);
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.removeEventListener('pwa-prompt-ready', handlePromptReady);
       window.removeEventListener('appinstalled', handleAppInstalled);
     };
   }, []);
 
   const handleDownloadAppClick = async () => {
-    if (deferredPrompt) {
-      deferredPrompt.prompt();
-      const choice = await deferredPrompt.userChoice;
+    const promptToUse = deferredPrompt || window.__deferredPrompt;
+
+    if (promptToUse) {
+      // Direct native browser install dialog — no modal!
+      promptToUse.prompt();
+      const choice = await promptToUse.userChoice;
       if (choice.outcome === 'accepted') {
         setIsInstalled(true);
         setDeferredPrompt(null);
-        // Automatically ask for push notification popup when downloaded
+        window.__deferredPrompt = null;
         if ('Notification' in window && Notification.permission === 'default') {
           setTimeout(() => {
             requestPushPermission(true);
           }, 800);
         }
       }
+    } else if (isInstalled) {
+      alert('NX Work OS App aapke phone / device par already installed hai!');
     } else {
-      setShowInstallModal(true);
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      if (isIOS) {
+        alert('Safari me neeche Share button (↑) par tap karke "Add to Home Screen" chunein.');
+      } else {
+        alert('Chrome ke menu (⋮) me jakar "Install app" par tap karein.');
+      }
     }
   };
 
@@ -107,14 +129,6 @@ export default function Login() {
 
   return (
     <div className="min-h-screen bg-white sm:bg-gradient-to-br sm:from-slate-950 sm:via-blue-950 sm:to-slate-900 flex flex-col justify-center sm:items-center sm:p-4">
-      {/* App Install Guide Modal (For iOS Safari or manual guidance) */}
-      <AppInstallModal
-        isOpen={showInstallModal}
-        onClose={() => setShowInstallModal(false)}
-        deferredPrompt={deferredPrompt}
-        onPromptInstall={handleDownloadAppClick}
-      />
-
       <div className="w-full sm:max-w-md bg-white sm:rounded-3xl sm:shadow-2xl sm:border sm:border-slate-100 flex flex-col justify-between min-h-screen sm:min-h-0 overflow-hidden">
         <div className="p-6 sm:p-8 flex-1 flex flex-col justify-center">
           {/* Logo */}
