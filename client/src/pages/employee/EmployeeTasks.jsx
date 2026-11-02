@@ -470,7 +470,7 @@ export default function EmployeeTasks() {
                   </div>
                 </div>
 
-                {/* Row 2: Metadata (Project, Due Date, Subtasks, Status Pill) */}
+                {/* Row 2: Metadata (Project, Due Date, Status Pill) */}
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-2.5 text-xs text-slate-500">
                   <div className="flex items-center gap-1.5 font-medium text-slate-700">
                     <Layers className="w-3.5 h-3.5 text-slate-400 shrink-0" />
@@ -483,13 +483,6 @@ export default function EmployeeTasks() {
                       {task.dueDate
                         ? new Date(task.dueDate).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })
                         : 'Today'}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center gap-1.5">
-                    <ListChecks className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                    <span>
-                      {isCompleted ? 'All subtasks done' : `${task.status === 'In Progress' ? '2 of 4' : '1 of 3'} subtasks`}
                     </span>
                   </div>
 
@@ -561,7 +554,7 @@ export default function EmployeeTasks() {
                   rows="3"
                   value={form.description}
                   onChange={(e) => setForm({ ...form, description: e.target.value })}
-                  placeholder="Details, checklist or subtask notes..."
+                  placeholder="Details or notes..."
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
