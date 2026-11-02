@@ -33,6 +33,18 @@ const errorHandler = (err, req, res, next) => {
     return res.status(401).json({ success: false, message: 'Token has expired' });
   }
 
+  // Operational business logic errors (thrown with custom messages from services)
+  if (err.name === 'Error' && err.message && (
+    err.message.includes('already exists') ||
+    err.message.includes('prior to') ||
+    err.message.includes('cannot be') ||
+    err.message.includes('exceeds') ||
+    err.message.includes('not found') ||
+    err.message.includes('required')
+  )) {
+    return res.status(400).json({ success: false, message: err.message });
+  }
+
   res.status(error.statusCode || 500).json({
     success: false,
     message: error.message || 'Internal Server Error'
