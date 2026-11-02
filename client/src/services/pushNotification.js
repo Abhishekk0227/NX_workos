@@ -4,7 +4,7 @@
 import api from '../api/client';
 
 export const isPushSupported = () => {
-  return 'Notification' in window && 'serviceWorker' in navigator;
+  return typeof window !== 'undefined' && 'Notification' in window && 'serviceWorker' in navigator;
 };
 
 export const getPushPermissionStatus = () => {
@@ -12,19 +12,18 @@ export const getPushPermissionStatus = () => {
   return Notification.permission; // 'default' | 'granted' | 'denied'
 };
 
-export const requestPushPermission = async () => {
+export const requestPushPermission = async (triggerWelcomeNotice = true) => {
   if (!isPushSupported()) {
-    alert('Push notifications are not supported on this browser.');
+    alert('Push notifications are not supported on this browser or device.');
     return false;
   }
 
   try {
     const permission = await Notification.requestPermission();
     if (permission === 'granted') {
-      // Register with service worker
-      if ('serviceWorker' in navigator) {
-        const reg = await navigator.serviceWorker.ready;
-        // Post subscription or sync to backend
+      // Sync subscription to backend if user is logged in
+      const token = localStorage.getItem('nx_token');
+      if (token && 'serviceWorker' in navigator) {
         try {
           await api.post('/notifications/subscribe', {
             subscription: {
@@ -33,9 +32,19 @@ export const requestPushPermission = async () => {
             }
           });
         } catch (apiErr) {
-          console.warn('[Push Service API error]:', apiErr);
+          // Non-blocking if subscription sync fails
+          console.warn('[Push Service API warning]:', apiErr?.message);
         }
       }
+
+      // Show welcome confirmation notification
+      if (triggerWelcomeNotice) {
+        await showPushNotification('NX Work OS — Push Notifications Active! 🔔', {
+          body: 'You will now receive instant shift alerts, company notices, and task updates.',
+          url: '/'
+        });
+      }
+
       return true;
     }
     return false;
@@ -50,25 +59,44 @@ export const showPushNotification = async (title, options = {}) => {
 
   if (Notification.permission === 'granted') {
     try {
+      // Prefer service worker showNotification for persistent native notifications
       if ('serviceWorker' in navigator) {
         const reg = await navigator.serviceWorker.ready;
-        if (reg.active) {
-          reg.active.postMessage({
-            type: 'SHOW_NOTIFICATION',
-            title,
+        if (reg && typeof reg.showNotification === 'function') {
+          await reg.showNotification(title, {
             body: options.body || '',
-            url: options.url || '/'
+            icon: options.icon || '/icons/icon-192.svg',
+            badge: options.badge || '/icons/icon-192.svg',
+            vibrate: [200, 100, 200],
+            tag: options.tag || ('nx-work-os-' + Date.now()),
+            data: { url: options.url || '/' }
           });
           return;
         }
       }
-      // Fallback
+
+      // Fallback to Window Notification API
       new Notification(title, {
         body: options.body || '',
-        icon: '/icons/icon-192.svg'
+        icon: options.icon || '/icons/icon-192.svg'
       });
     } catch (e) {
-      console.warn('Native notification failed:', e);
+      console.warn('Native notification via SW failed, trying direct Notification:', e);
+      try {
+        new Notification(title, {
+          body: options.body || '',
+          icon: '/icons/icon-192.svg'
+        });
+      } catch (err2) {
+        console.warn('Direct notification also failed:', err2);
+      }
     }
   }
+};
+
+export const sendTestPushNotification = async () => {
+  return await showPushNotification('NX Work OS — Test Push Notification 🚀', {
+    body: 'Push notification system is working 100% on this device!',
+    url: '/'
+  });
 };

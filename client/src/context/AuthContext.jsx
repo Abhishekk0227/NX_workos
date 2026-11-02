@@ -53,6 +53,17 @@ export const AuthProvider = ({ children }) => {
       setUser(receivedUser);
       localStorage.setItem('nx_token', receivedToken);
       localStorage.setItem('nx_user', JSON.stringify(receivedUser));
+
+      // Auto-register push notification subscription if already granted
+      if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted' && 'serviceWorker' in navigator) {
+        api.post('/notifications/subscribe', {
+          subscription: {
+            timestamp: new Date().toISOString(),
+            userAgent: navigator.userAgent
+          }
+        }).catch(() => {});
+      }
+
       return receivedUser;
     }
     throw new Error(res.data?.message || 'Login failed');

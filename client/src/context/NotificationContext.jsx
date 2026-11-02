@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import api from '../api/client';
 import { useAuth } from './AuthContext';
 import NotificationToast from '../components/common/NotificationToast';
+import { showPushNotification } from '../services/pushNotification';
 
 const NotificationContext = createContext(null);
 
@@ -38,16 +39,23 @@ export const NotificationProvider = ({ children }) => {
 
         setUnreadCount(unreadItems.length);
 
-        // Detect newly arrived notifications to show a floating toast pop-up
+        // Detect newly arrived notifications to show a floating toast pop-up and system push notification
         if (!isInitialLoadRef.current && unreadItems.length > 0) {
           const freshItems = unreadItems.filter((n) => !knownNotifIdsRef.current.has(n._id));
           freshItems.forEach((fresh) => {
+            // Floating UI Toast
             showToast({
               notifId: fresh._id,
               title: fresh.title,
               message: fresh.message,
               type: fresh.type,
               link: fresh.link
+            });
+
+            // Native OS Push Notification
+            showPushNotification(fresh.title, {
+              body: fresh.message,
+              url: fresh.link || '/'
             });
           });
         }
