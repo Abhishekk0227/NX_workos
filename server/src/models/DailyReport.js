@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const AttendanceService = require('../services/attendanceService');
 
 const dailyReportSchema = new mongoose.Schema(
   {
@@ -31,12 +32,28 @@ const dailyReportSchema = new mongoose.Schema(
     submittedAt: {
       type: Date,
       default: Date.now
+    },
+    submittedAtIST: {
+      type: String,
+      default: null
+    },
+    submittedTime: {
+      type: String,
+      default: null
     }
   },
   {
     timestamps: true
   }
 );
+
+// Pre-save hook to ensure permanent IST storage in database
+dailyReportSchema.pre('save', function (next) {
+  const d = this.submittedAt || new Date();
+  this.submittedAtIST = AttendanceService.toISTISOString(d);
+  this.submittedTime = AttendanceService.formatTime(d, {}, 'Asia/Kolkata');
+  next();
+});
 
 // Prevent duplicate reports per day per employee
 dailyReportSchema.index({ employee: 1, date: 1 }, { unique: true });

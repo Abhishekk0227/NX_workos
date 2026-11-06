@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const AttendanceService = require('../services/attendanceService');
 
 const attendanceCorrectionSchema = new mongoose.Schema(
   {
@@ -45,6 +46,22 @@ const attendanceSchema = new mongoose.Schema(
     },
     punchOut: {
       type: Date,
+      default: null
+    },
+    punchInIST: {
+      type: String,
+      default: null
+    },
+    punchOutIST: {
+      type: String,
+      default: null
+    },
+    punchInTime: {
+      type: String,
+      default: null
+    },
+    punchOutTime: {
+      type: String,
       default: null
     },
     actualWorkingHours: {
@@ -116,6 +133,52 @@ const attendanceSchema = new mongoose.Schema(
     timestamps: true
   }
 );
+
+// Pre-save hook to ensure permanent IST storage in database
+attendanceSchema.pre('save', function (next) {
+  if (this.punchIn) {
+    this.punchInIST = AttendanceService.toISTISOString(this.punchIn);
+    this.punchInTime = AttendanceService.formatTime(this.punchIn, {}, 'Asia/Kolkata');
+  }
+  if (this.punchOut) {
+    this.punchOutIST = AttendanceService.toISTISOString(this.punchOut);
+    this.punchOutTime = AttendanceService.formatTime(this.punchOut, {}, 'Asia/Kolkata');
+  }
+  next();
+});
+
+// Serialization transforms
+attendanceSchema.set('toJSON', {
+  virtuals: true,
+  transform: (doc, ret) => {
+    if (ret.punchIn instanceof Date) {
+      ret.punchIn = AttendanceService.toISTISOString(ret.punchIn);
+    }
+    if (ret.punchOut instanceof Date) {
+      ret.punchOut = AttendanceService.toISTISOString(ret.punchOut);
+    }
+    if (ret.createdAt instanceof Date) {
+      ret.createdAt = AttendanceService.toISTISOString(ret.createdAt);
+    }
+    if (ret.updatedAt instanceof Date) {
+      ret.updatedAt = AttendanceService.toISTISOString(ret.updatedAt);
+    }
+    return ret;
+  }
+});
+
+attendanceSchema.set('toObject', {
+  virtuals: true,
+  transform: (doc, ret) => {
+    if (ret.punchIn instanceof Date) {
+      ret.punchIn = AttendanceService.toISTISOString(ret.punchIn);
+    }
+    if (ret.punchOut instanceof Date) {
+      ret.punchOut = AttendanceService.toISTISOString(ret.punchOut);
+    }
+    return ret;
+  }
+});
 
 // Prevent duplicate sessions for an employee on the same date
 attendanceSchema.index({ employee: 1, date: 1 }, { unique: true });

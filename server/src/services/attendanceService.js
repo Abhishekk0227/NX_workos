@@ -46,11 +46,66 @@ class AttendanceService {
     if (!date) return '';
     const d = new Date(date);
     return new Intl.DateTimeFormat('en-CA', {
-      timeZone: timezone,
+      timeZone: timezone || 'Asia/Kolkata',
       year: 'numeric',
       month: '2-digit',
       day: '2-digit'
     }).format(d);
+  }
+
+  /**
+   * Format a Date into 12-hour time string in the specified timezone (default 'Asia/Kolkata')
+   * Example: "10:48 AM", "07:19 PM"
+   */
+  static formatTime(date = new Date(), options = {}, timezone = null) {
+    if (!date) return '';
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return '';
+    const tz = timezone || this.getTimezone();
+    const defaultOptions = {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+      timeZone: tz
+    };
+    return new Intl.DateTimeFormat('en-US', { ...defaultOptions, ...options }).format(d);
+  }
+
+  /**
+   * Format a Date into 24-hour time string "HH:mm" in the specified timezone (default 'Asia/Kolkata')
+   * Example: "10:48", "19:19"
+   */
+  static formatTime24(date = new Date(), timezone = null) {
+    if (!date) return '';
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return '';
+    const tz = timezone || this.getTimezone();
+    return new Intl.DateTimeFormat('en-GB', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+      timeZone: tz
+    }).format(d);
+  }
+
+  /**
+   * Format any Date or ISO string into an IST ISO string with "+05:30"
+   * Example: 2026-11-03T19:19:02.719+05:30
+   */
+  static toISTISOString(date = new Date()) {
+    if (!date) return null;
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return null;
+    const istOffsetMs = 5.5 * 60 * 60 * 1000;
+    const istDate = new Date(d.getTime() + istOffsetMs);
+    return istDate.toISOString().replace('Z', '+05:30');
+  }
+
+  /**
+   * Return a Date representing the current instant in IST
+   */
+  static getNowIST() {
+    return new Date();
   }
 
   /**

@@ -10,6 +10,14 @@ dotenv.config();
 // Ensure process default timezone is Asia/Kolkata
 process.env.TZ = process.env.TZ || 'Asia/Kolkata';
 
+// Global serialization: Convert all Date objects thrown in JSON API responses to IST (+05:30)
+Date.prototype.toJSON = function () {
+  if (isNaN(this.getTime())) return null;
+  const istOffsetMs = 5.5 * 60 * 60 * 1000;
+  const istDate = new Date(this.getTime() + istOffsetMs);
+  return istDate.toISOString().replace('Z', '+05:30');
+};
+
 const app = express();
 
 // Middleware

@@ -1,14 +1,50 @@
+export const COMPANY_TIMEZONE = 'Asia/Kolkata';
+
 /**
  * Formats a Date or timestamp string into 24-hour clock "HH:mm" (e.g. 19:20 for 7:20 PM)
+ * Defaults to company timezone 'Asia/Kolkata' (IST)
  */
-export function formatTime24(dateStr) {
+export function formatTime24(dateStr, timeZone = COMPANY_TIMEZONE) {
   if (!dateStr) return '—';
   const d = new Date(dateStr);
   if (isNaN(d.getTime())) return '—';
-  return d.toLocaleTimeString([], {
+  return d.toLocaleTimeString('en-GB', {
     hour: '2-digit',
     minute: '2-digit',
-    hour12: false
+    hour12: false,
+    timeZone
+  });
+}
+
+/**
+ * Formats a Date or timestamp string into 12-hour clock "hh:mm AM/PM" (e.g. 07:20 PM)
+ * Defaults to company timezone 'Asia/Kolkata' (IST)
+ */
+export function formatTime12(dateStr, timeZone = COMPANY_TIMEZONE) {
+  if (!dateStr) return '—';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return '—';
+  return d.toLocaleTimeString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+    timeZone
+  });
+}
+
+/**
+ * Formats a Date or timestamp string into short date "DD MMM YYYY" (e.g. 03 Nov 2026)
+ * Defaults to company timezone 'Asia/Kolkata' (IST)
+ */
+export function formatDateIST(dateStr, timeZone = COMPANY_TIMEZONE) {
+  if (!dateStr) return '—';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    timeZone
   });
 }
 

@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import api from '../../api/client';
 import { TableShimmer, CardListShimmer } from '../../components/common/Shimmer';
+import { formatTime12 } from '../../utils/timeUtils';
 
 export default function HRTasksReports() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -317,7 +318,7 @@ export default function HRTasksReports() {
 
                   <div className="flex items-center justify-between pt-1">
                     <span className="text-[11px] text-slate-500">
-                      {new Date(report.submittedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      {formatTime12(report.submittedAt)}
                     </span>
 
                     <button
@@ -394,7 +395,7 @@ export default function HRTasksReports() {
                       </td>
 
                       <td className="py-3.5 px-4 text-slate-600 font-medium">
-                        {new Date(report.submittedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        {formatTime12(report.submittedAt)}
                       </td>
 
                       <td className="py-3.5 px-4">
@@ -529,7 +530,7 @@ export default function HRTasksReports() {
               <div className="flex items-center justify-between pb-3 border-b border-slate-100 text-xs">
                 <span className="text-slate-500">Submitted at:</span>
                 <span className="font-bold text-slate-900">
-                  {new Date(selectedReport.submittedAt).toLocaleTimeString()}
+                  {formatTime12(selectedReport.submittedAt)}
                 </span>
               </div>
 

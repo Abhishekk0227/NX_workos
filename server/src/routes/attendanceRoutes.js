@@ -44,7 +44,7 @@ router.post('/punch-in', protect, async (req, res, next) => {
     // Joining date boundary check
     const joinRaw = employee.joiningDate || employee.createdAt;
     if (joinRaw) {
-      const joinStr = new Date(joinRaw).toISOString().slice(0, 10);
+      const joinStr = AttendanceService.formatDate(joinRaw, 'Asia/Kolkata');
       if (todayStr < joinStr) {
         return res.status(400).json({
           success: false,
@@ -95,12 +95,15 @@ router.post('/punch-in', protect, async (req, res, next) => {
     await attendance.populate('shift');
 
     // Notify HR of Employee Punch In
+    const timezone = AttendanceService.getTimezone(settings);
+    const formattedPunchInTime = AttendanceService.formatTime(now, {}, timezone);
+
     try {
       const lateAlert = metrics.lateMinutes > 0 ? ` [Late by ${metrics.lateMinutes} mins]` : ' on time';
       await NotificationService.send({
         targetRole: 'HR',
         title: 'Employee Punched In',
-        message: `${employee.fullName} (${employee.employeeId}) punched in at ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}${lateAlert}.`,
+        message: `${employee.fullName} (${employee.employeeId}) punched in at ${formattedPunchInTime}${lateAlert}.`,
         type: 'Attendance',
         link: '/hr/attendance'
       });
@@ -110,7 +113,7 @@ router.post('/punch-in', protect, async (req, res, next) => {
 
     res.status(201).json({
       success: true,
-      message: `Punched in successfully at ${now.toLocaleTimeString()}`,
+      message: `Punched in successfully at ${formattedPunchInTime}`,
       attendance
     });
   } catch (err) {
@@ -196,11 +199,14 @@ router.post('/punch-out', protect, async (req, res, next) => {
     await attendance.save();
 
     // Notify HR of Employee Punch Out with Daily Report
+    const timezone = AttendanceService.getTimezone(settings);
+    const formattedPunchOutTime = AttendanceService.formatTime(now, {}, timezone);
+
     try {
       await NotificationService.send({
         targetRole: 'HR',
         title: 'Employee Punched Out',
-        message: `${req.user.employee.fullName || 'Employee'} (${req.user.employee.employeeId || ''}) punched out at ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} with Daily Work Report (${metrics.actualWorkingHours} hrs logged).`,
+        message: `${req.user.employee.fullName || 'Employee'} (${req.user.employee.employeeId || ''}) punched out at ${formattedPunchOutTime} with Daily Work Report (${metrics.actualWorkingHours} hrs logged).`,
         type: 'Attendance',
         link: '/hr/attendance'
       });
@@ -211,7 +217,7 @@ router.post('/punch-out', protect, async (req, res, next) => {
     const halfDayNote = metrics.status === 'Half Day' ? ' (Marked as Half Day — under 6 working hours)' : '';
     res.json({
       success: true,
-      message: `Punched out successfully at ${now.toLocaleTimeString()}. Logged ${metrics.actualWorkingHours} working hours${halfDayNote}.`,
+      message: `Punched out successfully at ${formattedPunchOutTime}. Logged ${metrics.actualWorkingHours} working hours${halfDayNote}.`,
       attendance,
       dailyReport: report
     });

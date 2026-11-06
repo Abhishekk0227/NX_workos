@@ -24,6 +24,7 @@ import {
   showPushNotification
 } from '../../services/pushNotification';
 import { resolveNotificationRoute } from '../../utils/navigation';
+import { formatTime12 } from '../../utils/timeUtils';
 
 export default function NotificationDrawer({ isOpen, onClose }) {
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
@@ -197,7 +198,7 @@ export default function NotificationDrawer({ isOpen, onClose }) {
                           )}
                         </div>
                         <span className="text-[10px] text-slate-400 whitespace-nowrap font-medium">
-                          {new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          {formatTime12(item.createdAt)}
                         </span>
                       </div>
                       <p className="text-xs text-slate-600 leading-relaxed line-clamp-2">
