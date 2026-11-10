@@ -16,12 +16,14 @@ import {
 import api from '../../api/client';
 import PunchInModal from '../../components/modals/PunchInModal';
 import PunchOutModal from '../../components/modals/PunchOutModal';
+import MissingDailyReportModal from '../../components/modals/MissingDailyReportModal';
 import { AttendanceShimmer } from '../../components/common/Shimmer';
 import { formatTime24, formatWorkingHours } from '../../utils/timeUtils';
 
 export default function EmployeeAttendance() {
   const [activeTab, setActiveTab] = useState('details'); // 'details' | 'calendar' | 'history'
   const [history, setHistory] = useState([]);
+  const [holidays, setHolidays] = useState([]);
   const [todayAttendance, setTodayAttendance] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -32,6 +34,8 @@ export default function EmployeeAttendance() {
   // Modals
   const [showPunchIn, setShowPunchIn] = useState(false);
   const [showPunchOut, setShowPunchOut] = useState(false);
+  const [showMissingModal, setShowMissingModal] = useState(false);
+  const [selectedMissingReport, setSelectedMissingReport] = useState(null);
   const [showCorrectionModal, setShowCorrectionModal] = useState(false);
   const [correctionTarget, setCorrectionTarget] = useState(null);
   const [correctionData, setCorrectionData] = useState({
@@ -46,9 +50,12 @@ export default function EmployeeAttendance() {
   const fetchAttendance = async () => {
     setLoading(true);
     try {
-      const [todayRes, histRes] = await Promise.allSettled([
+      const year = currentDate.getFullYear();
+      const month = currentDate.getMonth() + 1;
+      const [todayRes, histRes, holRes] = await Promise.allSettled([
         api.get('/attendance/today'),
-        api.get(`/attendance/my-history?month=${selectedMonthParam}`)
+        api.get(`/attendance/my-history?month=${selectedMonthParam}`),
+        api.get(`/holidays?year=${year}&month=${month}`)
       ]);
 
       if (todayRes.status === 'fulfilled') {
@@ -56,6 +63,9 @@ export default function EmployeeAttendance() {
       }
       if (histRes.status === 'fulfilled') {
         setHistory(histRes.value.data.history || []);
+      }
+      if (holRes.status === 'fulfilled') {
+        setHolidays(holRes.value.data.holidays || []);
       }
     } catch (err) {
       console.error(err);
@@ -95,15 +105,29 @@ export default function EmployeeAttendance() {
       const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
       const record = history.find(h => h.date === dateStr);
       const isSunday = new Date(year, month, d).getDay() === 0;
+      const mmdd = `${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      const hol = holidays.find(h => h.date === dateStr || (h.startDate && h.endDate && h.startDate <= dateStr && dateStr <= h.endDate) || (h.isRecurring && h.date && h.date.slice(5) === mmdd));
 
       let dotColor = null;
-      if (isSunday) dotColor = 'bg-slate-400'; // Weekly Off
-      else if (record) {
-        if (record.status === 'Present') dotColor = 'bg-[#10b981]';
+      let status = null;
+      let holidayName = hol ? hol.name : null;
+
+      if (record) {
+        status = record.status;
+        if (record.status === 'Present' || record.status === 'Full Day') dotColor = 'bg-[#10b981]';
         else if (record.status === 'Late') dotColor = 'bg-[#f59e0b]';
         else if (record.status === 'Half Day' || record.status === 'Half-day') dotColor = 'bg-[#f97316]';
+        else if (record.status === 'Short Attendance') dotColor = 'bg-[#a855f7]';
+        else if (record.status === 'Holiday') dotColor = 'bg-[#06b6d4]';
+        else if (record.status === 'Working on Holiday') dotColor = 'bg-[#059669]';
         else if (record.status === 'On Leave') dotColor = 'bg-[#3b82f6]';
         else if (record.status === 'Absent' || record.status === 'Incomplete') dotColor = 'bg-[#ef4444]';
+      } else if (hol) {
+        status = 'Holiday';
+        dotColor = 'bg-[#06b6d4]';
+      } else if (isSunday) {
+        status = 'Weekly Off';
+        dotColor = 'bg-slate-400';
       }
 
       days.push({
@@ -112,7 +136,8 @@ export default function EmployeeAttendance() {
         isCurrentMonth: true,
         dotColor,
         isToday: d === new Date().getDate() && month === new Date().getMonth() && year === new Date().getFullYear(),
-        status: record ? record.status : isSunday ? 'Weekly Off' : null
+        status,
+        holidayName
       });
     }
     return days;
@@ -388,6 +413,10 @@ export default function EmployeeAttendance() {
                           {matchedRecord.punchOut ? ` – ${formatTime24(matchedRecord.punchOut)}` : ''}
                           {` (${formatWorkingHours(matchedRecord)})`}
                         </>
+                      ) : selectedItem.status === 'Holiday' ? (
+                        <span>
+                          Status: <strong className="text-cyan-700 font-bold">Holiday: {selectedItem.holidayName || 'Official Holiday'} (100% Paid)</strong>
+                        </span>
                       ) : (
                         <span>Status: <strong>{selectedItem.status || 'No record'}</strong></span>
                       )}
@@ -407,27 +436,35 @@ export default function EmployeeAttendance() {
             })()}
           </div>
 
-          {/* Legend matching EppanelD.png #4 */}
+          {/* Legend matching EppanelD.png #4 + New Upgrade Statuses */}
           <div className="pt-4 border-t border-slate-100 flex flex-wrap items-center justify-center gap-4 text-xs font-medium text-slate-600">
             <div className="flex items-center gap-1.5">
               <span className="w-2.5 h-2.5 rounded-full bg-[#10b981]" />
-              <span>Present</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-[#f59e0b]" />
-              <span>Late</span>
+              <span>Full Day / Present</span>
             </div>
             <div className="flex items-center gap-1.5">
               <span className="w-2.5 h-2.5 rounded-full bg-[#f97316]" />
-              <span>Half Day</span>
+              <span>Half Day (50%)</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-[#ef4444]" />
-              <span>Absent</span>
+              <span className="w-2.5 h-2.5 rounded-full bg-[#a855f7]" />
+              <span>Short Attendance</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-[#06b6d4]" />
+              <span>Holiday</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-[#059669]" />
+              <span>Working on Holiday</span>
             </div>
             <div className="flex items-center gap-1.5">
               <span className="w-2.5 h-2.5 rounded-full bg-[#3b82f6]" />
               <span>On Leave</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-[#ef4444]" />
+              <span>Absent</span>
             </div>
             <div className="flex items-center gap-1.5">
               <span className="w-2.5 h-2.5 rounded-full bg-slate-400" />
@@ -477,26 +514,52 @@ export default function EmployeeAttendance() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                      att.status === 'Present'
-                        ? 'bg-emerald-50 text-emerald-700'
-                        : att.status === 'Late'
-                        ? 'bg-amber-50 text-amber-700'
-                        : att.status === 'Half Day' || att.status === 'Half-day'
-                        ? 'bg-orange-50 text-orange-700'
-                        : 'bg-red-50 text-red-700'
-                    }`}>
-                      {att.status}
-                    </span>
+                    <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                        att.status === 'Present' || att.status === 'Full Day'
+                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                          : att.status === 'Half Day' || att.status === 'Half-day'
+                          ? 'bg-orange-50 text-orange-700 border border-orange-200'
+                          : att.status === 'Short Attendance'
+                          ? 'bg-purple-50 text-purple-700 border border-purple-200'
+                          : att.status === 'Holiday'
+                          ? 'bg-cyan-50 text-cyan-700 border border-cyan-200'
+                          : att.status === 'Working on Holiday'
+                          ? 'bg-emerald-50 text-emerald-800 border border-emerald-300 font-extrabold'
+                          : att.status === 'On Leave'
+                          ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                          : att.status === 'Late'
+                          ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                          : 'bg-red-50 text-red-700 border border-red-200'
+                      }`}>
+                        {att.status}
+                      </span>
 
-                    <button
-                      onClick={() => openCorrection(att)}
-                      className="text-xs text-blue-600 hover:text-blue-800 font-semibold ml-2"
-                    >
-                      Correction
-                    </button>
-                  </div>
+                      {att.autoPunchedOut && (
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-purple-100 text-purple-800 border border-purple-200">
+                          ⚡ Auto
+                        </span>
+                      )}
+
+                      {att.autoPunchedOut && !att.dailyReport && (
+                        <button
+                          onClick={() => {
+                            setSelectedMissingReport(att);
+                            setShowMissingModal(true);
+                          }}
+                          className="px-2 py-0.5 bg-amber-500 hover:bg-amber-600 text-white rounded text-[10px] font-bold shadow-xs transition cursor-pointer"
+                        >
+                          Write Report
+                        </button>
+                      )}
+
+                      <button
+                        onClick={() => openCorrection(att)}
+                        className="text-xs text-blue-600 hover:text-blue-800 font-semibold ml-1 cursor-pointer"
+                      >
+                        Correction
+                      </button>
+                    </div>
                 </div>
               ))
             )}
@@ -585,6 +648,16 @@ export default function EmployeeAttendance() {
         onClose={() => setShowPunchOut(false)}
         onSuccess={() => fetchAttendance()}
         punchIn={todayAttendance?.punchIn}
+      />
+
+      <MissingDailyReportModal
+        isOpen={showMissingModal}
+        onClose={() => setShowMissingModal(false)}
+        pendingSession={selectedMissingReport}
+        onSuccess={() => {
+          setShowMissingModal(false);
+          fetchAttendance();
+        }}
       />
     </div>
   );

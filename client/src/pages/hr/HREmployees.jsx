@@ -64,11 +64,25 @@ export default function HREmployees() {
 
   // Modals state
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [showSalaryModal, setShowSalaryModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
   const [detailTab, setDetailTab] = useState('overview'); // overview, attendance, leave, payroll
   const [feedback, setFeedback] = useState({ type: '', message: '' });
+
+  // Edit form state
+  const [editFormData, setEditFormData] = useState({
+    _id: '',
+    fullName: '',
+    mobileNumber: '',
+    department: 'Engineering',
+    designation: 'Developer',
+    employmentType: 'Full-time',
+    assignedShift: '',
+    employmentStatus: 'Active'
+  });
+  const [updatingEmployee, setUpdatingEmployee] = useState(false);
 
   // Password reset modal (HR only)
   const [showResetModal, setShowResetModal] = useState(false);
@@ -158,6 +172,86 @@ export default function HREmployees() {
       fetchData();
     } catch (err) {
       alert(err.response?.data?.message || 'Failed to update status');
+    }
+  };
+
+  const openEditModal = (emp) => {
+    setEditFormData({
+      _id: emp._id,
+      employeeId: emp.employeeId || '',
+      originalEmployeeId: emp.employeeId || '',
+      fullName: emp.fullName || '',
+      mobileNumber: emp.mobileNumber || '',
+      department: emp.department || 'Engineering',
+      designation: emp.designation || 'Developer',
+      employmentType: emp.employmentType || 'Full-time',
+      assignedShift: emp.assignedShift?._id || emp.assignedShift || '',
+      employmentStatus: emp.employmentStatus || 'Active'
+    });
+    setShowEditModal(true);
+  };
+
+  const handleUpdateEmployee = async (e) => {
+    e.preventDefault();
+    setUpdatingEmployee(true);
+    try {
+      const res = await api.put(`/employees/${editFormData._id}`, {
+        employeeId: editFormData.employeeId ? editFormData.employeeId.trim().toUpperCase() : undefined,
+        fullName: editFormData.fullName,
+        mobileNumber: editFormData.mobileNumber,
+        department: editFormData.department,
+        designation: editFormData.designation,
+        employmentType: editFormData.employmentType,
+        assignedShift: editFormData.assignedShift || null,
+        employmentStatus: editFormData.employmentStatus
+      });
+
+      if (res.data?.success) {
+        setShowEditModal(false);
+        const updated = res.data.employee;
+        if (selectedEmployee && selectedEmployee._id === editFormData._id) {
+          const freshShift = shifts.find((s) => s._id === editFormData.assignedShift);
+          setSelectedEmployee({ ...selectedEmployee, ...updated, assignedShift: freshShift || null });
+        }
+        setFeedback({
+          type: 'success',
+          message: updated.employeeId !== editFormData.originalEmployeeId
+            ? `Employee ID successfully changed from ${editFormData.originalEmployeeId} to ${updated.employeeId}!`
+            : 'Employee details updated successfully.'
+        });
+        fetchData();
+      }
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to update employee details');
+    } finally {
+      setUpdatingEmployee(false);
+    }
+  };
+
+  const handleQuickShiftChange = async (employeeId, shiftId) => {
+    try {
+      const res = await api.put(`/employees/${employeeId}`, {
+        assignedShift: shiftId || null
+      });
+
+      if (res.data?.success) {
+        const freshShift = shifts.find((s) => s._id === shiftId);
+        if (selectedEmployee && selectedEmployee._id === employeeId) {
+          setSelectedEmployee((prev) => ({
+            ...prev,
+            assignedShift: freshShift || null
+          }));
+        }
+        setEmployees((prev) =>
+          prev.map((emp) =>
+            emp._id === employeeId
+              ? { ...emp, assignedShift: freshShift || null }
+              : emp
+          )
+        );
+      }
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to change employee shift');
     }
   };
 
@@ -477,7 +571,12 @@ export default function HREmployees() {
                     </td>
 
                     <td className="py-3.5 px-4 font-mono font-bold text-slate-900">
-                      {emp.employeeId}
+                      <div>{emp.employeeId}</div>
+                      {(emp.employmentType === 'Intern' || emp.employmentType === 'Internship') && (
+                        <span className="inline-block mt-0.5 px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                          Intern
+                        </span>
+                      )}
                     </td>
 
                     <td className="py-3.5 px-4">
@@ -486,11 +585,19 @@ export default function HREmployees() {
                     </td>
 
                     <td className="py-3.5 px-4 text-slate-600">
-                      <span className="font-medium text-slate-700">
-                        {emp.assignedShift?.startTime && emp.assignedShift?.endTime
-                          ? `${emp.assignedShift.startTime} - ${emp.assignedShift.endTime}`
-                          : '09:30 AM - 06:30 PM'}
-                      </span>
+                      <select
+                        value={emp.assignedShift?._id || emp.assignedShift || ''}
+                        onChange={(e) => handleQuickShiftChange(emp._id, e.target.value)}
+                        className="text-[11px] font-semibold text-slate-800 bg-white hover:bg-slate-50 border border-slate-200/90 rounded-lg px-2 py-1 outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer shadow-2xs transition max-w-[190px]"
+                        title="Change Assigned Shift (Morning / Afternoon / General)"
+                      >
+                        <option value="">Default (10 AM - 6 PM)</option>
+                        {shifts.map((s) => (
+                          <option key={s._id} value={s._id}>
+                            {s.name.replace(' Shift', '')} ({s.startTime}-{s.endTime}) {!s.isActive ? '[Inactive]' : ''}
+                          </option>
+                        ))}
+                      </select>
                     </td>
 
                     <td className="py-3.5 px-4">
@@ -516,6 +623,13 @@ export default function HREmployees() {
 
                     <td className="py-3.5 px-4 text-right">
                       <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          onClick={() => openEditModal(emp)}
+                          className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition cursor-pointer"
+                          title="Edit Details & Shift"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
                         <button
                           onClick={() => {
                             setSelectedEmployee(emp);
@@ -793,7 +907,23 @@ export default function HREmployees() {
                       {selectedEmployee.employmentStatus || 'Active'}
                     </span>
                   </div>
-                  <div className="font-mono text-xs font-semibold text-slate-700">{selectedEmployee.employeeId}</div>
+                  <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                    <span className="font-mono text-xs font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">
+                      {selectedEmployee.employeeId}
+                    </span>
+                    {(selectedEmployee.employmentType === 'Intern' || selectedEmployee.employmentType === 'Internship') && (
+                      <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                        Intern
+                      </span>
+                    )}
+                    <button
+                      onClick={() => openEditModal(selectedEmployee)}
+                      className="text-[10px] text-blue-600 hover:text-blue-800 font-bold underline cursor-pointer"
+                      title="Change Employee ID or convert intern to permanent employee"
+                    >
+                      Change ID / Convert
+                    </button>
+                  </div>
                   <div className="text-xs text-slate-500">{selectedEmployee.designation}</div>
                   <div className="text-[11px] text-slate-400">{selectedEmployee.department}</div>
                 </div>
@@ -803,9 +933,9 @@ export default function HREmployees() {
               <div className="grid grid-cols-3 gap-1.5 sm:gap-2 mt-4 pt-3 border-t border-slate-100">
                 <button
                   onClick={() => {
-                    alert('Employee details can be updated via HR admin controls.');
+                    openEditModal(selectedEmployee);
                   }}
-                  className="flex items-center justify-center gap-1 sm:gap-1.5 py-2 px-1.5 sm:px-3 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-[11px] sm:text-xs font-bold text-slate-700 transition"
+                  className="flex items-center justify-center gap-1 sm:gap-1.5 py-2 px-1.5 sm:px-3 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-[11px] sm:text-xs font-bold text-slate-700 transition cursor-pointer"
                 >
                   <Edit2 className="w-3.5 h-3.5 text-blue-600 shrink-0" />
                   <span className="truncate">Edit</span>
@@ -896,14 +1026,22 @@ export default function HREmployees() {
                     <h4 className="font-bold text-slate-900 text-xs">Work Details</h4>
 
                     <div className="flex items-center justify-between py-1">
-                      <span className="text-slate-400 flex items-center gap-1.5">
+                      <span className="text-slate-400 flex items-center gap-1.5 shrink-0">
                         <Clock className="w-3.5 h-3.5" /> Shift
                       </span>
-                      <span className="font-semibold text-slate-800">
-                        {selectedEmployee.assignedShift?.startTime && selectedEmployee.assignedShift?.endTime
-                          ? `${selectedEmployee.assignedShift.startTime} - ${selectedEmployee.assignedShift.endTime}`
-                          : '10:00 AM - 6:00 PM'}
-                      </span>
+                      <select
+                        value={selectedEmployee.assignedShift?._id || selectedEmployee.assignedShift || ''}
+                        onChange={(e) => handleQuickShiftChange(selectedEmployee._id, e.target.value)}
+                        className="text-xs font-semibold text-slate-800 bg-white border border-slate-200 rounded-lg px-2 py-1 outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer max-w-[210px]"
+                        title="Change Employee Shift (Morning / Afternoon / General)"
+                      >
+                        <option value="">Default (10:00 AM - 6:00 PM)</option>
+                        {shifts.map((s) => (
+                          <option key={s._id} value={s._id}>
+                            {s.name} ({s.startTime} - {s.endTime}) {!s.isActive ? '[Inactive]' : ''}
+                          </option>
+                        ))}
+                      </select>
                     </div>
 
                     <div className="flex items-center justify-between py-1">
@@ -1179,6 +1317,178 @@ export default function HREmployees() {
                 </form>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT EMPLOYEE & SHIFT MODAL */}
+      {showEditModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
+          <div className="w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden my-auto animate-in fade-in zoom-in-95 duration-150">
+            <div className="px-6 py-4 bg-[#0f172a] text-white flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold">
+                  <Edit2 className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm">Edit Employee & Shift Assignment</h3>
+                  <p className="text-[11px] text-slate-400">Update employee details and assign Morning / Afternoon / General shift</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowEditModal(false)}
+                className="w-7 h-7 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateEmployee} className="p-6 space-y-4">
+              {/* Employee ID / Code with Intern-to-Employee Conversion Feature */}
+              <div className="p-3.5 bg-gradient-to-r from-blue-50/60 to-indigo-50/60 rounded-2xl border border-blue-200/80 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                    <span>Employee ID / Code *</span>
+                  </label>
+                  {(editFormData.employmentType === 'Intern' || editFormData.employmentType === 'Internship') && (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200 animate-pulse">
+                      Intern Conversion Active
+                    </span>
+                  )}
+                </div>
+                <input
+                  type="text"
+                  required
+                  value={editFormData.employeeId}
+                  onChange={(e) => setEditFormData({ ...editFormData, employeeId: e.target.value.toUpperCase() })}
+                  placeholder="e.g. NX001 or NX-EMP-001"
+                  className="w-full px-3 py-2 bg-white border border-blue-200 rounded-xl text-xs font-mono font-bold uppercase focus:ring-2 focus:ring-blue-600 outline-none text-slate-900 shadow-2xs"
+                />
+                <p className="text-[10px] text-blue-900/80 leading-tight">
+                  Update Employee ID when converting an intern (e.g. <span className="font-mono font-bold">INT001</span>) to a permanent employee (e.g. <span className="font-mono font-bold">NX005</span>).
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Full Name *</label>
+                  <input
+                    type="text"
+                    required
+                    value={editFormData.fullName}
+                    onChange={(e) => setEditFormData({ ...editFormData, fullName: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:bg-white focus:ring-2 focus:ring-blue-600 outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Mobile Number</label>
+                  <input
+                    type="tel"
+                    value={editFormData.mobileNumber}
+                    onChange={(e) => setEditFormData({ ...editFormData, mobileNumber: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:bg-white focus:ring-2 focus:ring-blue-600 outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Department</label>
+                  <select
+                    value={editFormData.department}
+                    onChange={(e) => setEditFormData({ ...editFormData, department: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:bg-white focus:ring-2 focus:ring-blue-600 outline-none cursor-pointer"
+                  >
+                    <option value="Engineering">Engineering</option>
+                    <option value="Development">Development</option>
+                    <option value="Operations">Operations</option>
+                    <option value="Product Design">Product Design</option>
+                    <option value="Human Resources">Human Resources</option>
+                    <option value="Sales & Marketing">Sales & Marketing</option>
+                    <option value="Quality Assurance">Quality Assurance</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Designation</label>
+                  <input
+                    type="text"
+                    value={editFormData.designation}
+                    onChange={(e) => setEditFormData({ ...editFormData, designation: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:bg-white focus:ring-2 focus:ring-blue-600 outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Shift Assignment Card */}
+              <div className="p-3.5 bg-blue-50/70 rounded-2xl border border-blue-200 space-y-1.5">
+                <label className="block text-xs font-bold text-blue-950 flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5 text-blue-600" />
+                  Assigned Shift (Morning / Afternoon / General) *
+                </label>
+                <select
+                  value={editFormData.assignedShift}
+                  onChange={(e) => setEditFormData({ ...editFormData, assignedShift: e.target.value })}
+                  className="w-full px-3 py-2.5 bg-white border border-blue-200 rounded-xl text-xs font-bold text-slate-800 focus:ring-2 focus:ring-blue-600 outline-none cursor-pointer shadow-2xs"
+                >
+                  <option value="">Company Default (10:00 AM - 6:00 PM)</option>
+                  {shifts.map((s) => (
+                    <option key={s._id} value={s._id}>
+                      {s.name} ({s.startTime} - {s.endTime}) {!s.isActive ? '[Inactive]' : ''}
+                    </option>
+                  ))}
+                </select>
+                <span className="text-[10px] text-blue-700 block">
+                  Assign the specific shift this employee works in (Morning, Afternoon, or General).
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Employment Type</label>
+                  <select
+                    value={editFormData.employmentType}
+                    onChange={(e) => setEditFormData({ ...editFormData, employmentType: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:bg-white focus:ring-2 focus:ring-blue-600 outline-none cursor-pointer"
+                  >
+                    <option value="Full-time">Full-time (Permanent)</option>
+                    <option value="Internship">Internship / Intern</option>
+                    <option value="Part-time">Part-time</option>
+                    <option value="Contract">Contract</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Account Status</label>
+                  <select
+                    value={editFormData.employmentStatus}
+                    onChange={(e) => setEditFormData({ ...editFormData, employmentStatus: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold focus:bg-white focus:ring-2 focus:ring-blue-600 outline-none cursor-pointer"
+                  >
+                    <option value="Active">Active</option>
+                    <option value="Inactive">Inactive</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowEditModal(false)}
+                  className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={updatingEmployee}
+                  className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-xs transition cursor-pointer"
+                >
+                  {updatingEmployee ? 'Saving Changes...' : 'Save & Assign Shift'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

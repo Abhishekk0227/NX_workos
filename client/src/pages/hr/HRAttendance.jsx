@@ -21,7 +21,8 @@ import {
 } from 'lucide-react';
 import api from '../../api/client';
 import { TableShimmer, AttendanceShimmer, CardListShimmer } from '../../components/common/Shimmer';
-import { formatTime24, formatWorkingHours } from '../../utils/timeUtils';
+import { formatTime24, formatWorkingHours, formatDateIST } from '../../utils/timeUtils';
+import ShortAttendanceModal from '../../components/modals/ShortAttendanceModal';
 
 export default function HRAttendance() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -59,12 +60,26 @@ export default function HRAttendance() {
   });
   const [calendarEmployeeId, setCalendarEmployeeId] = useState('');
   const [calendarRecords, setCalendarRecords] = useState([]);
+  const [monthlyHolidays, setMonthlyHolidays] = useState([]);
+
+  // Daily Dashboard Stats (7 KPI Cards)
+  const [dailyStats, setDailyStats] = useState({
+    totalEmployees: 0,
+    fullDayPresent: 0,
+    halfDay: 0,
+    shortAttendance: 0,
+    absent: 0,
+    onLeave: 0,
+    holiday: 0
+  });
 
   // Daily Log Filters: defaults to real-time current date
   const todayStr = new Date().toISOString().split('T')[0];
   const [selectedDate, setSelectedDate] = useState(urlDate || todayStr);
   const [selectedEmployee, setSelectedEmployee] = useState(urlEmp);
   const [selectedStatus, setSelectedStatus] = useState(urlStatus);
+  const [showShortAttendanceModal, setShowShortAttendanceModal] = useState(false);
+  const [selectedAlertAttendance, setSelectedAlertAttendance] = useState(null);
 
   // Sync state when URL searchParams change dynamically
   useEffect(() => {
@@ -144,6 +159,9 @@ export default function HRAttendance() {
       const emps = empRes.data?.employees || [];
       setEmployees(emps);
       setRecords(attRes.data?.records || []);
+      if (attRes.data?.stats) {
+        setDailyStats(attRes.data.stats);
+      }
 
       if (!calendarEmployeeId && emps.length > 0) {
         setCalendarEmployeeId(emps[0]._id);
@@ -169,8 +187,17 @@ export default function HRAttendance() {
         const month = String(calendarDate.getMonth() + 1).padStart(2, '0');
         const monthQuery = `${year}-${month}`;
 
-        const res = await api.get(`/attendance/all?employeeId=${calendarEmployeeId}&month=${monthQuery}`);
-        setCalendarRecords(res.data?.records || []);
+        const [res, holRes] = await Promise.allSettled([
+          api.get(`/attendance/all?employeeId=${calendarEmployeeId}&month=${monthQuery}`),
+          api.get(`/holidays?year=${year}&month=${month}`)
+        ]);
+
+        if (res.status === 'fulfilled') {
+          setCalendarRecords(res.value.data?.records || []);
+        }
+        if (holRes.status === 'fulfilled') {
+          setMonthlyHolidays(holRes.value.data?.holidays || []);
+        }
       } catch (err) {
         console.error('Error fetching calendar records:', err);
       }
@@ -195,6 +222,20 @@ export default function HRAttendance() {
       }
     } catch (err) {
       alert(err.response?.data?.message || 'Failed to review correction');
+    }
+  };
+
+  const handleReviewAutoPunchOut = async (attendanceId) => {
+    try {
+      const res = await api.patch(`/attendance/${attendanceId}/review-auto-punch-out`, {
+        remarks: 'HR acknowledged and reviewed auto punch-out.'
+      });
+      if (res.data?.success) {
+        alert(res.data.message);
+        fetchData();
+      }
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to review auto punch-out');
     }
   };
 
@@ -281,13 +322,15 @@ export default function HRAttendance() {
     }
   });
 
-  // Calculate KPIs strictly from employee's joining date onward
+  // Calculate KPIs strictly from employee's joining date onward (NO 0.5 split - Section 2)
   let activeWorkingDaysInMonth = 0;
   let presentDays = 0;
   let lateDays = 0;
   let halfDays = 0;
+  let shortAttendanceDays = 0;
   let absentDays = 0;
   let onLeaveDays = 0;
+  let holidayDays = 0;
 
   for (let d = 1; d <= daysInMonth; d++) {
     const dStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
@@ -304,22 +347,30 @@ export default function HRAttendance() {
     }
 
     const rec = recordsByDay[d];
+    const mmdd = `${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    const hol = monthlyHolidays.find(h => h.date === dStr || (h.startDate && h.endDate && h.startDate <= dStr && dStr <= h.endDate) || (h.isRecurring && h.date && h.date.slice(5) === mmdd));
+
     if (rec) {
-      if (rec.status === 'Present' || rec.status === 'Working' || rec.punchIn) {
-        if (rec.status === 'Late' || rec.lateMinutes > 0) {
-          presentDays++;
-          lateDays++;
-        } else if (rec.status === 'Half Day' || rec.status === 'Half-day') {
-          halfDays++;
-          presentDays += 0.5;
-        } else {
-          presentDays++;
-        }
-      } else if (rec.status === 'Absent' || rec.status === 'Incomplete') {
+      const s = rec.status;
+      if (s === 'Full Day' || s === 'Present' || s === 'Working') {
+        presentDays++;
+      } else if (s === 'Late') {
+        presentDays++;
+        lateDays++;
+      } else if (s === 'Half Day' || s === 'Half-day') {
+        halfDays++;
+      } else if (s === 'Short Attendance') {
+        shortAttendanceDays++;
+      } else if (s === 'Absent' || s === 'Incomplete') {
         absentDays++;
-      } else if (rec.status === 'On Leave') {
+      } else if (s === 'On Leave') {
         onLeaveDays++;
+      } else if (s === 'Holiday' || s === 'Working on Holiday') {
+        holidayDays++;
       }
+    } else if (hol) {
+      // Official company or national holiday - never mark Absent
+      holidayDays++;
     } else {
       // Past working day without punch-in during active employment
       if (!isSunday && dStr < todayStr) {
@@ -328,8 +379,9 @@ export default function HRAttendance() {
     }
   }
 
-  // Pending corrections
+  // Pending corrections & Auto Punch-Out alerts
   const pendingCorrections = records.filter((r) => r.correction?.status === 'Pending');
+  const pendingAutoPunchOuts = records.filter((r) => r.autoPunchedOut && !r.autoPunchOutAlert?.reviewed);
 
   // Formatted Live IST string
   const liveISTString = `${currentTimeIST.toLocaleDateString('en-IN', {
@@ -427,6 +479,51 @@ export default function HRAttendance() {
         </div>
       )}
 
+      {/* Auto Punch-Out Action Alert Banner */}
+      {pendingAutoPunchOuts.length > 0 && (
+        <div className="p-4 bg-purple-50 border border-purple-200 rounded-2xl">
+          <div className="flex items-center gap-2 mb-2 font-bold text-xs text-purple-900 uppercase tracking-wider">
+            <Clock className="w-4 h-4 text-purple-600" />
+            <span>Auto Punch-Out Sessions Pending Action ({pendingAutoPunchOuts.length})</span>
+          </div>
+          <div className="space-y-2">
+            {pendingAutoPunchOuts.map((att) => (
+              <div
+                key={att._id}
+                className="p-3 bg-white rounded-xl border border-purple-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
+              >
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-slate-800">{att.employee?.fullName}</span>
+                    <span className="text-slate-500 font-mono">({att.employee?.employeeId})</span>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-800">
+                      ⚡ Auto Punched-Out
+                    </span>
+                  </div>
+                  <div className="text-slate-600 mt-0.5 text-[11px]">
+                    Date: <strong>{att.date}</strong> | Logged: <strong>{att.actualWorkingHours || 0} hrs</strong> ({att.status}) | Shift: {att.shift?.name || 'Default'}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 self-end sm:self-auto">
+                  <button
+                    onClick={() => handleReviewAutoPunchOut(att._id)}
+                    className="px-3 py-1.5 border border-purple-200 text-purple-700 hover:bg-purple-50 rounded-lg font-semibold text-[11px] transition cursor-pointer"
+                  >
+                    Acknowledge
+                  </button>
+                  <button
+                    onClick={() => openOverride(att)}
+                    className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold text-[11px] transition cursor-pointer"
+                  >
+                    Audit / Correct
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* VIEW 1: MONTHLY CALENDAR VIEW */}
       {viewMode === 'calendar' && (
         <div className="space-y-4 sm:space-y-6">
@@ -494,36 +591,48 @@ export default function HRAttendance() {
             </div>
           </div>
 
-          {/* 5 Attendance KPI Cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 sm:gap-3">
-            <div className="bg-white p-3 sm:p-4 rounded-2xl border border-slate-200/80 shadow-xs text-center">
+          {/* 7 Attendance KPI Cards (Section 2 - Distinct Categories) */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 sm:gap-2.5">
+            <div className="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-xs text-center">
               <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">Active Days</span>
               <span className="text-xl sm:text-2xl font-black text-slate-900 font-mono">{activeWorkingDaysInMonth}</span>
               <span className="text-[10px] text-slate-500 block mt-0.5 truncate">Working Days</span>
             </div>
 
-            <div className="bg-white p-3 sm:p-4 rounded-2xl border border-emerald-100 shadow-xs text-center">
-              <span className="text-[10px] uppercase font-bold text-emerald-600 block mb-0.5">Present</span>
+            <div className="bg-white p-3 rounded-2xl border border-emerald-100 shadow-xs text-center">
+              <span className="text-[10px] uppercase font-bold text-emerald-600 block mb-0.5">Full Day</span>
               <span className="text-xl sm:text-2xl font-black text-emerald-600 font-mono">{presentDays}</span>
-              <span className="text-[10px] text-slate-500 block mt-0.5 truncate">On Schedule</span>
+              <span className="text-[10px] text-slate-500 block mt-0.5 truncate">100% Pay</span>
             </div>
 
-            <div className="bg-white p-3 sm:p-4 rounded-2xl border border-amber-100 shadow-xs text-center">
-              <span className="text-[10px] uppercase font-bold text-amber-600 block mb-0.5">Late</span>
-              <span className="text-xl sm:text-2xl font-black text-amber-600 font-mono">{lateDays}</span>
-              <span className="text-[10px] text-slate-500 block mt-0.5 truncate">Over Grace</span>
+            <div className="bg-white p-3 rounded-2xl border border-orange-100 shadow-xs text-center">
+              <span className="text-[10px] uppercase font-bold text-orange-600 block mb-0.5">Half Day</span>
+              <span className="text-xl sm:text-2xl font-black text-orange-600 font-mono">{halfDays}</span>
+              <span className="text-[10px] text-slate-500 block mt-0.5 truncate">50% Pay</span>
             </div>
 
-            <div className="bg-white p-3 sm:p-4 rounded-2xl border border-rose-100 shadow-xs text-center">
-              <span className="text-[10px] uppercase font-bold text-rose-600 block mb-0.5">Absent</span>
+            <div className="bg-white p-3 rounded-2xl border border-rose-200 shadow-xs text-center">
+              <span className="text-[10px] uppercase font-bold text-rose-600 block mb-0.5">Short Att.</span>
+              <span className="text-xl sm:text-2xl font-black text-rose-600 font-mono">{shortAttendanceDays}</span>
+              <span className="text-[10px] text-rose-500 font-bold block mt-0.5 truncate">&lt; 4h (Alert)</span>
+            </div>
+
+            <div className="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-xs text-center">
+              <span className="text-[10px] uppercase font-bold text-slate-500 block mb-0.5">Absent</span>
               <span className="text-xl sm:text-2xl font-black text-rose-600 font-mono">{absentDays}</span>
               <span className="text-[10px] text-slate-500 block mt-0.5 truncate">Unexcused</span>
             </div>
 
-            <div className="bg-white p-3 sm:p-4 rounded-2xl border border-blue-100 shadow-xs text-center col-span-2 sm:col-span-1">
+            <div className="bg-white p-3 rounded-2xl border border-blue-100 shadow-xs text-center">
               <span className="text-[10px] uppercase font-bold text-blue-600 block mb-0.5">On Leave</span>
               <span className="text-xl sm:text-2xl font-black text-blue-600 font-mono">{onLeaveDays}</span>
               <span className="text-[10px] text-slate-500 block mt-0.5 truncate">Approved</span>
+            </div>
+
+            <div className="bg-white p-3 rounded-2xl border border-amber-100 shadow-xs text-center">
+              <span className="text-[10px] uppercase font-bold text-amber-600 block mb-0.5">Holiday</span>
+              <span className="text-xl sm:text-2xl font-black text-amber-600 font-mono">{holidayDays}</span>
+              <span className="text-[10px] text-slate-500 block mt-0.5 truncate">Company Holiday</span>
             </div>
           </div>
 
@@ -549,6 +658,8 @@ export default function HRAttendance() {
               {Array.from({ length: daysInMonth }).map((_, i) => {
                 const dayNum = i + 1;
                 const cellDateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
+                const cellMmdd = `${String(month + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
+                const hol = monthlyHolidays.find(h => h.date === cellDateStr || (h.isRecurring && h.date && h.date.slice(5) === cellMmdd));
                 const dateObj = new Date(year, month, dayNum);
                 const isSunday = dateObj.getDay() === 0;
                 const isPreJoining = joinDateStr && cellDateStr < joinDateStr;
@@ -598,6 +709,30 @@ export default function HRAttendance() {
                       </span>
                     );
                     statusDot = <span className="w-2 h-2 rounded-full bg-orange-500 shadow-xs" title="Half Day" />;
+                  } else if (rec.status === 'Holiday') {
+                    bgStyle = 'bg-cyan-50/80 border-cyan-200 text-cyan-950';
+                    statusBadge = (
+                      <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-cyan-100 text-cyan-800 truncate">
+                        Holiday
+                      </span>
+                    );
+                    statusDot = <span className="w-2 h-2 rounded-full bg-cyan-500 shadow-xs" title="Holiday" />;
+                  } else if (rec.status === 'Working on Holiday') {
+                    bgStyle = 'bg-emerald-50/90 border-emerald-300 text-emerald-950';
+                    statusBadge = (
+                      <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-100 text-emerald-800 truncate">
+                        Work (Hol)
+                      </span>
+                    );
+                    statusDot = <span className="w-2 h-2 rounded-full bg-emerald-600 shadow-xs" title="Working on Holiday" />;
+                  } else if (rec.status === 'Short Attendance') {
+                    bgStyle = 'bg-purple-50/80 border-purple-200 text-purple-950';
+                    statusBadge = (
+                      <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-purple-100 text-purple-800 truncate">
+                        Short Att.
+                      </span>
+                    );
+                    statusDot = <span className="w-2 h-2 rounded-full bg-purple-500 shadow-xs" title="Short Attendance" />;
                   } else if (rec.status === 'On Leave') {
                     bgStyle = 'bg-blue-50/80 border-blue-200 text-blue-950';
                     statusBadge = (
@@ -615,6 +750,14 @@ export default function HRAttendance() {
                     );
                     statusDot = <span className="w-2 h-2 rounded-full bg-rose-500 shadow-xs" title="Absent" />;
                   }
+                } else if (hol) {
+                  bgStyle = 'bg-cyan-50/80 border-cyan-200 text-cyan-950';
+                  statusBadge = (
+                    <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-cyan-100 text-cyan-800 truncate" title={hol.name}>
+                      {hol.name.length > 12 ? hol.name.slice(0, 10) + '..' : hol.name}
+                    </span>
+                  );
+                  statusDot = <span className="w-2 h-2 rounded-full bg-cyan-500 shadow-xs" title={`Holiday: ${hol.name}`} />;
                 } else if (isToday) {
                   bgStyle = 'bg-blue-50/60 border-blue-300 text-blue-900';
                   statusBadge = (
@@ -677,6 +820,8 @@ export default function HRAttendance() {
             {/* Selected Active Day Inspection Strip (App-like experience) */}
             {(() => {
               const selDateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(selectedDay).padStart(2, '0')}`;
+              const selMmdd = `${String(month + 1).padStart(2, '0')}-${String(selectedDay).padStart(2, '0')}`;
+              const selHol = monthlyHolidays.find(h => h.date === selDateStr || (h.isRecurring && h.date && h.date.slice(5) === selMmdd));
               const selDateObj = new Date(year, month, selectedDay);
               const selIsSunday = selDateObj.getDay() === 0;
               const selIsPreJoin = joinDateStr && selDateStr < joinDateStr;
@@ -697,8 +842,14 @@ export default function HRAttendance() {
                 if (selRec.status === 'Present' || selRec.status === 'Working') statusPillClass = 'bg-emerald-100 text-emerald-800 font-bold';
                 else if (selRec.status === 'Late') statusPillClass = 'bg-amber-100 text-amber-800 font-bold';
                 else if (selRec.status === 'Half Day') statusPillClass = 'bg-orange-100 text-orange-800 font-bold';
+                else if (selRec.status === 'Short Attendance') statusPillClass = 'bg-purple-100 text-purple-800 font-bold';
+                else if (selRec.status === 'Holiday') statusPillClass = 'bg-cyan-100 text-cyan-800 font-bold';
+                else if (selRec.status === 'Working on Holiday') statusPillClass = 'bg-emerald-100 text-emerald-800 font-bold';
                 else if (selRec.status === 'On Leave') statusPillClass = 'bg-blue-100 text-blue-800 font-bold';
                 else statusPillClass = 'bg-rose-100 text-rose-800 font-bold';
+              } else if (selHol) {
+                statusLabel = `Holiday: ${selHol.name} (100% Paid)`;
+                statusPillClass = 'bg-cyan-100 text-cyan-800 font-bold border border-cyan-200';
               } else if (selIsFuture) {
                 statusLabel = 'Upcoming';
                 statusPillClass = 'bg-slate-50 text-slate-400';
@@ -729,6 +880,8 @@ export default function HRAttendance() {
                           ? `Employment started on ${joinDateStr}. Prior days are completely free from penalties.`
                           : selRec?.punchIn
                           ? `Punch In: ${formatTime24(selRec.punchIn)} • Punch Out: ${selRec.punchOut ? formatTime24(selRec.punchOut) : 'In Progress'} • ${formatWorkingHours(selRec)}`
+                          : selHol
+                          ? `Official Scheduled Holiday (${selHol.type}) • Fully paid leave under company policy`
                           : selIsSunday
                           ? 'Scheduled weekly holiday.'
                           : selIsFuture
@@ -795,6 +948,107 @@ export default function HRAttendance() {
       {/* VIEW 2: DAILY ATTENDANCE LOG */}
       {viewMode === 'log' && (
         <div className="space-y-4">
+          {/* 7 Attendance Dashboard KPI Cards (Section 2 - Distinct Categories, NO 0.5 Split) */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 sm:gap-2.5">
+            {/* 1. Total Employees */}
+            <div
+              onClick={() => handleStatusChange('All')}
+              className={`p-3 rounded-2xl border transition text-center cursor-pointer select-none ${
+                selectedStatus === 'All'
+                  ? 'bg-blue-50/90 border-blue-500 shadow-xs'
+                  : 'bg-white border-slate-200/80 hover:border-blue-300'
+              }`}
+            >
+              <span className="text-[10px] uppercase font-bold text-slate-500 block mb-0.5 truncate">Total Staff</span>
+              <span className="text-xl sm:text-2xl font-black text-slate-900 font-mono">{dailyStats.totalEmployees}</span>
+              <span className="text-[10px] text-blue-600 font-semibold block mt-0.5 truncate">Active Staff</span>
+            </div>
+
+            {/* 2. Full Day Present */}
+            <div
+              onClick={() => handleStatusChange('Full Day')}
+              className={`p-3 rounded-2xl border transition text-center cursor-pointer select-none ${
+                selectedStatus === 'Full Day'
+                  ? 'bg-emerald-100/80 border-emerald-500 shadow-xs'
+                  : 'bg-white border-emerald-100 hover:border-emerald-300'
+              }`}
+            >
+              <span className="text-[10px] uppercase font-bold text-emerald-600 block mb-0.5 truncate">Full Day</span>
+              <span className="text-xl sm:text-2xl font-black text-emerald-600 font-mono">{dailyStats.fullDayPresent}</span>
+              <span className="text-[10px] text-slate-400 font-medium block mt-0.5 truncate">8h+ / 100% Pay</span>
+            </div>
+
+            {/* 3. Half Day */}
+            <div
+              onClick={() => handleStatusChange('Half Day')}
+              className={`p-3 rounded-2xl border transition text-center cursor-pointer select-none ${
+                selectedStatus === 'Half Day'
+                  ? 'bg-orange-100/80 border-orange-500 shadow-xs'
+                  : 'bg-white border-orange-100 hover:border-orange-300'
+              }`}
+            >
+              <span className="text-[10px] uppercase font-bold text-orange-600 block mb-0.5 truncate">Half Day</span>
+              <span className="text-xl sm:text-2xl font-black text-orange-600 font-mono">{dailyStats.halfDay}</span>
+              <span className="text-[10px] text-slate-400 font-medium block mt-0.5 truncate">4-8h / 50% Pay</span>
+            </div>
+
+            {/* 4. Short Attendance */}
+            <div
+              onClick={() => handleStatusChange('Short Attendance')}
+              className={`p-3 rounded-2xl border transition text-center cursor-pointer select-none ${
+                selectedStatus === 'Short Attendance'
+                  ? 'bg-rose-100/80 border-rose-500 shadow-xs'
+                  : 'bg-white border-rose-200 hover:border-rose-400'
+              }`}
+            >
+              <span className="text-[10px] uppercase font-bold text-rose-600 block mb-0.5 truncate">Short Att.</span>
+              <span className="text-xl sm:text-2xl font-black text-rose-600 font-mono">{dailyStats.shortAttendance}</span>
+              <span className="text-[10px] text-rose-500 font-bold block mt-0.5 truncate">&lt; 4h (Alert)</span>
+            </div>
+
+            {/* 5. Absent */}
+            <div
+              onClick={() => handleStatusChange('Absent')}
+              className={`p-3 rounded-2xl border transition text-center cursor-pointer select-none ${
+                selectedStatus === 'Absent'
+                  ? 'bg-slate-200 border-slate-500 shadow-xs'
+                  : 'bg-white border-slate-200/80 hover:border-slate-400'
+              }`}
+            >
+              <span className="text-[10px] uppercase font-bold text-slate-500 block mb-0.5 truncate">Absent</span>
+              <span className="text-xl sm:text-2xl font-black text-slate-700 font-mono">{dailyStats.absent}</span>
+              <span className="text-[10px] text-slate-400 font-medium block mt-0.5 truncate">Unexcused / 0%</span>
+            </div>
+
+            {/* 6. On Leave */}
+            <div
+              onClick={() => handleStatusChange('On Leave')}
+              className={`p-3 rounded-2xl border transition text-center cursor-pointer select-none ${
+                selectedStatus === 'On Leave'
+                  ? 'bg-blue-100/80 border-blue-500 shadow-xs'
+                  : 'bg-white border-blue-100 hover:border-blue-300'
+              }`}
+            >
+              <span className="text-[10px] uppercase font-bold text-blue-600 block mb-0.5 truncate">On Leave</span>
+              <span className="text-xl sm:text-2xl font-black text-blue-600 font-mono">{dailyStats.onLeave}</span>
+              <span className="text-[10px] text-slate-400 font-medium block mt-0.5 truncate">Approved</span>
+            </div>
+
+            {/* 7. Holiday */}
+            <div
+              onClick={() => handleStatusChange('Holiday')}
+              className={`p-3 rounded-2xl border transition text-center cursor-pointer select-none ${
+                selectedStatus === 'Holiday'
+                  ? 'bg-amber-100/80 border-amber-500 shadow-xs'
+                  : 'bg-white border-amber-100 hover:border-amber-300'
+              }`}
+            >
+              <span className="text-[10px] uppercase font-bold text-amber-600 block mb-0.5 truncate">Holiday</span>
+              <span className="text-xl sm:text-2xl font-black text-amber-600 font-mono">{dailyStats.holiday}</span>
+              <span className="text-[10px] text-slate-400 font-medium block mt-0.5 truncate">Paid Non-Working</span>
+            </div>
+          </div>
+
           {/* Filters Bar */}
           <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
             <div className="w-full sm:w-auto">
@@ -831,16 +1085,44 @@ export default function HRAttendance() {
                 className="w-full sm:w-auto px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-700 outline-none"
               >
                 <option value="All">All Statuses</option>
+                <option value="Full Day">Full Day</option>
                 <option value="Present">Present</option>
                 <option value="Late">Late</option>
                 <option value="Half Day">Half Day</option>
+                <option value="Short Attendance">Short Attendance</option>
                 <option value="Working">Working</option>
                 <option value="On Leave">On Leave</option>
+                <option value="Holiday">Holiday</option>
                 <option value="Incomplete">Incomplete</option>
                 <option value="Absent">Absent</option>
               </select>
             </div>
           </div>
+
+          {/* Short Attendance Action Alert Banner */}
+          {dailyStats.shortAttendance > 0 && selectedStatus !== 'Short Attendance' && (
+            <div className="p-3.5 bg-amber-50/90 border border-amber-200/90 rounded-2xl flex items-center justify-between gap-3 text-xs text-amber-900 shadow-2xs">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center font-bold shrink-0">
+                  <AlertTriangle className="w-4 h-4 text-amber-700" />
+                </div>
+                <div>
+                  <span className="font-bold block text-slate-900">
+                    {dailyStats.shortAttendance} Short Attendance Session(s) Recorded
+                  </span>
+                  <span className="text-[11px] text-amber-800 font-medium">
+                    Sessions under half-day threshold. Click to review, set deduction/payable amount, or convert classification.
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={() => handleStatusChange('Short Attendance')}
+                className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer shrink-0"
+              >
+                Filter Shortfall
+              </button>
+            </div>
+          )}
 
           {/* Mobile Card View (App-like for phones) */}
           <div className="block md:hidden space-y-2.5">
@@ -881,6 +1163,11 @@ export default function HRAttendance() {
                       >
                         {att.status}
                       </span>
+                      {att.autoPunchedOut && (
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-purple-100 text-purple-800">
+                          ⚡ Auto
+                        </span>
+                      )}
                     </div>
 
                     <div className="grid grid-cols-2 gap-2 text-[11px] bg-slate-50 p-2.5 rounded-xl border border-slate-100">
@@ -1007,17 +1294,26 @@ export default function HRAttendance() {
                           <td className="py-3.5 px-4">
                             <span
                               className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                                att.status === 'Present' || att.status === 'Working'
+                                att.status === 'Full Day' || att.status === 'Present' || att.status === 'Working'
                                   ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                                   : att.status === 'Late'
                                   ? 'bg-amber-50 text-amber-700 border border-amber-200'
                                   : att.status === 'Half Day'
                                   ? 'bg-orange-50 text-orange-700 border border-orange-200'
+                                  : att.status === 'Short Attendance'
+                                  ? 'bg-rose-100 text-rose-800 border border-rose-300'
+                                  : att.status === 'Holiday' || att.status === 'Working on Holiday'
+                                  ? 'bg-purple-50 text-purple-700 border border-purple-200'
                                   : 'bg-rose-50 text-rose-700 border border-rose-200'
                               }`}
                             >
                               {att.status}
                             </span>
+                            {att.autoPunchedOut && (
+                              <span className="block mt-1 text-[9px] font-bold text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200 w-fit">
+                                ⚡ Auto Punch-Out
+                              </span>
+                            )}
                           </td>
 
                           <td className="py-3.5 px-4">
@@ -1031,12 +1327,37 @@ export default function HRAttendance() {
                           </td>
 
                           <td className="py-3.5 px-4 text-right">
-                            <button
-                              onClick={() => openOverride(att)}
-                              className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[11px] font-bold transition cursor-pointer"
-                            >
-                              Edit (HR)
-                            </button>
+                            <div className="flex items-center justify-end gap-1.5">
+                              {(att.shortAttendanceAlert?.status === 'Pending' || (att.status === 'Short Attendance' && att.shortAttendanceAlert?.status !== 'Resolved')) && (
+                                <button
+                                  onClick={() => {
+                                    setSelectedAlertAttendance(att);
+                                    setShowShortAttendanceModal(true);
+                                  }}
+                                  className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-[10px] font-bold shadow-xs transition cursor-pointer"
+                                >
+                                  Resolve Alert
+                                </button>
+                              )}
+                              {att.shortAttendanceAlert?.status === 'Resolved' && (
+                                <button
+                                  onClick={() => {
+                                    setSelectedAlertAttendance(att);
+                                    setShowShortAttendanceModal(true);
+                                  }}
+                                  className="px-2 py-0.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded text-[10px] font-semibold transition cursor-pointer"
+                                  title="View or modify HR decision"
+                                >
+                                  Resolved ({att.shortAttendanceAlert.hrClassification || 'Decision'})
+                                </button>
+                              )}
+                              <button
+                                onClick={() => openOverride(att)}
+                                className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[11px] font-bold transition cursor-pointer"
+                              >
+                                Edit (HR)
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       );
@@ -1141,6 +1462,20 @@ export default function HRAttendance() {
             </form>
           </div>
         </div>
+      )}
+      {/* SHORT ATTENDANCE ALERT RESOLUTION MODAL */}
+      {showShortAttendanceModal && (
+        <ShortAttendanceModal
+          isOpen={showShortAttendanceModal}
+          onClose={() => {
+            setShowShortAttendanceModal(false);
+            setSelectedAlertAttendance(null);
+          }}
+          attendance={selectedAlertAttendance}
+          onSuccess={() => {
+            fetchDailyAttendance();
+          }}
+        />
       )}
     </div>
   );

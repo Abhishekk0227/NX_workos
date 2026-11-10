@@ -22,6 +22,46 @@ const attendanceCorrectionSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const shortAttendanceAlertSchema = new mongoose.Schema(
+  {
+    isAlert: {
+      type: Boolean,
+      default: false
+    },
+    status: {
+      type: String,
+      enum: ['None', 'Pending', 'Resolved'],
+      default: 'None'
+    },
+    payableAmount: {
+      type: Number,
+      default: 0
+    },
+    deductionAmount: {
+      type: Number,
+      default: 0
+    },
+    hrClassification: {
+      type: String,
+      default: '' // 'Half Day', 'LWP', 'Special Allowance', etc.
+    },
+    resolvedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null
+    },
+    resolvedAt: {
+      type: Date,
+      default: null
+    },
+    resolutionRemarks: {
+      type: String,
+      default: ''
+    }
+  },
+  { _id: false }
+);
+
 const attendanceSchema = new mongoose.Schema(
   {
     employee: {
@@ -87,14 +127,19 @@ const attendanceSchema = new mongoose.Schema(
     status: {
       type: String,
       enum: [
+        'Full Day',
         'Present',
         'Late',
         'Half Day',
         'Half-day',
+        'Short Attendance',
         'Absent',
         'On Leave',
+        'Holiday',
+        'Working on Holiday',
         'Weekly Off',
         'Working',
+        'Auto Punch-Out',
         'Incomplete',
         'Unmarked/Review Required'
       ],
@@ -103,6 +148,32 @@ const attendanceSchema = new mongoose.Schema(
     dailyReport: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'DailyReport',
+      default: null
+    },
+    autoPunchedOut: {
+      type: Boolean,
+      default: false
+    },
+    punchOutType: {
+      type: String,
+      enum: ['MANUAL', 'SYSTEM_AUTO', 'HR_CORRECTED'],
+      default: 'MANUAL'
+    },
+    autoPunchOutAlert: {
+      isAlert: { type: Boolean, default: false },
+      reviewed: { type: Boolean, default: false }
+    },
+    shortAttendanceAlert: {
+      type: shortAttendanceAlertSchema,
+      default: () => ({})
+    },
+    isHoliday: {
+      type: Boolean,
+      default: false
+    },
+    holiday: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Holiday',
       default: null
     },
     isIncomplete: {

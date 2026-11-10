@@ -10,7 +10,7 @@ import Login from './pages/auth/Login';
 import HRLayout from './components/layout/HRLayout';
 import EmployeeLayout from './components/layout/EmployeeLayout';
 
-// HR Pages (7 Sections)
+// HR Pages
 import HRDashboard from './pages/hr/HRDashboard';
 import HREmployees from './pages/hr/HREmployees';
 import HRAttendance from './pages/hr/HRAttendance';
@@ -20,11 +20,14 @@ import HRPayroll from './pages/hr/HRPayroll';
 import HRSettings from './pages/hr/HRSettings';
 import HRBroadcast from './pages/hr/HRBroadcast';
 import HRMoreMenu from './pages/hr/HRMoreMenu';
+import HRHolidayCalendar from './pages/hr/HRHolidayCalendar';
+import HRReports from './pages/hr/HRReports';
 
 // Employee Pages (5 Sections)
 import EmployeeHome from './pages/employee/EmployeeHome';
 import EmployeeTasks from './pages/employee/EmployeeTasks';
 import EmployeeAttendance from './pages/employee/EmployeeAttendance';
+import EmployeeHolidays from './pages/employee/EmployeeHolidays';
 import EmployeeLeave from './pages/employee/EmployeeLeave';
 import EmployeeProfile from './pages/employee/EmployeeProfile';
 import EmployeeNotices from './pages/employee/EmployeeNotices';
@@ -87,6 +90,8 @@ export default function App() {
               <Route path="dashboard" element={<HRDashboard />} />
               <Route path="employees" element={<HREmployees />} />
               <Route path="attendance" element={<HRAttendance />} />
+              <Route path="holidays" element={<HRHolidayCalendar />} />
+              <Route path="reports" element={<HRReports />} />
               <Route path="tasks-reports" element={<HRTasksReports />} />
               <Route path="leave" element={<HRLeave />} />
               <Route path="payroll" element={<HRPayroll />} />
@@ -108,6 +113,7 @@ export default function App() {
               <Route path="home" element={<EmployeeHome />} />
               <Route path="tasks" element={<EmployeeTasks />} />
               <Route path="attendance" element={<EmployeeAttendance />} />
+              <Route path="holidays" element={<EmployeeHolidays />} />
               <Route path="leave" element={<EmployeeLeave />} />
               <Route path="notices" element={<EmployeeNotices />} />
               <Route path="profile" element={<EmployeeProfile />} />

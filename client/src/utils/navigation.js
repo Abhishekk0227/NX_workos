@@ -19,6 +19,15 @@ export const resolveNotificationRoute = (notif, userRole) => {
   if (type === 'correction') {
     return isHR ? '/hr/attendance' : '/employee/attendance';
   }
+  if (type === 'holiday' || title.includes('holiday')) {
+    return isHR ? '/hr/holidays' : '/employee/home';
+  }
+  if (type === 'reminder' || title.includes('reminder')) {
+    return isHR ? '/hr/dashboard' : '/employee/home';
+  }
+  if (type === 'short attendance' || title.includes('short attendance')) {
+    return isHR ? '/hr/attendance' : '/employee/attendance';
+  }
   if (title.includes('notice') || title.includes('broadcast') || type === 'system') {
     return isHR ? '/hr/broadcast' : '/employee/notices';
   }

@@ -35,14 +35,20 @@ app.get('/', (req, res) => {
     success: true,
     system: 'NX Work OS API Server',
     status: 'online',
-    version: '1.0.0',
-    message: 'NX Work OS Backend is running successfully on Vercel',
+    version: '2.0.0',
+    timezone: 'Asia/Kolkata (IST)',
+    message: 'NX Work OS Backend is running successfully',
     endpoints: {
       health: '/api/health',
       auth: '/api/auth/login',
       employees: '/api/employees',
       shifts: '/api/shifts',
-      attendance: '/api/attendance'
+      attendance: '/api/attendance',
+      holidays: '/api/holidays',
+      reminders: '/api/reminders',
+      tasks: '/api/tasks',
+      reports: '/api/reports',
+      payroll: '/api/payroll'
     },
     timestamp: new Date().toISOString()
   });
@@ -53,7 +59,8 @@ app.get('/api/health', (req, res) => {
   res.json({
     status: 'online',
     system: 'NX Work OS',
-    version: '1.0.0',
+    version: '2.0.0',
+    timezone: 'Asia/Kolkata (IST)',
     timestamp: new Date().toISOString()
   });
 });
@@ -74,6 +81,8 @@ app.use('/api/employees', require('./routes/employeeRoutes'));
 app.use('/api/shifts', require('./routes/shiftRoutes'));
 app.use('/api/settings', require('./routes/settingRoutes'));
 app.use('/api/attendance', require('./routes/attendanceRoutes'));
+app.use('/api/holidays', require('./routes/holidayRoutes'));
+app.use('/api/reminders', require('./routes/reminderRoutes'));
 app.use('/api/tasks', require('./routes/taskRoutes'));
 app.use('/api/reports', require('./routes/reportRoutes'));
 app.use('/api/leaves', require('./routes/leaveRoutes'));
@@ -95,11 +104,61 @@ app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
 
+// Setup background automated checks
+const startBackgroundWorkers = () => {
+  const AttendanceService = require('./services/attendanceService');
+  const Reminder = require('./models/Reminder');
+  const NotificationService = require('./services/notificationService');
+
+  // 1. Periodic Auto Punch-Out check (runs immediately on start + every 5 minutes)
+  AttendanceService.processAutoPunchOut().catch((err) =>
+    console.warn('[Auto Punch-Out Initial Run Error]:', err.message)
+  );
+  setInterval(async () => {
+    try {
+      await AttendanceService.processAutoPunchOut();
+    } catch (err) {
+      console.warn('[Auto Punch-Out Worker Error]:', err.message);
+    }
+  }, 5 * 60 * 1000);
+
+  // 2. Periodic Reminder Trigger check (runs every 1 minute)
+  setInterval(async () => {
+    try {
+      const now = new Date();
+      const dueReminders = await Reminder.find({
+        status: 'Pending',
+        isTriggered: false,
+        remindAt: { $lte: now }
+      }).populate('user');
+
+      for (const r of dueReminders) {
+        r.isTriggered = true;
+        r.triggeredAt = now;
+        await r.save();
+
+        if (r.user) {
+          await NotificationService.send({
+            recipient: r.user._id,
+            title: `Reminder: ${r.title}`,
+            message: r.description || `Scheduled for ${r.date} at ${r.time} (${r.type})`,
+            type: 'Reminder',
+            link: r.linkedTask ? '/employee/tasks' : '/'
+          });
+        }
+      }
+    } catch (err) {
+      console.warn('[Reminder Worker Error]:', err.message);
+    }
+  }, 60 * 1000);
+};
+
 // Connect to Database and start listener in non-serverless environments
 if (!process.env.VERCEL) {
   connectDB().then(() => {
     app.listen(PORT, () => {
       console.log(`[NX Work OS Server] Running on http://localhost:${PORT}`);
+      startBackgroundWorkers();
     });
   }).catch((err) => {
     console.error('Initial DB connection failed:', err.message);

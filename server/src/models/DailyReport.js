@@ -21,13 +21,31 @@ const dailyReportSchema = new mongoose.Schema(
     },
     summaryBullets: {
       type: [String],
-      required: [true, 'At least one bullet point summary is required'],
-      validate: {
-        validator: function (v) {
-          return Array.isArray(v) && v.length > 0 && v.some(b => b && b.trim().length > 0);
-        },
-        message: 'At least one valid bullet point must be provided'
-      }
+      default: []
+    },
+    completedWork: {
+      type: String,
+      default: '',
+      trim: true
+    },
+    pendingTasks: {
+      type: String,
+      default: '',
+      trim: true
+    },
+    challengesFaced: {
+      type: String,
+      default: '',
+      trim: true
+    },
+    nextDayPlan: {
+      type: String,
+      default: '',
+      trim: true
+    },
+    voiceUsed: {
+      type: Boolean,
+      default: false
     },
     submittedAt: {
       type: Date,
@@ -52,6 +70,14 @@ dailyReportSchema.pre('save', function (next) {
   const d = this.submittedAt || new Date();
   this.submittedAtIST = AttendanceService.toISTISOString(d);
   this.submittedTime = AttendanceService.formatTime(d, {}, 'Asia/Kolkata');
+
+  // If summaryBullets is empty but completedWork is present, populate summaryBullets for backwards compatibility
+  if ((!this.summaryBullets || this.summaryBullets.length === 0) && this.completedWork) {
+    this.summaryBullets = this.completedWork
+      .split('\n')
+      .map(line => line.trim())
+      .filter(Boolean);
+  }
   next();
 });
 

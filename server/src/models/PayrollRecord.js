@@ -104,6 +104,14 @@ const payrollRecordSchema = new mongoose.Schema(
       type: Number,
       default: 0
     },
+    shortAttendanceDays: {
+      type: Number,
+      default: 0
+    },
+    shortAttendanceDeduction: {
+      type: Number,
+      default: 0
+    },
     shortfallDeduction: {
       type: Number,
       default: 0

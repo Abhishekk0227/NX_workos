@@ -18,7 +18,9 @@ import {
   AlertCircle,
   X,
   Mail,
-  KeyRound
+  KeyRound,
+  CalendarDays,
+  BarChart3
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../api/client';
@@ -89,6 +91,8 @@ export default function HRMoreMenu() {
   const hrName = user?.employee?.fullName || 'HR Admin';
 
   const operationalModules = [
+    { name: 'Holiday Calendar', path: '/hr/holidays', icon: CalendarDays, color: 'text-sky-600 bg-sky-50 border-sky-100', desc: 'Holidays & schedule' },
+    { name: 'Reports & Analytics', path: '/hr/reports', icon: BarChart3, color: 'text-violet-600 bg-violet-50 border-violet-100', desc: '11 Exportable reports' },
     { name: 'Leave Management', path: '/hr/leave', icon: CalendarOff, color: 'text-amber-600 bg-amber-50 border-amber-100', desc: 'Quotas & approvals' },
     { name: 'Payroll', path: '/hr/payroll', icon: CreditCard, color: 'text-emerald-600 bg-emerald-50 border-emerald-100', desc: 'Monthly compensation' },
     { name: 'Tasks & Reports', path: '/hr/tasks-reports', icon: ClipboardList, color: 'text-indigo-600 bg-indigo-50 border-indigo-100', desc: 'Work verification' },

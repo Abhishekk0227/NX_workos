@@ -126,6 +126,8 @@ router.post('/generate', async (req, res, next) => {
             existing.lateDeduction = calculated.lateDeduction;
             existing.halfDays = calculated.halfDays;
             existing.halfDayDeduction = calculated.halfDayDeduction;
+            existing.shortAttendanceDays = calculated.shortAttendanceDays;
+            existing.shortAttendanceDeduction = calculated.shortAttendanceDeduction;
             existing.shortfallDeduction = calculated.shortfallDeduction;
             existing.lwpDeduction = calculated.lwpDeduction;
             existing.deductionBreakdown = calculated.deductionBreakdown;
@@ -153,6 +155,8 @@ router.post('/generate', async (req, res, next) => {
               lateDeduction: calculated.lateDeduction,
               halfDays: calculated.halfDays,
               halfDayDeduction: calculated.halfDayDeduction,
+              shortAttendanceDays: calculated.shortAttendanceDays,
+              shortAttendanceDeduction: calculated.shortAttendanceDeduction,
               shortfallDeduction: calculated.shortfallDeduction,
               lwpDeduction: calculated.lwpDeduction,
               deductionBreakdown: calculated.deductionBreakdown,
@@ -287,6 +291,46 @@ router.get('/leaves-review', async (req, res, next) => {
       month,
       count: leaves.length,
       leaves
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * GET /api/payroll/short-attendance-review
+ * Review all short attendance sessions for the given month before or during payroll
+ */
+router.get('/short-attendance-review', async (req, res, next) => {
+  try {
+    const { month } = req.query;
+    if (!month || !/^\d{4}-\d{2}$/.test(month)) {
+      return res.status(400).json({ success: false, message: 'Valid month (YYYY-MM) is required' });
+    }
+
+    const Attendance = require('../models/Attendance');
+    const calendarDays = PayrollService.getDaysInMonth(month);
+    const startStr = `${month}-01`;
+    const endStr = `${month}-${String(calendarDays).padStart(2, '0')}`;
+
+    const records = await Attendance.find({
+      date: { $gte: startStr, $lte: endStr },
+      $or: [
+        { status: 'Short Attendance' },
+        { 'shortAttendanceAlert.isAlert': true },
+        { 'shortAttendanceAlert.status': { $in: ['Pending', 'Resolved'] } }
+      ]
+    })
+      .populate('employee', 'employeeId fullName department designation salary')
+      .populate('shift', 'name startTime endTime requiredHours fullDayWorkingHoursThreshold halfDayWorkingHoursThreshold')
+      .populate('shortAttendanceAlert.resolvedBy', 'name email')
+      .sort({ date: -1 });
+
+    res.json({
+      success: true,
+      month,
+      count: records.length,
+      records
     });
   } catch (err) {
     next(err);

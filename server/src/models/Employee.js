@@ -40,7 +40,7 @@ const employeeSchema = new mongoose.Schema(
     },
     employmentType: {
       type: String,
-      enum: ['Full-Time', 'Full-time', 'Part-Time', 'Part-time', 'Intern', 'Contract'],
+      enum: ['Full-Time', 'Full-time', 'Part-Time', 'Part-time', 'Intern', 'Internship', 'Contract'],
       default: 'Full-time'
     },
     joiningDate: {

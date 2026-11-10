@@ -5,6 +5,7 @@ const LeaveRequest = require('../models/LeaveRequest');
 const Employee = require('../models/Employee');
 const ShiftTemplate = require('../models/ShiftTemplate');
 const SystemSetting = require('../models/SystemSetting');
+const Holiday = require('../models/Holiday');
 
 class PayrollService {
   /**
@@ -42,7 +43,6 @@ class PayrollService {
 
   /**
    * Calculate payroll for a single employee for a specific month (YYYY-MM)
-   * Integrates Conditions 11-24, 47-66, and Employee Joining Date boundary
    */
   static async calculateEmployeePayroll(employeeId, month) {
     const employee = await Employee.findById(employeeId).populate('assignedShift');
@@ -70,15 +70,15 @@ class PayrollService {
     }
 
     const calendarDays = this.getDaysInMonth(month);
+    const [year] = month.split('-');
     const startStr = `${month}-01`;
     const endStr = `${month}-${String(calendarDays).padStart(2, '0')}`;
 
-    // Employee joining date boundary check (Condition: No payroll/attendance before joining date)
+    // Employee joining date boundary check
     const joinRaw = employee.joiningDate || employee.createdAt;
     const joinDateStr = joinRaw ? (typeof joinRaw === 'string' ? joinRaw.slice(0, 10) : new Date(joinRaw).toISOString().slice(0, 10)) : null;
 
     if (joinDateStr && joinDateStr > endStr) {
-      // Employee joined in a future month! Zero days & zero salary for this month.
       return {
         month,
         employee: employee._id,
@@ -99,12 +99,15 @@ class PayrollService {
         perMinuteRate: 0,
         paidLeaveDays: 0,
         weeklyOffDays: 0,
+        holidayDays: 0,
         lwpDays: 0,
+        shortAttendanceDays: 0,
         unmarkedDays: 0,
         incompleteDays: 0,
         perDayRate: 0,
         lateDeduction: 0,
         halfDayDeduction: 0,
+        shortAttendanceDeduction: 0,
         lwpDeduction: 0,
         shortfallDeduction: 0,
         deductionBreakdown: [],
@@ -119,7 +122,7 @@ class PayrollService {
     const activeStartDay = isMidMonthJoiner ? parseInt(joinDateStr.split('-')[2], 10) : 1;
     const effectiveActiveDays = calendarDays - activeStartDay + 1;
 
-    // Get attendance records in month (strictly from active start date)
+    // Get attendance records in month
     const effectiveStartStr = `${month}-${String(activeStartDay).padStart(2, '0')}`;
     const attendanceRecords = await Attendance.find({
       employee: employeeId,
@@ -130,25 +133,81 @@ class PayrollService {
     let lateDays = 0;
     let incompleteDays = 0;
     let halfDays = 0;
+    let shortAttendanceDays = 0;
+    let holidayDays = 0;
+    let shortAttendanceAdjustmentDeduction = 0;
     let totalLateMinutes = 0;
 
     for (const att of attendanceRecords) {
-      if (att.status === 'Present') {
+      const s = att.status;
+      if (s === 'Full Day' || s === 'Present') {
         presentDays++;
-      } else if (att.status === 'Late') {
+      } else if (s === 'Late') {
         presentDays++;
         lateDays++;
-      } else if (att.status === 'Half Day' || att.status === 'Half-day') {
+      } else if (s === 'Half Day' || s === 'Half-day') {
         halfDays++;
-      } else if (att.status === 'Incomplete') {
+      } else if (s === 'Short Attendance') {
+        shortAttendanceDays++;
+        // If HR has resolved with specific payable or deduction amount
+        if (att.shortAttendanceAlert?.status === 'Resolved') {
+          if (att.shortAttendanceAlert.deductionAmount > 0) {
+            shortAttendanceAdjustmentDeduction += att.shortAttendanceAlert.deductionAmount;
+          }
+        }
+      } else if (s === 'Holiday') {
+        holidayDays++;
+      } else if (s === 'Working on Holiday') {
+        presentDays++;
+        holidayDays++;
+      } else if (s === 'Incomplete') {
         incompleteDays++;
       }
 
-      // Late minutes are deducted if not already deducted as half day
-      if (att.status !== 'Half Day' && att.status !== 'Half-day') {
+      // Late minutes deducted if not already deducted as half day or short attendance
+      if (s !== 'Half Day' && s !== 'Half-day' && s !== 'Short Attendance') {
         if (att.lateMinutes > 0) {
           totalLateMinutes += att.lateMinutes;
         }
+      }
+    }
+
+    // Fetch official holidays for this month to ensure unscheduled/unpunched holidays are paid & not deducted as Absent
+    const monthPadded = month.slice(5); // "MM"
+    const officialHolidays = await Holiday.find({
+      $or: [
+        { date: { $regex: new RegExp(`^${month}`) } },
+        { isRecurring: true, date: { $regex: new RegExp(`-${monthPadded}-`) } }
+      ]
+    });
+
+    const applicableHolidayDates = new Set();
+    for (const h of officialHolidays) {
+      let isApplicable = false;
+      if (h.applicability === 'All') isApplicable = true;
+      else if (h.applicability === 'Department' && employee.department && h.applicableDepartments?.includes(employee.department)) {
+        isApplicable = true;
+      } else if (h.applicability === 'Shift' && employee.assignedShift) {
+        const sId = employee.assignedShift._id ? employee.assignedShift._id.toString() : employee.assignedShift.toString();
+        if (h.applicableShifts?.some(s => s.toString() === sId)) isApplicable = true;
+      } else if (h.applicability === 'Custom' && h.applicableEmployees?.some(e => e.toString() === employee._id.toString())) {
+        isApplicable = true;
+      }
+
+      if (isApplicable) {
+        const hDateStr = h.isRecurring ? `${year}-${h.date.slice(5)}` : h.date;
+        const dayOfWeek = new Date(hDateStr + 'T12:00:00+05:30').getDay();
+        // Exclude if it falls on Sunday (already covered under weeklyOffDays)
+        if (dayOfWeek !== 0) {
+          applicableHolidayDates.add(hDateStr);
+        }
+      }
+    }
+
+    for (const hDate of applicableHolidayDates) {
+      const existingAtt = attendanceRecords.find(att => att.date === hDate);
+      if (!existingAtt) {
+        holidayDays++;
       }
     }
 
@@ -172,20 +231,15 @@ class PayrollService {
       lwpDays += lwp;
     }
 
-    // Policy Rule: Full month salary is based on "all days - sundays" (WorkingDays)
+    // Sundays & working days
     const totalMonthSundays = this.getSundaysInRange(month, 1, calendarDays);
     const totalMonthWorkingDays = Math.max(1, calendarDays - totalMonthSundays);
 
-    // Active employment Sundays and active working days (for mid-month joiners)
     const activeSundays = this.getSundaysInRange(month, activeStartDay, calendarDays);
     const activeWorkingDays = Math.max(0, effectiveActiveDays - activeSundays);
     const weeklyOffDays = activeSundays;
 
-    // Calculate unmarked / unexcused days during active employment duration
-    const totalAccountedDays = presentDays + halfDays + incompleteDays + paidLeaveDays + lwpDays;
-    const unmarkedDays = Math.max(0, activeWorkingDays - totalAccountedDays);
-
-    // Compute Base Rates: Company standard is "all days - sundays" (WorkingDays)
+    // Base rates
     const fullMonthlyGross = salaryProfile.monthlyGrossSalary;
     let perDayRate = 0;
 
@@ -195,39 +249,59 @@ class PayrollService {
     } else if (rateBasis === 'CalendarDays') {
       perDayRate = parseFloat((fullMonthlyGross / calendarDays).toFixed(2));
     } else {
-      // Default & Standard Policy: WorkingDays (all days - sundays)
       perDayRate = parseFloat((fullMonthlyGross / totalMonthWorkingDays).toFixed(2));
     }
 
-    // Mid-month joiner prorated gross (based on active working days vs total working days)
     const grossSalary = isMidMonthJoiner
       ? parseFloat(((fullMonthlyGross / totalMonthWorkingDays) * activeWorkingDays).toFixed(2))
       : fullMonthlyGross;
 
-    // Shift Hours & Per-Minute Rate (10:00 to 18:00 = 8 hours = 480 mins)
-    const shiftHours = employee.assignedShift?.requiredHours || settings?.defaultRequiredHours || 8;
+    const shiftHours = employee.assignedShift?.fullDayWorkingHoursThreshold || employee.assignedShift?.requiredHours || settings?.defaultRequiredHours || 8;
     const shiftMinutes = Math.max(60, shiftHours * 60);
     const perMinuteRate = parseFloat((perDayRate / shiftMinutes).toFixed(4));
 
-    // Deduction 1: Late Arrival (Per-minute rate deduction)
+    // Deduction 1: Late Arrival
     const enableLateDeduction = settings ? settings.enableLateDeduction !== false : true;
     const lateDeduction = enableLateDeduction && totalLateMinutes > 0
       ? parseFloat((totalLateMinutes * perMinuteRate).toFixed(2))
       : 0;
 
-    // Deduction 2: Half-Day Deduction (< 6 hours worked = 50% day salary deduction)
+    // Deduction 2: Half-Day (50% day salary deduction)
     const halfDayDeductionPct = settings?.halfDayDeductionPercentage || 50;
     const halfDayRate = perDayRate * (halfDayDeductionPct / 100);
     const halfDayDeduction = halfDays > 0
       ? parseFloat((halfDays * halfDayRate).toFixed(2))
       : 0;
 
-    // Deduction 3: LWP / Unpaid Leaves
+    // Deduction 3: Short Attendance (Unresolved short attendance counts as absent deduction unless resolved by HR)
+    let shortAttendanceDeduction = 0;
+    for (const att of attendanceRecords) {
+      if (att.status === 'Short Attendance') {
+        if (att.shortAttendanceAlert?.status === 'Resolved') {
+          if (att.shortAttendanceAlert.deductionAmount > 0) {
+            shortAttendanceDeduction += att.shortAttendanceAlert.deductionAmount;
+          } else if (att.shortAttendanceAlert.payableAmount > 0) {
+            shortAttendanceDeduction += Math.max(0, perDayRate - att.shortAttendanceAlert.payableAmount);
+          } else if (att.shortAttendanceAlert.hrClassification === 'Half Day') {
+            shortAttendanceDeduction += halfDayRate;
+          } else if (att.shortAttendanceAlert.hrClassification === 'Full Day') {
+            // Pardoned - 0 deduction
+          } else {
+            // HR resolved with 0 deduction
+          }
+        } else {
+          // If unresolved by HR, default to 1 day rate deduction
+          shortAttendanceDeduction += perDayRate;
+        }
+      }
+    }
+    shortAttendanceDeduction = parseFloat(shortAttendanceDeduction.toFixed(2));
+
+    // Deduction 4: LWP
     const lwpDeduction = lwpDays > 0
       ? parseFloat((lwpDays * perDayRate).toFixed(2))
       : 0;
 
-    // Overtime (> 8 hours): No extra salary added (per user policy)
     const shortfallDeduction = 0;
 
     // Build Itemized Deduction Breakdown
@@ -246,6 +320,13 @@ class PayrollService {
         amount: halfDayDeduction
       });
     }
+    if (shortAttendanceDeduction > 0) {
+      deductionBreakdown.push({
+        type: 'Short_Attendance',
+        description: `Short Attendance (${shortAttendanceDays} session(s) adjustment/deduction)`,
+        amount: shortAttendanceDeduction
+      });
+    }
     if (lwpDeduction > 0) {
       deductionBreakdown.push({
         type: 'LWP',
@@ -254,12 +335,14 @@ class PayrollService {
       });
     }
 
-    // Payable Days & Final Net Pay
-    const totalDeductions = parseFloat((lateDeduction + halfDayDeduction + lwpDeduction + shortfallDeduction).toFixed(2));
+    const totalAccountedDays = presentDays + halfDays + incompleteDays + paidLeaveDays + lwpDays + holidayDays;
+    const unmarkedDays = Math.max(0, activeWorkingDays - totalAccountedDays);
+
+    const totalDeductions = parseFloat((lateDeduction + halfDayDeduction + shortAttendanceDeduction + lwpDeduction + shortfallDeduction).toFixed(2));
     const netPayable = Math.max(0, parseFloat((grossSalary - totalDeductions).toFixed(2)));
     const payableDays = Math.min(
       effectiveActiveDays,
-      parseFloat((presentDays + (halfDays * (1 - halfDayDeductionPct / 100)) + paidLeaveDays + weeklyOffDays).toFixed(2))
+      parseFloat((presentDays + (halfDays * (1 - halfDayDeductionPct / 100)) + paidLeaveDays + weeklyOffDays + holidayDays).toFixed(2))
     );
 
     return {
@@ -281,6 +364,8 @@ class PayrollService {
       payableDays,
       presentDays,
       halfDays,
+      shortAttendanceDays,
+      holidayDays,
       lateDays,
       totalLateMinutes,
       perMinuteRate,
@@ -292,6 +377,7 @@ class PayrollService {
       perDayRate,
       lateDeduction,
       halfDayDeduction,
+      shortAttendanceDeduction,
       lwpDeduction,
       shortfallDeduction,
       deductionBreakdown,

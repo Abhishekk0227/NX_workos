@@ -11,27 +11,34 @@ import {
   MoreHorizontal,
   Bell,
   Megaphone,
-  LayoutGrid
+  LayoutGrid,
+  CalendarDays,
+  BarChart3,
+  Clock
 } from 'lucide-react';
 import Header from '../common/Header';
 import { useAuth } from '../../context/AuthContext';
 import { useNotifications } from '../../context/NotificationContext';
 import NotificationDrawer from '../modals/NotificationDrawer';
+import ReminderModal from '../modals/ReminderModal';
 
 export default function HRLayout() {
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showReminders, setShowReminders] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const { unreadCount } = useNotifications();
 
-  // Navigation Items matching hrpanelD.png + Broadcast
+  // Navigation Items matching hrpanelD.png + Broadcast + Holidays & Reports
   const navItems = [
     { name: 'Dashboard', path: '/hr/dashboard', icon: LayoutDashboard },
     { name: 'Employees', path: '/hr/employees', icon: Users },
     { name: 'Attendance', path: '/hr/attendance', icon: CalendarCheck },
+    { name: 'Holiday Calendar', path: '/hr/holidays', icon: CalendarDays },
     { name: 'Leave Management', path: '/hr/leave', icon: CalendarOff },
     { name: 'Tasks & Reports', path: '/hr/tasks-reports', icon: ClipboardList },
+    { name: 'Reports & Analytics', path: '/hr/reports', icon: BarChart3 },
     { name: 'Payroll', path: '/hr/payroll', icon: CreditCard },
     { name: 'Broadcast / Notice', path: '/hr/broadcast', icon: Megaphone },
     { name: 'Roles & Settings', path: '/hr/settings', icon: Settings },
@@ -105,6 +112,13 @@ export default function HRLayout() {
 
           <div className="flex items-center gap-2.5">
             <button
+              onClick={() => setShowReminders(true)}
+              className="p-1 text-slate-300 hover:text-white cursor-pointer"
+              title="Reminders & Alarms"
+            >
+              <Clock className="w-5 h-5" />
+            </button>
+            <button
               onClick={() => setShowNotifications(true)}
               className="relative p-1 text-slate-300 hover:text-white cursor-pointer"
             >
@@ -161,6 +175,10 @@ export default function HRLayout() {
       <NotificationDrawer
         isOpen={showNotifications}
         onClose={() => setShowNotifications(false)}
+      />
+      <ReminderModal
+        isOpen={showReminders}
+        onClose={() => setShowReminders(false)}
       />
     </div>
   );

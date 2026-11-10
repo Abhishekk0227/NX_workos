@@ -5,6 +5,7 @@ import {
   CheckSquare,
   Clock,
   CalendarDays,
+  CalendarOff,
   User,
   X,
   Menu,
@@ -15,10 +16,12 @@ import Header from '../common/Header';
 import { useAuth } from '../../context/AuthContext';
 import { useNotifications } from '../../context/NotificationContext';
 import NotificationDrawer from '../modals/NotificationDrawer';
+import ReminderModal from '../modals/ReminderModal';
 
 export default function EmployeeLayout() {
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showReminders, setShowReminders] = useState(false);
   const location = useLocation();
   const { user } = useAuth();
   const { unreadCount } = useNotifications();
@@ -32,12 +35,13 @@ export default function EmployeeLayout() {
     { name: 'Profile', path: '/employee/profile', icon: User },
   ];
 
-  // Sidebar Menu Navigation (Includes Notices / Announcements)
+  // Sidebar Menu Navigation (Includes Notices / Announcements & Holidays)
   const sidebarNavItems = [
     { name: 'Home', path: '/employee/home', icon: Home },
     { name: 'Tasks', path: '/employee/tasks', icon: CheckSquare },
     { name: 'Attendance', path: '/employee/attendance', icon: Clock },
-    { name: 'Leave', path: '/employee/leave', icon: CalendarDays },
+    { name: 'Holiday Calendar', path: '/employee/holidays', icon: CalendarDays },
+    { name: 'Leave', path: '/employee/leave', icon: CalendarOff },
     { name: 'Notice Board', path: '/employee/notices', icon: Megaphone },
     { name: 'Profile', path: '/employee/profile', icon: User },
   ];
@@ -123,6 +127,13 @@ export default function EmployeeLayout() {
 
           <div className="flex items-center gap-2.5">
             <button
+              onClick={() => setShowReminders(true)}
+              className="p-1 text-slate-300 hover:text-white"
+              title="Reminders & Alarms"
+            >
+              <Clock className="w-5 h-5" />
+            </button>
+            <button
               onClick={() => setShowNotifications(true)}
               className="relative p-1 text-slate-300 hover:text-white"
             >
@@ -180,6 +191,10 @@ export default function EmployeeLayout() {
       <NotificationDrawer
         isOpen={showNotifications}
         onClose={() => setShowNotifications(false)}
+      />
+      <ReminderModal
+        isOpen={showReminders}
+        onClose={() => setShowReminders(false)}
       />
     </div>
   );

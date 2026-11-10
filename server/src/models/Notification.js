@@ -26,7 +26,18 @@ const notificationSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ['Attendance', 'Leave', 'Task', 'Payroll', 'Correction', 'System'],
+      enum: [
+        'Attendance',
+        'Short Attendance',
+        'Auto Punch-Out',
+        'Leave',
+        'Task',
+        'Reminder',
+        'Holiday',
+        'Payroll',
+        'Correction',
+        'System'
+      ],
       default: 'System'
     },
     link: {

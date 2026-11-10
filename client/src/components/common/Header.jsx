@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
-import { Bell, Search, ChevronDown, LogOut, User, Shield, Menu, Radio } from 'lucide-react';
+import { Bell, Search, ChevronDown, LogOut, User, Shield, Menu, Radio, Clock } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useNotifications } from '../../context/NotificationContext';
 import NotificationDrawer from '../modals/NotificationDrawer';
+import ReminderModal from '../modals/ReminderModal';
 import PwaInstallButton from './PwaInstallButton';
 
 export default function Header({ onToggleMobileNav, searchPlaceholder = 'Search anything...' }) {
   const { user, logout } = useAuth();
   const { unreadCount } = useNotifications();
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showReminders, setShowReminders] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
 
   const emp = user?.employee;
@@ -47,6 +49,15 @@ export default function Header({ onToggleMobileNav, searchPlaceholder = 'Search 
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           {/* PWA Download / Install App Button */}
           <PwaInstallButton />
+
+          {/* Reminders & Alarms */}
+          <button
+            onClick={() => setShowReminders(true)}
+            className="p-2 text-slate-600 hover:text-blue-700 hover:bg-blue-50 rounded-xl transition cursor-pointer"
+            title="Reminders & Alarms"
+          >
+            <Clock className="w-5 h-5" />
+          </button>
 
           {/* Notification Bell with Badge */}
           <button
@@ -111,6 +122,11 @@ export default function Header({ onToggleMobileNav, searchPlaceholder = 'Search 
       <NotificationDrawer
         isOpen={showNotifications}
         onClose={() => setShowNotifications(false)}
+      />
+
+      <ReminderModal
+        isOpen={showReminders}
+        onClose={() => setShowReminders(false)}
       />
     </>
   );

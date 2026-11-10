@@ -15,7 +15,13 @@ import {
   FileText,
   Clock,
   MoreVertical,
-  Check
+  Check,
+  ChevronDown,
+  ChevronUp,
+  MessageSquare,
+  Send,
+  Flame,
+  AlertCircle
 } from 'lucide-react';
 import api from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
@@ -41,13 +47,20 @@ export default function EmployeeTasks() {
   const [showModal, setShowModal] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
   const [savingTask, setSavingTask] = useState(false);
+  const [expandedTaskId, setExpandedTaskId] = useState(null);
+  const [newSubtaskInputs, setNewSubtaskInputs] = useState({});
+  const [newCommentInputs, setNewCommentInputs] = useState({});
+
   const [form, setForm] = useState({
     title: '',
     description: '',
+    category: 'General',
     priority: 'Medium',
     taskType: 'Personal',
     employeeId: '',
-    dueDate: new Date().toISOString().split('T')[0]
+    startDate: new Date().toISOString().split('T')[0],
+    dueDate: new Date().toISOString().split('T')[0],
+    subtasks: ['']
   });
 
   const fetchEmployees = async () => {
@@ -97,10 +110,13 @@ export default function EmployeeTasks() {
     setForm({
       title: '',
       description: '',
+      category: 'General',
       priority: 'Medium',
       taskType: activeTab === 'hr' ? 'HR_Assigned' : 'Personal',
       employeeId: empList.length > 0 ? empList[0]._id : '',
-      dueDate: new Date().toISOString().split('T')[0]
+      startDate: new Date().toISOString().split('T')[0],
+      dueDate: new Date().toISOString().split('T')[0],
+      subtasks: ['']
     });
     setShowModal(true);
   };
@@ -110,9 +126,11 @@ export default function EmployeeTasks() {
     setForm({
       title: task.title,
       description: task.description || '',
+      category: task.category || 'General',
       priority: task.priority || 'Medium',
       taskType: task.taskType || 'Personal',
-      dueDate: task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : ''
+      dueDate: task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : '',
+      subtasks: task.subtasks?.map(s => s.title) || ['']
     });
     setActiveMenuId(null);
     setShowModal(true);
@@ -124,12 +142,15 @@ export default function EmployeeTasks() {
 
     setSavingTask(true);
     try {
+      const cleanedSubtasks = (form.subtasks || []).map(s => typeof s === 'string' ? s.trim() : s?.title?.trim()).filter(Boolean);
+      const payload = { ...form, subtasks: cleanedSubtasks };
+
       if (editingTask) {
-        await api.put(`/tasks/${editingTask._id}`, form);
+        await api.put(`/tasks/${editingTask._id}`, payload);
       } else if (user?.role === 'HR' && form.employeeId) {
-        await api.post('/tasks/assign', form);
+        await api.post('/tasks/assign', payload);
       } else {
-        await api.post('/tasks/personal', form);
+        await api.post('/tasks', payload);
       }
       setShowModal(false);
       if (form.taskType === 'HR_Assigned') {
@@ -145,14 +166,51 @@ export default function EmployeeTasks() {
     }
   };
 
-  const handleToggleStatus = async (taskId, currentStatus) => {
-    const nextStatus = currentStatus === 'Completed' ? 'Pending' : 'Completed';
+  const handleToggleSubtask = async (taskId, subtaskId) => {
     try {
-      await api.patch(`/tasks/${taskId}/status`, { status: nextStatus });
+      await api.patch(`/tasks/${taskId}/subtasks/${subtaskId}`);
       fetchTasks();
     } catch (err) {
-      console.error(err);
+      console.error('Failed to toggle subtask:', err);
     }
+  };
+
+  const handleAddSubtask = async (taskId) => {
+    const title = (newSubtaskInputs[taskId] || '').trim();
+    if (!title) return;
+    try {
+      await api.post(`/tasks/${taskId}/subtasks`, { title });
+      setNewSubtaskInputs(prev => ({ ...prev, [taskId]: '' }));
+      fetchTasks();
+    } catch (err) {
+      console.error('Failed to add subtask:', err);
+    }
+  };
+
+  const handleAddComment = async (taskId) => {
+    const text = (newCommentInputs[taskId] || '').trim();
+    if (!text) return;
+    try {
+      await api.post(`/tasks/${taskId}/updates`, { text });
+      setNewCommentInputs(prev => ({ ...prev, [taskId]: '' }));
+      fetchTasks();
+    } catch (err) {
+      console.error('Failed to post update:', err);
+    }
+  };
+
+  const handleStatusSelect = async (taskId, status) => {
+    try {
+      await api.patch(`/tasks/${taskId}/status`, { status });
+      fetchTasks();
+    } catch (err) {
+      console.error('Failed to update status:', err);
+    }
+  };
+
+  const handleToggleStatus = async (taskId, currentStatus) => {
+    const nextStatus = currentStatus === 'Completed' ? 'In Progress' : 'Completed';
+    handleStatusSelect(taskId, nextStatus);
   };
 
   const handleDelete = async (taskId) => {
@@ -383,29 +441,32 @@ export default function EmployeeTasks() {
         ) : (
           filteredTasks.map((task) => {
             const isCompleted = task.status === 'Completed';
+            const isExpanded = expandedTaskId === task._id;
 
-            // Progress estimation for visual bar matching mockup
-            let progressPercent = 0;
-            if (task.status === 'Completed') progressPercent = 100;
-            else if (task.status === 'In Progress') progressPercent = 50;
-            else if (task.status === 'Pending') progressPercent = 25;
-            else progressPercent = 10;
+            // Dynamic progress calculation based on subtasks or percentage
+            const totalSubtasks = task.subtasks?.length || 0;
+            const completedSubtasks = task.subtasks?.filter(s => s.isCompleted).length || 0;
+            const progressPercent = task.progressPercentage ?? (totalSubtasks > 0 ? Math.round((completedSubtasks / totalSubtasks) * 100) : (isCompleted ? 100 : (task.status === 'In Progress' ? 50 : 10)));
 
             const priorityBadgeClass =
-              task.priority === 'High'
-                ? 'bg-rose-50 text-rose-600'
+              task.priority === 'Urgent'
+                ? 'bg-red-500 text-white font-extrabold shadow-xs'
+                : task.priority === 'High'
+                ? 'bg-rose-50 text-rose-600 border border-rose-200'
                 : task.priority === 'Medium'
-                ? 'bg-amber-50 text-amber-600'
-                : 'bg-emerald-50 text-emerald-600';
+                ? 'bg-amber-50 text-amber-600 border border-amber-200'
+                : 'bg-emerald-50 text-emerald-600 border border-emerald-200';
 
             const statusBadgeClass =
               task.status === 'Completed'
-                ? 'bg-emerald-50 text-emerald-700'
+                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                 : task.status === 'In Progress'
-                ? 'bg-blue-50 text-blue-600'
-                : task.status === 'New'
-                ? 'bg-sky-50 text-sky-600'
-                : 'bg-amber-50 text-amber-700';
+                ? 'bg-blue-50 text-blue-600 border border-blue-200'
+                : task.status === 'Overdue'
+                ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                : task.status === 'On Hold'
+                ? 'bg-purple-50 text-purple-700 border border-purple-200'
+                : 'bg-sky-50 text-sky-600 border border-sky-200';
 
             return (
               <div
@@ -427,17 +488,30 @@ export default function EmployeeTasks() {
                       {isCompleted && <Check className="w-3 h-3 stroke-[3]" />}
                     </button>
 
-                    <h3
-                      className={`text-sm font-bold truncate leading-tight ${
-                        isCompleted ? 'line-through text-slate-400' : 'text-slate-900'
-                      }`}
-                    >
-                      {task.title}
-                    </h3>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        {task.category && (
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-slate-100 text-slate-600">
+                            {task.category}
+                          </span>
+                        )}
+                        <h3
+                          className={`text-sm font-bold truncate leading-tight ${
+                            isCompleted ? 'line-through text-slate-400' : 'text-slate-900'
+                          }`}
+                        >
+                          {task.title}
+                        </h3>
+                      </div>
+                      {task.description && (
+                        <p className="text-[11px] text-slate-500 truncate mt-0.5">{task.description}</p>
+                      )}
+                    </div>
                   </div>
 
                   <div className="flex items-center gap-2 shrink-0">
-                    <span className={`px-2.5 py-0.5 rounded-md text-[10px] font-bold ${priorityBadgeClass}`}>
+                    <span className={`px-2.5 py-0.5 rounded-md text-[10px] font-bold flex items-center gap-1 ${priorityBadgeClass}`}>
+                      {task.priority === 'Urgent' && <Flame className="w-3 h-3 animate-pulse" />}
                       {task.priority || 'Medium'}
                     </span>
 
@@ -479,7 +553,7 @@ export default function EmployeeTasks() {
                   </div>
                 </div>
 
-                {/* Row 2: Metadata (Project, Due Date, Status Pill) */}
+                {/* Row 2: Metadata (Project, Due Date, Status Pill, Progress Ratio) */}
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-2.5 text-xs text-slate-500">
                   <div className="flex items-center gap-1.5 font-medium text-slate-700">
                     <Layers className="w-3.5 h-3.5 text-slate-400 shrink-0" />
@@ -495,7 +569,10 @@ export default function EmployeeTasks() {
                     </span>
                   </div>
 
-                  <div className="ml-auto">
+                  <div className="flex items-center gap-2 ml-auto">
+                    <span className="text-[10px] font-bold text-slate-600">
+                      {totalSubtasks > 0 ? `${completedSubtasks}/${totalSubtasks} steps (${progressPercent}%)` : `${progressPercent}%`}
+                    </span>
                     <span className={`px-2.5 py-0.5 rounded-md text-[10px] font-bold ${statusBadgeClass}`}>
                       {task.status || 'New'}
                     </span>
@@ -511,6 +588,145 @@ export default function EmployeeTasks() {
                     style={{ width: `${progressPercent}%` }}
                   />
                 </div>
+
+                {/* Expandable Subtasks & Work Updates Button */}
+                <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={() => setExpandedTaskId(isExpanded ? null : task._id)}
+                    className="text-[11px] font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 cursor-pointer"
+                  >
+                    <ListChecks className="w-3.5 h-3.5" />
+                    <span>
+                      {totalSubtasks > 0 ? `Subtasks (${completedSubtasks}/${totalSubtasks})` : 'Checklist'}
+                      {task.updates?.length > 0 ? ` • ${task.updates.length} updates` : ''}
+                    </span>
+                    {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                  </button>
+
+                  {/* Quick status switch chips */}
+                  <div className="flex items-center gap-1">
+                    {['New', 'In Progress', 'On Hold', 'Completed'].map(st => (
+                      <button
+                        key={st}
+                        type="button"
+                        onClick={() => handleStatusSelect(task._id, st)}
+                        className={`px-2 py-0.5 text-[9px] rounded font-bold transition cursor-pointer ${
+                          task.status === st
+                            ? 'bg-slate-900 text-white'
+                            : 'bg-slate-50 text-slate-500 hover:bg-slate-100'
+                        }`}
+                      >
+                        {st}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Expanded Subtasks & Comments Drawer */}
+                {isExpanded && (
+                  <div className="mt-3 p-3 bg-slate-50/80 rounded-2xl border border-slate-200/80 space-y-3 animate-in fade-in duration-150">
+                    {/* Checklist section */}
+                    <div>
+                      <div className="text-[11px] font-bold text-slate-700 mb-1.5 flex items-center gap-1.5">
+                        <ListChecks className="w-3.5 h-3.5 text-blue-600" />
+                        Checklist Subtasks ({completedSubtasks}/{totalSubtasks})
+                      </div>
+
+                      {task.subtasks?.length === 0 ? (
+                        <p className="text-[11px] text-slate-400 italic">No subtasks added yet.</p>
+                      ) : (
+                        <div className="space-y-1.5">
+                          {task.subtasks.map((sub) => (
+                            <label
+                              key={sub._id}
+                              className="flex items-center gap-2 text-xs text-slate-700 bg-white p-2 rounded-xl border border-slate-100 cursor-pointer hover:bg-slate-50 transition"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={!!sub.isCompleted}
+                                onChange={() => handleToggleSubtask(task._id, sub._id)}
+                                className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500"
+                              />
+                              <span className={`flex-1 ${sub.isCompleted ? 'line-through text-slate-400 font-normal' : 'font-medium'}`}>
+                                {sub.title}
+                              </span>
+                            </label>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Add subtask inline input */}
+                      <div className="flex items-center gap-2 mt-2">
+                        <input
+                          type="text"
+                          placeholder="Add new subtask item..."
+                          value={newSubtaskInputs[task._id] || ''}
+                          onChange={(e) => setNewSubtaskInputs({ ...newSubtaskInputs, [task._id]: e.target.value })}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleAddSubtask(task._id);
+                            }
+                          }}
+                          className="flex-1 px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs outline-none focus:ring-1 focus:ring-blue-500"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleAddSubtask(task._id)}
+                          className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition cursor-pointer"
+                        >
+                          + Add
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Comments & Work Updates Section */}
+                    <div className="pt-2 border-t border-slate-200/80">
+                      <div className="text-[11px] font-bold text-slate-700 mb-1.5 flex items-center gap-1.5">
+                        <MessageSquare className="w-3.5 h-3.5 text-blue-600" />
+                        Work Updates & Notes ({task.updates?.length || 0})
+                      </div>
+
+                      {task.updates?.length > 0 && (
+                        <div className="space-y-1.5 max-h-36 overflow-y-auto mb-2">
+                          {task.updates.map((up, idx) => (
+                            <div key={idx} className="bg-white p-2 rounded-xl border border-slate-100 text-xs">
+                              <div className="flex items-center justify-between text-[10px] text-slate-400 mb-0.5">
+                                <span className="font-bold text-slate-700">{up.authorName || 'Staff'}</span>
+                                <span>{new Date(up.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                              </div>
+                              <p className="text-slate-800">{up.text}</p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          placeholder="Post a progress update or remark..."
+                          value={newCommentInputs[task._id] || ''}
+                          onChange={(e) => setNewCommentInputs({ ...newCommentInputs, [task._id]: e.target.value })}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleAddComment(task._id);
+                            }
+                          }}
+                          className="flex-1 px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs outline-none focus:ring-1 focus:ring-blue-500"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleAddComment(task._id)}
+                          className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold flex items-center gap-1 transition cursor-pointer"
+                        >
+                          <Send className="w-3 h-3" /> Post
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })
@@ -570,16 +786,42 @@ export default function EmployeeTasks() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
+                  <label className="block font-bold text-slate-700 mb-1">Category</label>
+                  <select
+                    value={form.category || 'General'}
+                    onChange={(e) => setForm({ ...form, category: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+                  >
+                    {['General', 'Development', 'Design', 'Marketing', 'Operations', 'Finance', 'Support', 'Quality'].map(cat => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
                   <label className="block font-bold text-slate-700 mb-1">Priority</label>
                   <select
                     value={form.priority}
                     onChange={(e) => setForm({ ...form, priority: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold"
                   >
-                    <option value="Low">Low</option>
-                    <option value="Medium">Medium</option>
+                    <option value="Urgent">🔥 Urgent</option>
                     <option value="High">High</option>
+                    <option value="Medium">Medium</option>
+                    <option value="Low">Low</option>
                   </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Start Date</label>
+                  <input
+                    type="date"
+                    value={form.startDate || new Date().toISOString().split('T')[0]}
+                    onChange={(e) => setForm({ ...form, startDate: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+                  />
                 </div>
 
                 <div>
@@ -592,6 +834,51 @@ export default function EmployeeTasks() {
                   />
                 </div>
               </div>
+
+              {/* Subtasks Builder in Modal */}
+              {!editingTask && (
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="font-bold text-slate-700">Checklist Subtasks ({form.subtasks?.length || 0})</label>
+                    <button
+                      type="button"
+                      onClick={() => setForm({ ...form, subtasks: [...(form.subtasks || []), ''] })}
+                      className="text-[11px] text-blue-600 font-bold hover:underline cursor-pointer"
+                    >
+                      + Add Step
+                    </button>
+                  </div>
+                  <div className="space-y-1.5 max-h-32 overflow-y-auto">
+                    {form.subtasks?.map((sub, idx) => (
+                      <div key={idx} className="flex items-center gap-1.5">
+                        <input
+                          type="text"
+                          placeholder={`Step ${idx + 1}...`}
+                          value={sub}
+                          onChange={(e) => {
+                            const updated = [...form.subtasks];
+                            updated[idx] = e.target.value;
+                            setForm({ ...form, subtasks: updated });
+                          }}
+                          className="flex-1 px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:ring-1 focus:ring-blue-500"
+                        />
+                        {form.subtasks.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const updated = form.subtasks.filter((_, i) => i !== idx);
+                              setForm({ ...form, subtasks: updated });
+                            }}
+                            className="p-1 text-slate-400 hover:text-rose-500 rounded cursor-pointer"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {user?.role === 'HR' && !editingTask && (
                 <div>

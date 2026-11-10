@@ -13,7 +13,9 @@ import {
   Megaphone,
   DollarSign,
   ListFilter,
-  Info
+  Info,
+  AlarmClock,
+  PartyPopper
 } from 'lucide-react';
 import { useNotifications } from '../../context/NotificationContext';
 import { useAuth } from '../../context/AuthContext';

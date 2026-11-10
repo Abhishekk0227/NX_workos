@@ -262,6 +262,7 @@ router.get('/:id', protect, async (req, res, next) => {
 router.put('/:id', protect, authorize('HR'), async (req, res, next) => {
   try {
     const {
+      employeeId,
       fullName,
       mobileNumber,
       department,
@@ -279,6 +280,29 @@ router.put('/:id', protect, authorize('HR'), async (req, res, next) => {
     }
 
     const previousState = employee.toObject();
+    let idChanged = false;
+    const oldEmployeeId = employee.employeeId;
+
+    // Handle Employee ID modification (e.g. converting an Intern to full-time Employee)
+    if (employeeId && employeeId.trim()) {
+      const sanitizedId = employeeId.trim().toUpperCase();
+      if (sanitizedId !== employee.employeeId) {
+        const duplicate = await Employee.findOne({
+          employeeId: sanitizedId,
+          _id: { $ne: employee._id }
+        });
+
+        if (duplicate) {
+          return res.status(400).json({
+            success: false,
+            message: `Employee ID "${sanitizedId}" is already assigned to another employee (${duplicate.fullName}).`
+          });
+        }
+
+        employee.employeeId = sanitizedId;
+        idChanged = true;
+      }
+    }
 
     if (fullName) employee.fullName = fullName;
     if (mobileNumber) employee.mobileNumber = mobileNumber;
@@ -293,12 +317,14 @@ router.put('/:id', protect, authorize('HR'), async (req, res, next) => {
     await employee.save();
 
     await AuditLog.create({
-      action: 'EMPLOYEE_UPDATED',
+      action: idChanged ? 'EMPLOYEE_ID_CHANGED' : 'EMPLOYEE_UPDATED',
       entityType: 'Employee',
       entityId: employee._id,
       performedBy: req.user._id,
       performedByName: req.user.email,
-      reason: `Employee details updated for ${employee.employeeId}`,
+      reason: idChanged
+        ? `Employee ID changed from ${oldEmployeeId} to ${employee.employeeId} (Intern to Employee conversion)`
+        : `Employee details updated for ${employee.employeeId}`,
       previousState,
       newState: employee.toObject()
     });

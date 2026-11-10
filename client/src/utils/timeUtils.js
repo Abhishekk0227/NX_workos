@@ -49,6 +49,16 @@ export function formatDateIST(dateStr, timeZone = COMPANY_TIMEZONE) {
 }
 
 /**
+ * Formats a Date or timestamp string into full date & time (e.g. 08 Nov 2026, 02:30 PM)
+ */
+export function formatDateTimeIST(dateStr, timeZone = COMPANY_TIMEZONE) {
+  if (!dateStr) return '—';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return '—';
+  return `${formatDateIST(d, timeZone)}, ${formatTime12(d, timeZone)}`;
+}
+
+/**
  * Formats attendance working hours into "H:mm hrs" (e.g. "9:22 hrs")
  * Direct punchOut - punchIn difference
  */
@@ -88,4 +98,33 @@ export function formatWorkingHours(recordOrHours) {
   }
 
   return `${recordOrHours} hrs`;
+}
+
+/**
+ * Play a gentle alert audio chime via Web Audio API
+ */
+export function playReminderChime() {
+  try {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContext) return;
+    const ctx = new AudioContext();
+
+    const playTone = (freq, start, duration) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, ctx.currentTime + start);
+      gain.gain.setValueAtTime(0.15, ctx.currentTime + start);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + start + duration);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(ctx.currentTime + start);
+      osc.stop(ctx.currentTime + start + duration);
+    };
+
+    playTone(587.33, 0, 0.2); // D5
+    playTone(880, 0.15, 0.4);  // A5
+  } catch (err) {
+    console.warn('Reminder chime audio error:', err);
+  }
 }

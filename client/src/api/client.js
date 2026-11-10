@@ -2,12 +2,18 @@ import axios from 'axios';
 
 // Get API Base URL with seamless local dev & production fallback
 const getApiBaseUrl = () => {
+  if (import.meta.env.DEV) {
+    const localUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+    const cleaned = localUrl.replace(/\/$/, '');
+    // If VITE_API_URL points to Vercel, ignore it in DEV and use local backend port 5000
+    if (cleaned.includes('vercel.app')) {
+      return 'http://localhost:5000/api';
+    }
+    return cleaned.endsWith('/api') ? cleaned : `${cleaned}/api`;
+  }
   if (import.meta.env.VITE_API_URL) {
     const cleaned = import.meta.env.VITE_API_URL.replace(/\/$/, '');
     return cleaned.endsWith('/api') ? cleaned : `${cleaned}/api`;
-  }
-  if (import.meta.env.DEV) {
-    return 'http://localhost:5000/api';
   }
   return 'https://nx-workos-server.vercel.app/api';
 };
