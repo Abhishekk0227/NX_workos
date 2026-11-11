@@ -25,6 +25,11 @@ export default function EmployeeAttendance() {
   const [history, setHistory] = useState([]);
   const [holidays, setHolidays] = useState([]);
   const [todayAttendance, setTodayAttendance] = useState(null);
+  const [workHoursPolicy, setWorkHoursPolicy] = useState({
+    fullDayThresholdHours: 8,
+    halfDayThresholdHours: 4,
+    gracePeriodMinutes: 15
+  });
   const [loading, setLoading] = useState(true);
 
   // Calendar month state
@@ -52,10 +57,11 @@ export default function EmployeeAttendance() {
     try {
       const year = currentDate.getFullYear();
       const month = currentDate.getMonth() + 1;
-      const [todayRes, histRes, holRes] = await Promise.allSettled([
+      const [todayRes, histRes, holRes, setRes] = await Promise.allSettled([
         api.get('/attendance/today'),
         api.get(`/attendance/my-history?month=${selectedMonthParam}`),
-        api.get(`/holidays?year=${year}&month=${month}`)
+        api.get(`/holidays?year=${year}&month=${month}`),
+        api.get('/settings')
       ]);
 
       if (todayRes.status === 'fulfilled') {
@@ -66,6 +72,14 @@ export default function EmployeeAttendance() {
       }
       if (holRes.status === 'fulfilled') {
         setHolidays(holRes.value.data.holidays || []);
+      }
+      if (setRes.status === 'fulfilled' && setRes.value.data?.settings) {
+        const s = setRes.value.data.settings;
+        setWorkHoursPolicy({
+          fullDayThresholdHours: s.fullDayThresholdHours ?? s.defaultRequiredHours ?? 8,
+          halfDayThresholdHours: s.halfDayThresholdHours ?? 4,
+          gracePeriodMinutes: s.gracePeriodMinutes ?? 15
+        });
       }
     } catch (err) {
       console.error(err);
@@ -247,7 +261,7 @@ export default function EmployeeAttendance() {
                   </>
                 ) : isWorking ? (
                   <>
-                    <Clock className="w-3.5 h-3.5 text-blue-600" /> Shift Active
+                    <Clock className="w-3.5 h-3.5 text-blue-600" /> Working
                   </>
                 ) : (
                   <>
@@ -288,27 +302,27 @@ export default function EmployeeAttendance() {
             )}
           </div>
 
-          {/* Today's Shift Specs Card matching Screen 4 */}
+          {/* Working Hours Rules Card */}
           <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-3">
-            <h3 className="font-bold text-slate-900 text-sm">Today's Shift</h3>
+            <h3 className="font-bold text-slate-900 text-sm">Working Hours Policy</h3>
             <div className="space-y-2.5 text-xs">
               <div className="flex justify-between py-1.5 border-b border-slate-100">
-                <span className="text-slate-500">Shift Time</span>
-                <span className="font-bold text-slate-800">10:00 AM – 6:00 PM</span>
+                <span className="text-slate-500">Full Day Requirement</span>
+                <span className="font-bold text-emerald-700">&ge; {workHoursPolicy.fullDayThresholdHours} hours (100% Pay)</span>
               </div>
               <div className="flex justify-between py-1.5 border-b border-slate-100">
-                <span className="text-slate-500">Grace Time</span>
-                <span className="font-bold text-slate-800">10 minutes</span>
+                <span className="text-slate-500">Half Day Requirement</span>
+                <span className="font-bold text-amber-700">{workHoursPolicy.halfDayThresholdHours} to &lt; {workHoursPolicy.fullDayThresholdHours} hours (50% Pay)</span>
               </div>
               <div className="flex justify-between py-1.5 border-b border-slate-100">
-                <span className="text-slate-500">Working Hours</span>
+                <span className="text-slate-500">Logged Working Hours</span>
                 <span className="font-bold text-slate-800">
-                  {todayAttendance?.actualWorkingHours ? formatWorkingHours(todayAttendance) : '8 hours'}
+                  {todayAttendance?.actualWorkingHours ? formatWorkingHours(todayAttendance) : '0:00'}
                 </span>
               </div>
               <div className="flex justify-between py-1.5">
-                <span className="text-slate-500">Break Time</span>
-                <span className="font-bold text-slate-800">1 hour (Optional)</span>
+                <span className="text-slate-500">Grace Period</span>
+                <span className="font-bold text-slate-800">{workHoursPolicy.gracePeriodMinutes} minutes</span>
               </div>
             </div>
           </div>

@@ -260,12 +260,12 @@ export default function MissingDailyReportModal({
                 </div>
               </div>
 
-              {/* Shift and Time Details */}
+              {/* Session Date & Time Details */}
               <div className="grid grid-cols-2 gap-2.5 p-3 bg-slate-50 rounded-xl border border-slate-200/60">
                 <div>
-                  <span className="text-[10px] text-slate-500 uppercase tracking-wider block font-bold">Shift</span>
+                  <span className="text-[10px] text-slate-500 uppercase tracking-wider block font-bold">Session Date</span>
                   <strong className="text-slate-800 font-bold text-xs">
-                    {pendingSession.shift?.name || 'Assigned Shift'}
+                    {pendingSession.date || 'Previous Session'}
                   </strong>
                 </div>
                 <div>

@@ -46,9 +46,13 @@ const systemSettingSchema = new mongoose.Schema(
       type: Boolean,
       default: true
     },
+    fullDayThresholdHours: {
+      type: Number,
+      default: 8
+    },
     halfDayThresholdHours: {
       type: Number,
-      default: 6
+      default: 4
     },
     halfDayDeductionPercentage: {
       type: Number,
@@ -89,6 +93,14 @@ const systemSettingSchema = new mongoose.Schema(
     yearlySlTotal: {
       type: Number,
       default: 12
+    },
+    workStartTime: {
+      type: String,
+      default: '10:00'
+    },
+    workEndTime: {
+      type: String,
+      default: '18:00'
     },
     defaultRequiredHours: {
       type: Number,

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Lock,
   HelpCircle,
@@ -25,6 +25,25 @@ import api from '../../api/client';
 export default function EmployeeProfile() {
   const { user, logout, setUser } = useAuth();
   const emp = user?.employee || {};
+
+  const [workHoursPolicy, setWorkHoursPolicy] = useState({
+    fullDayThresholdHours: 8,
+    halfDayThresholdHours: 4
+  });
+
+  useEffect(() => {
+    api.get('/settings')
+      .then((res) => {
+        if (res.data?.settings) {
+          const s = res.data.settings;
+          setWorkHoursPolicy({
+            fullDayThresholdHours: s.fullDayThresholdHours ?? s.defaultRequiredHours ?? 8,
+            halfDayThresholdHours: s.halfDayThresholdHours ?? 4
+          });
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   // Modals state
   const [showPasswordModal, setShowPasswordModal] = useState(false);
@@ -197,9 +216,7 @@ export default function EmployeeProfile() {
     year: 'numeric'
   });
 
-  const shiftDisplay = emp.assignedShift?.startTime && emp.assignedShift?.endTime
-    ? `${emp.assignedShift.startTime} - ${emp.assignedShift.endTime}`
-    : '10:00 AM - 6:00 PM';
+  const hoursTargetDisplay = `${workHoursPolicy.fullDayThresholdHours} hrs Full Day / ${workHoursPolicy.halfDayThresholdHours} hrs Half Day`;
 
   return (
     <div className="max-w-md mx-auto space-y-4 pb-6">
@@ -265,8 +282,8 @@ export default function EmployeeProfile() {
         </div>
 
         <div className="flex items-center justify-between px-4 py-3 text-xs">
-          <span className="text-slate-500 font-medium">Shift</span>
-          <span className="font-semibold text-slate-900">{shiftDisplay}</span>
+          <span className="text-slate-500 font-medium">Daily Hours Target</span>
+          <span className="font-semibold text-slate-900">{hoursTargetDisplay}</span>
         </div>
 
         <div className="flex items-center justify-between px-4 py-3 text-xs">
@@ -464,7 +481,7 @@ export default function EmployeeProfile() {
             </div>
 
             <div className="space-y-3 text-xs text-slate-600">
-              <p>Need assistance with attendance, leave requests, or your shift assignments? Reach out to HR operations.</p>
+              <p>Need assistance with attendance, leave requests, or working hours policy? Reach out to HR operations.</p>
               
               <div className="p-3 bg-slate-50 rounded-xl space-y-2 border border-slate-200">
                 <div className="flex items-center gap-2 text-slate-800">

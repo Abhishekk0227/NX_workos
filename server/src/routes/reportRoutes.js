@@ -80,7 +80,6 @@ router.get('/pending-auto-punch-out', protect, async (req, res, next) => {
       autoPunchedOut: true,
       dailyReport: null
     })
-      .populate('shift', 'name startTime endTime')
       .sort({ date: -1 });
 
     res.json({
@@ -136,7 +135,7 @@ router.post('/submit-pending', protect, async (req, res, next) => {
     const attendance = await Attendance.findOne({
       _id: attendanceId,
       employee: req.user.employee._id
-    }).populate('shift');
+    });
 
     if (!attendance) {
       return res.status(404).json({

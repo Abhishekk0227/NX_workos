@@ -97,7 +97,7 @@ export default function HRMoreMenu() {
     { name: 'Payroll', path: '/hr/payroll', icon: CreditCard, color: 'text-emerald-600 bg-emerald-50 border-emerald-100', desc: 'Monthly compensation' },
     { name: 'Tasks & Reports', path: '/hr/tasks-reports', icon: ClipboardList, color: 'text-indigo-600 bg-indigo-50 border-indigo-100', desc: 'Work verification' },
     { name: 'Broadcast / Notice', path: '/hr/broadcast', icon: Megaphone, color: 'text-rose-600 bg-rose-50 border-rose-100', desc: 'Push announcements' },
-    { name: 'System Settings', path: '/hr/settings', icon: Settings, color: 'text-purple-600 bg-purple-50 border-purple-100', desc: 'Shifts & policies' },
+    { name: 'System Settings', path: '/hr/settings', icon: Settings, color: 'text-purple-600 bg-purple-50 border-purple-100', desc: 'Hours & policies' },
   ];
 
   return (

@@ -44,7 +44,6 @@ function calculateDays(start, end) {
 export default function HRHolidayCalendar() {
   const [holidays, setHolidays] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [shifts, setShifts] = useState([]);
   const [departments, setDepartments] = useState([
     'Engineering',
     'Product Design',
@@ -73,7 +72,6 @@ export default function HRHolidayCalendar() {
     type: 'Company Holiday',
     applicability: 'All',
     applicableDepartments: [],
-    applicableShifts: [],
     isRecurring: false,
     paid: true
   });
@@ -89,17 +87,8 @@ export default function HRHolidayCalendar() {
       if (selectedType !== 'All') params.set('type', selectedType);
       if (selectedDept !== 'All') params.set('department', selectedDept);
 
-      const [holRes, shiftRes] = await Promise.allSettled([
-        api.get(`/holidays?${params.toString()}`),
-        api.get('/shifts')
-      ]);
-
-      if (holRes.status === 'fulfilled') {
-        setHolidays(holRes.value.data?.holidays || []);
-      }
-      if (shiftRes.status === 'fulfilled') {
-        setShifts(shiftRes.value.data?.shifts || []);
-      }
+      const holRes = await api.get(`/holidays?${params.toString()}`);
+      setHolidays(holRes.data?.holidays || []);
     } catch (err) {
       console.error('Failed to load holidays:', err);
     } finally {
@@ -131,7 +120,6 @@ export default function HRHolidayCalendar() {
       type: 'Company Holiday',
       applicability: 'All',
       applicableDepartments: [],
-      applicableShifts: [],
       isRecurring: false,
       paid: true
     });
@@ -147,9 +135,8 @@ export default function HRHolidayCalendar() {
       endDate: hol.endDate || hol.date,
       description: hol.description || '',
       type: hol.type || 'Company Holiday',
-      applicability: hol.applicability || 'All',
+      applicability: hol.applicability === 'Shift' ? 'All' : (hol.applicability || 'All'),
       applicableDepartments: hol.applicableDepartments || [],
-      applicableShifts: (hol.applicableShifts || []).map((s) => (s._id ? s._id : s)),
       isRecurring: !!hol.isRecurring,
       paid: hol.paid !== false
     });
@@ -589,7 +576,6 @@ export default function HRHolidayCalendar() {
                 >
                   <option value="All">All Employees (Company-wide)</option>
                   <option value="Department">Department-wise</option>
-                  <option value="Shift">Shift-wise</option>
                 </select>
               </div>
 
@@ -618,39 +604,6 @@ export default function HRHolidayCalendar() {
                         <span>{d}</span>
                       </label>
                     ))}
-                  </div>
-                </div>
-              )}
-
-              {form.applicability === 'Shift' && (
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Applicable Shifts
-                  </label>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 p-3 bg-slate-50 rounded-xl border border-slate-200">
-                    {shifts.length === 0 ? (
-                      <p className="text-xs text-slate-400 col-span-2">No shift templates defined</p>
-                    ) : (
-                      shifts.map((s) => (
-                        <label key={s._id} className="flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={form.applicableShifts.includes(s._id)}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setForm({ ...form, applicableShifts: [...form.applicableShifts, s._id] });
-                              } else {
-                                setForm({
-                                  ...form,
-                                  applicableShifts: form.applicableShifts.filter((id) => id !== s._id)
-                                });
-                              }
-                            }}
-                          />
-                          <span>{s.name} ({s.startTime} - {s.endTime})</span>
-                        </label>
-                      ))
-                    )}
                   </div>
                 </div>
               )}

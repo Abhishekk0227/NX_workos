@@ -179,7 +179,7 @@ router.post('/apply', protect, async (req, res, next) => {
       });
     }
 
-    const employee = await Employee.findById(req.user.employee._id).populate('assignedShift');
+    const employee = await Employee.findById(req.user.employee._id);
     if (!employee) {
       return res.status(404).json({ success: false, message: 'Employee not found' });
     }
@@ -192,8 +192,7 @@ router.post('/apply', protect, async (req, res, next) => {
       isHalfDay: !!isHalfDay,
       halfDayType: halfDayType || 'None',
       reasonCategory,
-      reasonDetails: reasonDetails.trim(),
-      shift: employee.assignedShift
+      reasonDetails: reasonDetails.trim()
     });
 
     const leaveRequest = await LeaveRequest.create({

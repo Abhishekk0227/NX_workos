@@ -229,7 +229,7 @@ export default function HRDashboard() {
                     {alert.employee?.fullName} ({alert.employee?.employeeId})
                   </div>
                   <div className="text-[11px] text-slate-600 mt-0.5">
-                    <span className="font-semibold text-rose-600">{alert.actualWorkingHours} hrs logged</span> • {formatDateIST(alert.date)} • {alert.shift?.name || 'Shift'}
+                    <span className="font-semibold text-rose-600">{alert.actualWorkingHours} hrs logged</span> • {formatDateIST(alert.date)} • {alert.employee?.department || 'Staff'}
                   </div>
                 </div>
                 <button
@@ -259,7 +259,7 @@ export default function HRDashboard() {
                     </span>
                   </div>
                   <div className="text-[11px] text-purple-800 font-medium mt-0.5">
-                    {formatDateIST(rec.date)} • Shift: {rec.shift?.name || 'Default'} • {rec.actualWorkingHours || 0} hrs logged ({rec.status})
+                    {formatDateIST(rec.date)} • {rec.actualWorkingHours || 0} hrs logged ({rec.status})
                   </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
@@ -447,8 +447,8 @@ export default function HRDashboard() {
             className="p-3.5 bg-slate-50 hover:bg-slate-100 border border-slate-200/70 rounded-xl text-center transition group"
           >
             <ShieldCheck className="w-5 h-5 mx-auto text-purple-600 mb-1 group-hover:scale-110 transition" />
-            <span className="text-xs font-bold text-slate-800 block">Shift Management</span>
-            <span className="text-[10px] text-slate-400">Cutoffs & Thresholds</span>
+            <span className="text-xs font-bold text-slate-800 block">Working Hours &amp; Policy</span>
+            <span className="text-[10px] text-slate-400">Thresholds &amp; Rules</span>
           </Link>
         </div>
       </div>

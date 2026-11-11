@@ -610,7 +610,7 @@ export default function HRBroadcast() {
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 outline-none"
                 >
                   <option value="General">General Announcement</option>
-                  <option value="Operational">Operations & Shift Directives</option>
+                  <option value="Operational">Operations Directives</option>
                   <option value="Emergency">Emergency Alert</option>
                   <option value="HR Policy">HR Policy & Compliance</option>
                   <option value="Holiday">Company Holiday</option>

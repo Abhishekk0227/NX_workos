@@ -91,10 +91,10 @@ export default function HRReports() {
     let csvContent = 'data:text/csv;charset=utf-8,';
 
     if (['daily_attendance', 'monthly_attendance', 'employee_attendance', 'short_attendance', 'late_arrival', 'auto_punch_out'].includes(selectedReport)) {
-      csvContent += 'Employee ID,Full Name,Department,Date,Shift,Punch In,Punch Out,Working Hours,Status\n';
+      csvContent += 'Employee ID,Full Name,Department,Date,Punch In,Punch Out,Working Hours,Status\n';
       data.forEach((r) => {
         const emp = r.employee || {};
-        csvContent += `"${emp.employeeId || ''}","${emp.fullName || ''}","${emp.department || ''}","${r.date || ''}","${r.shift?.name || ''}","${r.punchIn ? formatTime12(r.punchIn) : ''}","${r.punchOut ? formatTime12(r.punchOut) : ''}","${r.actualWorkingHours || 0}","${r.status || ''}"\n`;
+        csvContent += `"${emp.employeeId || ''}","${emp.fullName || ''}","${emp.department || ''}","${r.date || ''}","${r.punchIn ? formatTime12(r.punchIn) : ''}","${r.punchOut ? formatTime12(r.punchOut) : ''}","${r.actualWorkingHours || 0}","${r.status || ''}"\n`;
       });
     } else if (selectedReport === 'leave') {
       csvContent += 'Employee ID,Full Name,Start Date,End Date,Days,Reason Category,Status\n';

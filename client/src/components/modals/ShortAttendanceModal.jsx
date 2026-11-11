@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   AlertTriangle,
   X,
@@ -31,11 +31,22 @@ export default function ShortAttendanceModal({ isOpen, onClose, attendance, onSu
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [halfDayThreshold, setHalfDayThreshold] = useState(4);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    api.get('/settings')
+      .then((res) => {
+        if (res.data?.settings?.halfDayThresholdHours != null) {
+          setHalfDayThreshold(res.data.settings.halfDayThresholdHours);
+        }
+      })
+      .catch(() => {});
+  }, [isOpen]);
 
   if (!isOpen || !attendance) return null;
 
   const emp = attendance.employee || {};
-  const shift = attendance.shift || {};
   const isAlreadyResolved = attendance.shortAttendanceAlert?.status === 'Resolved';
 
   // Quick preset helper
@@ -144,9 +155,9 @@ export default function ShortAttendanceModal({ isOpen, onClose, attendance, onSu
               </strong>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-slate-500 font-medium">Date &amp; Shift:</span>
+              <span className="text-slate-500 font-medium">Session Date:</span>
               <span className="font-medium text-slate-800">
-                {formatDateIST(attendance.date)} • {shift.name || 'Assigned Shift'} ({shift.startTime || '09:00'} - {shift.endTime || '18:00'})
+                {formatDateIST(attendance.date)}
               </span>
             </div>
             <div className="flex items-center justify-between">
@@ -156,13 +167,13 @@ export default function ShortAttendanceModal({ isOpen, onClose, attendance, onSu
               </span>
             </div>
             <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1 border-t border-slate-200/60">
-              <span>Shift Half-Day Threshold:</span>
-              <span className="font-semibold text-slate-700">{shift.halfDayWorkingHoursThreshold || 4.0} hrs</span>
+              <span>Half-Day Working Hours Threshold:</span>
+              <span className="font-semibold text-slate-700">{halfDayThreshold} hrs</span>
             </div>
             {attendance.autoPunchedOut && (
               <div className="text-[11px] text-purple-700 font-semibold pt-1 border-t border-slate-200/60 flex items-center gap-1.5">
                 <Clock className="w-3 h-3" />
-                <span>Auto Punched-Out by system at shift cutoff.</span>
+                <span>Auto Punched-Out by system at 12:00 AM IST cutoff.</span>
               </div>
             )}
             {isAlreadyResolved && attendance.shortAttendanceAlert?.resolvedAt && (

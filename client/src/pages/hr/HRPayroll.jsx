@@ -22,7 +22,9 @@ import {
   Clock,
   Sliders,
   Check,
-  ShieldAlert
+  ShieldAlert,
+  Edit2,
+  RotateCcw
 } from 'lucide-react';
 import api from '../../api/client';
 import { TableShimmer, CardListShimmer } from '../../components/common/Shimmer';
@@ -44,6 +46,7 @@ export default function HRPayroll() {
 
   // Short Attendance State & Review
   const [shortAttendanceSessions, setShortAttendanceSessions] = useState([]);
+  const [thresholds, setThresholds] = useState({ fullDayThresholdHours: 8, halfDayThresholdHours: 4 });
   const [showShortAttendanceModal, setShowShortAttendanceModal] = useState(false);
   const [targetShortAttendance, setTargetShortAttendance] = useState(null);
   const [loadingShortAttendance, setLoadingShortAttendance] = useState(false);
@@ -57,6 +60,32 @@ export default function HRPayroll() {
   // Payslip Modal State
   const [showPayslipModal, setShowPayslipModal] = useState(false);
   const [payslipData, setPayslipData] = useState(null);
+
+  // Manual Payroll Edit Modal State
+  const [showEditPayrollModal, setShowEditPayrollModal] = useState(false);
+  const [editTarget, setEditTarget] = useState(null);
+  const [savingManualEdit, setSavingManualEdit] = useState(false);
+  const [editError, setEditError] = useState('');
+  const [editForm, setEditForm] = useState({
+    grossSalary: 0,
+    bonusAmount: 0,
+    presentDays: 0,
+    halfDays: 0,
+    paidLeaveDays: 0,
+    weeklyOffDays: 0,
+    lwpDays: 0,
+    payableDays: 0,
+    lateDeduction: 0,
+    halfDayDeduction: 0,
+    shortAttendanceDeduction: 0,
+    lwpDeduction: 0,
+    shortfallDeduction: 0,
+    otherDeductions: 0,
+    overrideNetPayable: false,
+    netPayable: 0,
+    reason: '',
+    notes: ''
+  });
 
   const fetchPayrollPreview = async () => {
     setLoading(true);
@@ -79,6 +108,9 @@ export default function HRPayroll() {
       const res = await api.get(`/payroll/short-attendance-review?month=${selectedMonth}`);
       if (res.data?.success) {
         setShortAttendanceSessions(res.data.records || []);
+        if (res.data.thresholds) {
+          setThresholds(res.data.thresholds);
+        }
       }
     } catch (err) {
       console.error('Failed to load short attendance sessions:', err);
@@ -229,6 +261,145 @@ export default function HRPayroll() {
     }
   };
 
+  const openEditPayrollModal = (item, fromHistory = false) => {
+    const status = fromHistory ? item.status : (item.savedStatus || 'Unprocessed');
+    if (status === 'Finalized') {
+      alert('Finalized payroll records are locked and cannot be edited.');
+      return;
+    }
+
+    const empObj = fromHistory ? item.employee : item.employeeDetails;
+    const empId = fromHistory ? item.employee?._id : item.employee;
+    const payrollRecordId = fromHistory ? item._id : (item.existingRecordId || null);
+
+    setEditTarget({
+      payrollRecordId,
+      employeeId: empId,
+      month: item.month || selectedMonth,
+      fullName: empObj?.fullName || 'Employee',
+      empCode: empObj?.employeeId || '',
+      status,
+      isManuallyEdited: Boolean(item.isManuallyEdited),
+      manualEditReason: item.manualEditReason || ''
+    });
+
+    setEditForm({
+      grossSalary: item.grossSalary ?? 0,
+      bonusAmount: item.bonusAmount ?? 0,
+      presentDays: item.presentDays ?? 0,
+      halfDays: item.halfDays ?? 0,
+      paidLeaveDays: item.paidLeaveDays ?? 0,
+      weeklyOffDays: item.weeklyOffDays ?? 0,
+      lwpDays: item.lwpDays ?? 0,
+      payableDays: item.payableDays ?? 0,
+      lateDeduction: item.lateDeduction ?? 0,
+      halfDayDeduction: item.halfDayDeduction ?? 0,
+      shortAttendanceDeduction: item.shortAttendanceDeduction ?? 0,
+      lwpDeduction: item.lwpDeduction ?? 0,
+      shortfallDeduction: item.shortfallDeduction ?? 0,
+      otherDeductions: item.otherDeductions ?? 0,
+      overrideNetPayable: Boolean(item.isNetPayableOverridden),
+      netPayable: item.netPayable ?? 0,
+      reason: item.manualEditReason || '',
+      notes: item.notes || ''
+    });
+    setEditError('');
+    setShowEditPayrollModal(true);
+  };
+
+  const liveManualDeductionsTotal = parseFloat(
+    (
+      (Number(editForm.lateDeduction) || 0) +
+      (Number(editForm.halfDayDeduction) || 0) +
+      (Number(editForm.shortAttendanceDeduction) || 0) +
+      (Number(editForm.lwpDeduction) || 0) +
+      (Number(editForm.shortfallDeduction) || 0) +
+      (Number(editForm.otherDeductions) || 0)
+    ).toFixed(2)
+  );
+
+  const liveComputedNetPayable = Math.max(
+    0,
+    parseFloat(
+      ((Number(editForm.grossSalary) || 0) + (Number(editForm.bonusAmount) || 0) - liveManualDeductionsTotal).toFixed(2)
+    )
+  );
+
+  const handleManualEditSubmit = async (e) => {
+    e.preventDefault();
+    if (!editForm.reason || !editForm.reason.trim()) {
+      setEditError('Please provide an audit reason for the manual payroll edit.');
+      return;
+    }
+    setSavingManualEdit(true);
+    setEditError('');
+    try {
+      const payload = {
+        payrollRecordId: editTarget.payrollRecordId,
+        employeeId: editTarget.employeeId,
+        month: editTarget.month,
+        grossSalary: Number(editForm.grossSalary),
+        bonusAmount: Number(editForm.bonusAmount || 0),
+        presentDays: Number(editForm.presentDays),
+        halfDays: Number(editForm.halfDays),
+        paidLeaveDays: Number(editForm.paidLeaveDays),
+        weeklyOffDays: Number(editForm.weeklyOffDays),
+        lwpDays: Number(editForm.lwpDays),
+        payableDays: Number(editForm.payableDays),
+        lateDeduction: Number(editForm.lateDeduction || 0),
+        halfDayDeduction: Number(editForm.halfDayDeduction || 0),
+        shortAttendanceDeduction: Number(editForm.shortAttendanceDeduction || 0),
+        lwpDeduction: Number(editForm.lwpDeduction || 0),
+        shortfallDeduction: Number(editForm.shortfallDeduction || 0),
+        otherDeductions: Number(editForm.otherDeductions || 0),
+        overrideNetPayable: Boolean(editForm.overrideNetPayable),
+        netPayable: editForm.overrideNetPayable ? Number(editForm.netPayable) : liveComputedNetPayable,
+        reason: editForm.reason.trim(),
+        notes: editForm.notes?.trim() || ''
+      };
+
+      const res = await api.put('/payroll/manual-edit', payload);
+      if (res.data?.success) {
+        setShowEditPayrollModal(false);
+        setEditTarget(null);
+        if (activeTab === 'history') {
+          fetchHistory();
+        } else {
+          fetchPayrollPreview();
+        }
+        alert(res.data.message || 'Payroll manually updated!');
+      }
+    } catch (err) {
+      setEditError(err.response?.data?.message || 'Failed to update payroll.');
+    } finally {
+      setSavingManualEdit(false);
+    }
+  };
+
+  const handleResetToAuto = async (payrollRecordId) => {
+    if (!payrollRecordId) return;
+    if (!window.confirm('Reset this manually edited payroll record back to auto-calculated attendance & deduction figures?')) {
+      return;
+    }
+    try {
+      const res = await api.post(`/payroll/${payrollRecordId}/reset-auto`, {
+        reason: 'Reset manually edited payroll to auto-calculated attendance values'
+      });
+      if (res.data?.success) {
+        setShowEditPayrollModal(false);
+        setShowPayslipModal(false);
+        if (activeTab === 'history') {
+          fetchHistory();
+        } else {
+          fetchPayrollPreview();
+        }
+        alert(res.data.message || 'Payroll reset to auto-calculated values.');
+      }
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to reset payroll.');
+    }
+  };
+
   // Month navigation helpers
   const handlePrevMonth = () => {
     const [y, m] = selectedMonth.split('-').map(Number);
@@ -262,7 +433,7 @@ export default function HRPayroll() {
             <CreditCard className="w-6 h-6 text-blue-600" /> Payroll Management
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Automated salary computations with Short Attendance alerts, configurable shift thresholds, and audit trails.
+            Automated salary computations with Short Attendance alerts, configurable working-hour thresholds, and audit trails.
           </p>
         </div>
 
@@ -450,15 +621,31 @@ export default function HRPayroll() {
                       <div className="font-bold text-slate-900">{item.employeeDetails?.fullName}</div>
                       <div className="font-mono text-[11px] text-emerald-600 font-semibold">{item.employeeDetails?.employeeId}</div>
                     </div>
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                      Processed
-                    </span>
+                    <div className="flex flex-col items-end gap-1">
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                        item.savedStatus === 'Finalized'
+                          ? 'bg-slate-900 text-white border-slate-900'
+                          : item.savedStatus === 'Review' || item.savedStatus === 'Draft'
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                          : 'bg-slate-100 text-slate-600 border-slate-200'
+                      }`}>
+                        {item.savedStatus || 'Preview'}
+                      </span>
+                      {item.isManuallyEdited && (
+                        <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                          Manually Edited
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-2 text-[11px] bg-slate-50 p-2.5 rounded-xl border border-slate-100">
                     <div>
                       <span className="text-slate-400 block text-[10px]">Gross Pay</span>
                       <strong className="text-slate-800 font-mono">₹{item.grossSalary?.toLocaleString()}</strong>
+                      {item.bonusAmount > 0 && (
+                        <span className="block text-[10px] font-bold text-emerald-600 font-mono">+₹{item.bonusAmount?.toLocaleString()} Bonus</span>
+                      )}
                     </div>
                     <div>
                       <span className="text-slate-400 block text-[10px]">Net Pay</span>
@@ -497,6 +684,14 @@ export default function HRPayroll() {
                           className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 rounded-lg font-bold text-xs transition cursor-pointer"
                         >
                           Adjust Shortfall
+                        </button>
+                      )}
+                      {item.savedStatus !== 'Finalized' && (
+                        <button
+                          onClick={() => openEditPayrollModal(item, false)}
+                          className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg font-bold text-xs transition cursor-pointer inline-flex items-center gap-1"
+                        >
+                          <Edit2 className="w-3 h-3" /> Edit
                         </button>
                       )}
                       <button
@@ -602,7 +797,10 @@ export default function HRPayroll() {
                           </td>
 
                           <td className="py-3.5 px-4 font-mono font-bold text-slate-900">
-                            ₹ {item.grossSalary?.toLocaleString()}
+                            <div>₹ {item.grossSalary?.toLocaleString()}</div>
+                            {item.bonusAmount > 0 && (
+                              <div className="text-[10px] font-semibold text-emerald-600">+₹ {item.bonusAmount?.toLocaleString()} bonus</div>
+                            )}
                           </td>
 
                           <td className="py-3.5 px-4 font-mono font-semibold text-rose-600">
@@ -614,9 +812,30 @@ export default function HRPayroll() {
                           </td>
 
                           <td className="py-3.5 px-4">
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                              <CheckCircle2 className="w-3 h-3 text-emerald-500" /> Processed
-                            </span>
+                            <div className="flex flex-col items-start gap-1">
+                              <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+                                item.savedStatus === 'Finalized'
+                                  ? 'bg-slate-900 text-white border-slate-900'
+                                  : item.savedStatus === 'Review' || item.savedStatus === 'Draft'
+                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                  : 'bg-slate-100 text-slate-600 border-slate-200'
+                              }`}>
+                                {item.savedStatus === 'Finalized' ? (
+                                  <Lock className="w-3 h-3" />
+                                ) : (
+                                  <CheckCircle2 className="w-3 h-3 text-emerald-500" />
+                                )}
+                                {item.savedStatus || 'Preview'}
+                              </span>
+                              {item.isManuallyEdited && (
+                                <span
+                                  title={item.manualEditReason || 'Manually edited by HR'}
+                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold bg-amber-50 text-amber-800 border border-amber-200"
+                                >
+                                  Manual Edit
+                                </span>
+                              )}
+                            </div>
                           </td>
 
                           <td className="py-3.5 px-4 text-right">
@@ -628,6 +847,15 @@ export default function HRPayroll() {
                                   title="Review & Adjust Short Attendance Deductions"
                                 >
                                   <Sliders className="w-4 h-4" />
+                                </button>
+                              )}
+                              {item.savedStatus !== 'Finalized' && (
+                                <button
+                                  onClick={() => openEditPayrollModal(item, false)}
+                                  className="p-1.5 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition cursor-pointer"
+                                  title="Manually Edit Payroll"
+                                >
+                                  <Edit2 className="w-4 h-4" />
                                 </button>
                               )}
                               <button
@@ -683,7 +911,7 @@ export default function HRPayroll() {
               <thead>
                 <tr className="bg-slate-50/80 border-b border-slate-200/80 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                   <th className="py-3.5 px-4">Employee</th>
-                  <th className="py-3.5 px-4">Date &amp; Shift</th>
+                  <th className="py-3.5 px-4">Session Date</th>
                   <th className="py-3.5 px-4">Logged Hours</th>
                   <th className="py-3.5 px-4">Alert Status</th>
                   <th className="py-3.5 px-4">HR Classification</th>
@@ -712,7 +940,6 @@ export default function HRPayroll() {
                     const isPending = rec.shortAttendanceAlert?.status === 'Pending' || rec.status === 'Short Attendance';
                     const isResolved = rec.shortAttendanceAlert?.status === 'Resolved';
                     const emp = rec.employee || {};
-                    const shift = rec.shift || {};
 
                     return (
                       <tr key={rec._id} className="hover:bg-slate-50/70 transition">
@@ -723,14 +950,14 @@ export default function HRPayroll() {
                         </td>
                         <td className="py-3.5 px-4">
                           <div className="font-semibold text-slate-800">{formatDateIST(rec.date)}</div>
-                          <div className="text-[10px] text-slate-500">{shift.name || 'Shift'} ({shift.startTime || '09:00'} - {shift.endTime || '18:00'})</div>
+                          <div className="text-[10px] text-slate-500">{emp.designation || 'Employee'}</div>
                         </td>
                         <td className="py-3.5 px-4">
                           <div className="font-bold text-rose-600 font-mono">
                             {rec.actualWorkingHours || 0} hrs
                           </div>
                           <div className="text-[10px] text-slate-400">
-                            threshold: &lt; {shift.halfDayWorkingHoursThreshold || 4.0}h
+                            threshold: &lt; {thresholds.halfDayThresholdHours || 4}h
                           </div>
                         </td>
                         <td className="py-3.5 px-4">
@@ -880,41 +1107,115 @@ export default function HRPayroll() {
                 <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider">
                   <th className="py-3.5 px-4">Month</th>
                   <th className="py-3.5 px-4">Employee</th>
-                  <th className="py-3.5 px-4">Gross Salary</th>
+                  <th className="py-3.5 px-4">Gross / Bonus</th>
                   <th className="py-3.5 px-4">Payable Days</th>
-                  <th className="py-3.5 px-4">Late / LWP Deductions</th>
+                  <th className="py-3.5 px-4">Total Deductions</th>
                   <th className="py-3.5 px-4">Net Salary</th>
-                  <th className="py-3.5 px-4">Lock Status</th>
+                  <th className="py-3.5 px-4">Status</th>
+                  <th className="py-3.5 px-4 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {historyRecords.length === 0 ? (
                   <tr>
-                    <td colSpan="7" className="py-12 text-center text-slate-400">
-                      No finalized payroll records yet
+                    <td colSpan="8" className="py-12 text-center text-slate-400">
+                      No payroll records generated yet
                     </td>
                   </tr>
                 ) : (
-                  historyRecords.map((hist) => (
-                    <tr key={hist._id} className="hover:bg-slate-50/70 transition">
-                      <td className="py-3.5 px-4 font-bold text-slate-800">{hist.month}</td>
-                      <td className="py-3.5 px-4">
-                        <div className="font-bold text-slate-800">{hist.employee?.fullName}</div>
-                        <div className="font-mono text-[10px] text-emerald-600">{hist.employee?.employeeId}</div>
-                      </td>
-                      <td className="py-3.5 px-4 font-mono font-bold">₹ {hist.grossSalary?.toLocaleString()}</td>
-                      <td className="py-3.5 px-4">{hist.payableDays} / {hist.calendarDays} days</td>
-                      <td className="py-3.5 px-4 font-mono text-rose-600">
-                        -₹ {((hist.lateDeduction || 0) + (hist.halfDayDeduction || 0) + (hist.shortAttendanceDeduction || 0) + (hist.lwpDeduction || 0))?.toLocaleString()}
-                      </td>
-                      <td className="py-3.5 px-4 font-mono font-bold text-emerald-700">₹ {hist.netPayable?.toLocaleString()}</td>
-                      <td className="py-3.5 px-4">
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                          <Lock className="w-3 h-3" /> Locked
-                        </span>
-                      </td>
-                    </tr>
-                  ))
+                  historyRecords.map((hist) => {
+                    const computedDeductions =
+                      hist.totalDeductions > 0 || hist.isManuallyEdited
+                        ? (hist.totalDeductions ?? 0)
+                        : ((hist.lateDeduction || 0) +
+                           (hist.halfDayDeduction || 0) +
+                           (hist.shortAttendanceDeduction || 0) +
+                           (hist.lwpDeduction || 0) +
+                           (hist.otherDeductions || 0));
+
+                    return (
+                      <tr key={hist._id} className="hover:bg-slate-50/70 transition">
+                        <td className="py-3.5 px-4 font-bold text-slate-800">{hist.month}</td>
+                        <td className="py-3.5 px-4">
+                          <div className="font-bold text-slate-800">{hist.employee?.fullName}</div>
+                          <div className="font-mono text-[10px] text-emerald-600">{hist.employee?.employeeId}</div>
+                        </td>
+                        <td className="py-3.5 px-4 font-mono font-bold">
+                          <div>₹ {hist.grossSalary?.toLocaleString()}</div>
+                          {hist.bonusAmount > 0 && (
+                            <div className="text-[10px] font-semibold text-emerald-600">+₹ {hist.bonusAmount?.toLocaleString()} bonus</div>
+                          )}
+                        </td>
+                        <td className="py-3.5 px-4">{hist.payableDays} / {hist.calendarDays} days</td>
+                        <td className="py-3.5 px-4 font-mono text-rose-600">
+                          -₹ {computedDeductions?.toLocaleString()}
+                        </td>
+                        <td className="py-3.5 px-4 font-mono font-bold text-emerald-700">₹ {hist.netPayable?.toLocaleString()}</td>
+                        <td className="py-3.5 px-4">
+                          <div className="flex flex-col items-start gap-1">
+                            {hist.status === 'Finalized' ? (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                <Lock className="w-3 h-3" /> Locked
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                                {hist.status || 'Review'}
+                              </span>
+                            )}
+                            {hist.isManuallyEdited && (
+                              <span
+                                title={hist.manualEditReason || 'Manually edited by HR'}
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold bg-amber-50 text-amber-800 border border-amber-200"
+                              >
+                                Manual Edit
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-3.5 px-4 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            {hist.status !== 'Finalized' && (
+                              <>
+                                <button
+                                  onClick={() => openEditPayrollModal(hist, true)}
+                                  className="p-1.5 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition cursor-pointer"
+                                  title="Manually Edit Payroll"
+                                >
+                                  <Edit2 className="w-4 h-4" />
+                                </button>
+                                {hist.isManuallyEdited && (
+                                  <button
+                                    onClick={() => handleResetToAuto(hist._id)}
+                                    className="p-1.5 text-amber-600 hover:text-amber-700 hover:bg-amber-50 rounded-lg transition cursor-pointer"
+                                    title="Reset to Auto-Calculated Values"
+                                  >
+                                    <RotateCcw className="w-4 h-4" />
+                                  </button>
+                                )}
+                              </>
+                            )}
+                            <button
+                              onClick={() => {
+                                setPayslipData({
+                                  ...hist,
+                                  employee: hist.employee?._id || hist.employee,
+                                  employeeDetails: hist.employee,
+                                  savedStatus: hist.status,
+                                  existingRecordId: hist._id,
+                                  totalDeductions: computedDeductions
+                                });
+                                setShowPayslipModal(true);
+                              }}
+                              className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition cursor-pointer"
+                              title="View Payslip Breakdown"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
@@ -1008,9 +1309,16 @@ export default function HRPayroll() {
           <div className="w-full max-w-lg bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-100 overflow-hidden my-auto sm:my-8 animate-in fade-in zoom-in-95 duration-150">
             <div className="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
               <div>
-                <h3 className="font-bold text-base">Itemized Payslip Breakdown</h3>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-bold text-base">Itemized Payslip Breakdown</h3>
+                  {payslipData.isManuallyEdited && (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-400/40">
+                      Manually Edited
+                    </span>
+                  )}
+                </div>
                 <p className="text-[11px] text-slate-300">
-                  {payslipData.employeeDetails?.fullName} ({payslipData.employeeDetails?.employeeId}) • {selectedMonth}
+                  {payslipData.employeeDetails?.fullName} ({payslipData.employeeDetails?.employeeId}) • {payslipData.month || selectedMonth}
                 </p>
               </div>
               <button
@@ -1022,6 +1330,22 @@ export default function HRPayroll() {
             </div>
 
             <div className="p-6 space-y-4 text-xs">
+              {payslipData.isManuallyEdited && (
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 space-y-0.5">
+                  <div className="font-bold text-[11px]">Manually Edited Payroll Record</div>
+                  {payslipData.manualEditReason && (
+                    <div className="text-[11px] text-amber-800">
+                      <strong>Reason:</strong> {payslipData.manualEditReason}
+                    </div>
+                  )}
+                  {payslipData.notes && (
+                    <div className="text-[11px] text-amber-700">
+                      <strong>Notes:</strong> {payslipData.notes}
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-3 pb-3 border-b border-slate-100">
                 <div>
                   <span className="text-slate-400 block text-[11px]">Monthly Gross Salary</span>
@@ -1042,6 +1366,13 @@ export default function HRPayroll() {
                   <span className="font-bold text-slate-900 font-mono">₹ {payslipData.perMinuteRate?.toFixed(4)} / min</span>
                 </div>
               </div>
+
+              {(payslipData.bonusAmount || 0) > 0 && (
+                <div className="flex justify-between items-center py-2 px-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800">
+                  <span className="font-semibold">Bonus / Manual Addition</span>
+                  <span className="font-mono font-bold">+₹ {payslipData.bonusAmount?.toLocaleString()}</span>
+                </div>
+              )}
 
               {/* Attendance Counts */}
               <div className="space-y-1.5 py-2 border-b border-slate-100">
@@ -1099,7 +1430,31 @@ export default function HRPayroll() {
               </div>
             </div>
 
-            <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end">
+            <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                {(payslipData.savedStatus || payslipData.status) !== 'Finalized' && (
+                  <button
+                    onClick={() => {
+                      const target = payslipData;
+                      setShowPayslipModal(false);
+                      openEditPayrollModal(target, false);
+                    }}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs transition cursor-pointer inline-flex items-center gap-1.5"
+                  >
+                    <Edit2 className="w-3.5 h-3.5" /> Edit Payroll
+                  </button>
+                )}
+                {payslipData.isManuallyEdited &&
+                  (payslipData.existingRecordId || payslipData._id) &&
+                  (payslipData.savedStatus || payslipData.status) !== 'Finalized' && (
+                    <button
+                      onClick={() => handleResetToAuto(payslipData.existingRecordId || payslipData._id)}
+                      className="px-3.5 py-2 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 font-bold rounded-xl text-xs transition cursor-pointer inline-flex items-center gap-1.5"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" /> Reset Auto
+                    </button>
+                  )}
+              </div>
               <button
                 onClick={() => setShowPayslipModal(false)}
                 className="px-5 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold rounded-xl text-xs transition cursor-pointer"
@@ -1107,6 +1462,302 @@ export default function HRPayroll() {
                 Close Breakdown
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MANUAL PAYROLL EDIT MODAL */}
+      {showEditPayrollModal && editTarget && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-start sm:items-center justify-center p-2 sm:p-4 pt-4 sm:pt-6 pb-20 sm:pb-8">
+          <div className="w-full max-w-2xl bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-100 overflow-hidden my-auto sm:my-6 animate-in fade-in zoom-in-95 duration-150">
+            <div className="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-base flex items-center gap-2">
+                  <Edit2 className="w-4 h-4 text-blue-400" /> Manually Edit Employee Payroll
+                </h3>
+                <p className="text-[11px] text-slate-300 mt-0.5">
+                  {editTarget.fullName} ({editTarget.empCode}) • Month: {editTarget.month}
+                </p>
+              </div>
+              <button
+                onClick={() => setShowEditPayrollModal(false)}
+                className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleManualEditSubmit} className="p-5 sm:p-6 space-y-5 text-xs">
+              {editError && (
+                <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl font-semibold">
+                  {editError}
+                </div>
+              )}
+
+              {/* Section 1: Salary & Bonus */}
+              <div>
+                <h4 className="font-bold text-slate-800 text-[11px] uppercase tracking-wider mb-2.5">Salary &amp; Additions</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">Monthly Gross Salary (₹)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      required
+                      value={editForm.grossSalary}
+                      onChange={(e) => setEditForm((f) => ({ ...f, grossSalary: e.target.value }))}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono outline-none focus:border-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">Bonus / Extra Allowance (₹)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={editForm.bonusAmount}
+                      onChange={(e) => setEditForm((f) => ({ ...f, bonusAmount: e.target.value }))}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono outline-none focus:border-blue-500"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 2: Days */}
+              <div>
+                <h4 className="font-bold text-slate-800 text-[11px] uppercase tracking-wider mb-2.5">Attendance &amp; Payable Days</h4>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block font-semibold text-slate-600 mb-1">Present Days</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.5"
+                      value={editForm.presentDays}
+                      onChange={(e) => setEditForm((f) => ({ ...f, presentDays: e.target.value }))}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono outline-none focus:border-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-semibold text-slate-600 mb-1">Half Days</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={editForm.halfDays}
+                      onChange={(e) => setEditForm((f) => ({ ...f, halfDays: e.target.value }))}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono outline-none focus:border-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-semibold text-slate-600 mb-1">Paid Leaves (CL/SL)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.5"
+                      value={editForm.paidLeaveDays}
+                      onChange={(e) => setEditForm((f) => ({ ...f, paidLeaveDays: e.target.value }))}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono outline-none focus:border-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-semibold text-slate-600 mb-1">Weekly Offs</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.5"
+                      value={editForm.weeklyOffDays}
+                      onChange={(e) => setEditForm((f) => ({ ...f, weeklyOffDays: e.target.value }))}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono outline-none focus:border-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-semibold text-slate-600 mb-1">LWP Days</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.5"
+                      value={editForm.lwpDays}
+                      onChange={(e) => setEditForm((f) => ({ ...f, lwpDays: e.target.value }))}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono outline-none focus:border-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-semibold text-slate-600 mb-1">Payable Days</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.5"
+                      value={editForm.payableDays}
+                      onChange={(e) => setEditForm((f) => ({ ...f, payableDays: e.target.value }))}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono outline-none focus:border-blue-500"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 3: Deductions */}
+              <div>
+                <h4 className="font-bold text-slate-800 text-[11px] uppercase tracking-wider mb-2.5">Itemized Deductions (₹)</h4>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block font-semibold text-slate-600 mb-1">Late Deduction</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={editForm.lateDeduction}
+                      onChange={(e) => setEditForm((f) => ({ ...f, lateDeduction: e.target.value }))}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono outline-none focus:border-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-semibold text-slate-600 mb-1">Half-Day Deduction</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={editForm.halfDayDeduction}
+                      onChange={(e) => setEditForm((f) => ({ ...f, halfDayDeduction: e.target.value }))}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono outline-none focus:border-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-semibold text-slate-600 mb-1">Short Attendance Ded.</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={editForm.shortAttendanceDeduction}
+                      onChange={(e) => setEditForm((f) => ({ ...f, shortAttendanceDeduction: e.target.value }))}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono outline-none focus:border-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-semibold text-slate-600 mb-1">LWP Deduction</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={editForm.lwpDeduction}
+                      onChange={(e) => setEditForm((f) => ({ ...f, lwpDeduction: e.target.value }))}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono outline-none focus:border-blue-500"
+                    />
+                  </div>
+                  <div className="col-span-2 sm:col-span-2">
+                    <label className="block font-semibold text-slate-600 mb-1">Other / Manual Deduction (₹)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={editForm.otherDeductions}
+                      onChange={(e) => setEditForm((f) => ({ ...f, otherDeductions: e.target.value }))}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono outline-none focus:border-blue-500"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 4: Net Payable Calculation / Direct Override */}
+              <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="space-y-0.5">
+                    <div className="text-[11px] text-emerald-800">
+                      Auto Summary: Gross (₹{Number(editForm.grossSalary || 0).toLocaleString()}) + Bonus (₹{Number(editForm.bonusAmount || 0).toLocaleString()}) − Deductions (₹{liveManualDeductionsTotal.toLocaleString()})
+                    </div>
+                    <div className="font-black text-emerald-900 font-mono text-lg">
+                      Net Payable: ₹ {(editForm.overrideNetPayable ? Number(editForm.netPayable || 0) : liveComputedNetPayable).toLocaleString()}
+                    </div>
+                  </div>
+                  <label className="inline-flex items-center gap-2 cursor-pointer text-[11px] font-bold text-emerald-900 bg-white px-3 py-1.5 rounded-xl border border-emerald-200">
+                    <input
+                      type="checkbox"
+                      checked={editForm.overrideNetPayable}
+                      onChange={(e) =>
+                        setEditForm((f) => ({
+                          ...f,
+                          overrideNetPayable: e.target.checked,
+                          netPayable: e.target.checked ? liveComputedNetPayable : f.netPayable
+                        }))
+                      }
+                      className="rounded border-slate-300 text-emerald-600"
+                    />
+                    Override Net Payable Manually
+                  </label>
+                </div>
+
+                {editForm.overrideNetPayable && (
+                  <div>
+                    <label className="block font-semibold text-emerald-900 mb-1">Custom Final Net Payable (₹)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      required
+                      value={editForm.netPayable}
+                      onChange={(e) => setEditForm((f) => ({ ...f, netPayable: e.target.value }))}
+                      className="w-full px-3 py-2 bg-white border border-emerald-300 rounded-xl font-mono font-bold text-emerald-900 outline-none focus:border-emerald-600"
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Section 5: Audit Reason & Notes */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Audit Reason *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g., Performance bonus / Advance recovery / Attendance correction"
+                    value={editForm.reason}
+                    onChange={(e) => setEditForm((f) => ({ ...f, reason: e.target.value }))}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Payslip Notes (Optional)</label>
+                  <input
+                    type="text"
+                    placeholder="Visible remark on payslip record"
+                    value={editForm.notes}
+                    onChange={(e) => setEditForm((f) => ({ ...f, notes: e.target.value }))}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-blue-500"
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100">
+                <div>
+                  {editTarget.payrollRecordId && editTarget.isManuallyEdited && (
+                    <button
+                      type="button"
+                      onClick={() => handleResetToAuto(editTarget.payrollRecordId)}
+                      className="px-3.5 py-2 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-xl font-bold transition cursor-pointer inline-flex items-center gap-1.5"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" /> Reset to Auto
+                    </button>
+                  )}
+                </div>
+                <div className="flex items-center gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setShowEditPayrollModal(false)}
+                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={savingManualEdit}
+                    className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition cursor-pointer disabled:opacity-50"
+                  >
+                    {savingManualEdit ? 'Saving...' : 'Save Payroll Changes'}
+                  </button>
+                </div>
+              </div>
+            </form>
           </div>
         </div>
       )}

@@ -130,7 +130,7 @@ export default function PwaInstallButton({ className = '' }) {
               </div>
 
               <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 text-[11px] text-slate-500">
-                ✓ Full offline shift and punch caching <br />
+                ✓ Full offline attendance and punch caching <br />
                 ✓ Standalone window without browser bars <br />
                 ✓ Native OS push notification alerts
               </div>

@@ -65,14 +65,10 @@ router.get('/', protect, async (req, res, next) => {
     if (req.user.role === 'Employee' && req.user.employee) {
       const empDept = req.user.employee.department;
       const empId = req.user.employee._id;
-      const empShift = req.user.employee.assignedShift || req.user.employee.shift;
 
       const appConditions = [{ applicability: 'All' }];
       if (empDept) {
         appConditions.push({ applicability: 'Department', applicableDepartments: empDept });
-      }
-      if (empShift) {
-        appConditions.push({ applicability: 'Shift', applicableShifts: empShift });
       }
       if (empId) {
         appConditions.push({ applicableEmployees: empId });
@@ -91,7 +87,6 @@ router.get('/', protect, async (req, res, next) => {
     const finalQuery = conditions.length > 0 ? { $and: conditions } : {};
 
     const holidays = await Holiday.find(finalQuery)
-      .populate('applicableShifts', 'name startTime endTime')
       .populate('applicableEmployees', 'employeeId fullName department')
       .populate('createdBy', 'name email')
       .sort({ date: 1 });
@@ -188,7 +183,6 @@ router.post('/', protect, authorize('HR'), async (req, res, next) => {
       type,
       applicability,
       applicableDepartments,
-      applicableShifts,
       applicableEmployees,
       isRecurring,
       paid
@@ -245,7 +239,6 @@ router.post('/', protect, authorize('HR'), async (req, res, next) => {
         holiday.type = type || holiday.type;
         holiday.applicability = applicability || holiday.applicability;
         holiday.applicableDepartments = Array.isArray(applicableDepartments) ? applicableDepartments : holiday.applicableDepartments;
-        holiday.applicableShifts = Array.isArray(applicableShifts) ? applicableShifts : holiday.applicableShifts;
         holiday.applicableEmployees = Array.isArray(applicableEmployees) ? applicableEmployees : holiday.applicableEmployees;
         holiday.isRecurring = !!isRecurring;
         holiday.paid = paid !== false;
@@ -263,7 +256,6 @@ router.post('/', protect, authorize('HR'), async (req, res, next) => {
           type: type || 'Company Holiday',
           applicability: applicability || 'All',
           applicableDepartments: Array.isArray(applicableDepartments) ? applicableDepartments : [],
-          applicableShifts: Array.isArray(applicableShifts) ? applicableShifts : [],
           applicableEmployees: Array.isArray(applicableEmployees) ? applicableEmployees : [],
           isRecurring: !!isRecurring,
           paid: paid !== false,
@@ -341,7 +333,6 @@ router.put('/:id', protect, authorize('HR'), async (req, res, next) => {
       type,
       applicability,
       applicableDepartments,
-      applicableShifts,
       applicableEmployees,
       isRecurring,
       paid
@@ -426,7 +417,6 @@ router.put('/:id', protect, authorize('HR'), async (req, res, next) => {
         type: type || existing.type,
         applicability: applicability || existing.applicability,
         applicableDepartments: applicableDepartments !== undefined ? applicableDepartments : existing.applicableDepartments,
-        applicableShifts: applicableShifts !== undefined ? applicableShifts : existing.applicableShifts,
         applicableEmployees: applicableEmployees !== undefined ? applicableEmployees : existing.applicableEmployees,
         isRecurring: isRecurring !== undefined ? !!isRecurring : existing.isRecurring,
         paid: paid !== undefined ? !!paid : existing.paid,

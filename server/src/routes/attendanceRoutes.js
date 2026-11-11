@@ -4,7 +4,6 @@ const mongoose = require('mongoose');
 const Attendance = require('../models/Attendance');
 const DailyReport = require('../models/DailyReport');
 const Employee = require('../models/Employee');
-const ShiftTemplate = require('../models/ShiftTemplate');
 const SystemSetting = require('../models/SystemSetting');
 const Holiday = require('../models/Holiday');
 const AuditLog = require('../models/AuditLog');
@@ -28,7 +27,7 @@ router.post('/punch-in', protect, async (req, res, next) => {
       });
     }
 
-    const employee = await Employee.findById(req.user.employee._id).populate('assignedShift');
+    const employee = await Employee.findById(req.user.employee._id);
     if (!employee) {
       return res.status(404).json({ success: false, message: 'Employee record not found.' });
     }
@@ -74,12 +73,11 @@ router.post('/punch-in', protect, async (req, res, next) => {
 
     const now = new Date();
     const isHoliday = !!holidayRecord;
-    const metrics = AttendanceService.calculateAttendanceMetrics(now, null, employee.assignedShift, settings, isHoliday);
+    const metrics = AttendanceService.calculateAttendanceMetrics(now, null, settings, isHoliday);
 
     let attendance;
     if (existing) {
       existing.punchIn = now;
-      existing.shift = employee.assignedShift?._id || null;
       existing.lateMinutes = metrics.lateMinutes;
       existing.status = metrics.status;
       existing.isHoliday = isHoliday;
@@ -89,7 +87,6 @@ router.post('/punch-in', protect, async (req, res, next) => {
       attendance = await Attendance.create({
         employee: employee._id,
         date: todayStr,
-        shift: employee.assignedShift?._id || null,
         punchIn: now,
         lateMinutes: metrics.lateMinutes,
         status: metrics.status,
@@ -97,9 +94,6 @@ router.post('/punch-in', protect, async (req, res, next) => {
         holiday: holidayRecord?._id || null
       });
     }
-
-    // Populate shift before responding
-    await attendance.populate('shift');
 
     // Notify HR of Employee Punch In
     const timezone = AttendanceService.getTimezone(settings);
@@ -170,7 +164,7 @@ router.post('/punch-out', protect, async (req, res, next) => {
       date: todayStr,
       punchIn: { $ne: null },
       punchOut: null
-    }).populate('shift');
+    });
 
     if (!attendance) {
       return res.status(400).json({
@@ -225,7 +219,6 @@ router.post('/punch-out', protect, async (req, res, next) => {
     const metrics = AttendanceService.calculateAttendanceMetrics(
       attendance.punchIn,
       now,
-      attendance.shift,
       settings,
       isHoliday
     );
@@ -310,8 +303,7 @@ router.patch('/:id/resolve-short-attendance', protect, authorize('HR'), async (r
     const { payableAmount, deductionAmount, hrClassification, resolutionRemarks } = req.body;
 
     const attendance = await Attendance.findById(req.params.id)
-      .populate('employee')
-      .populate('shift');
+      .populate('employee');
 
     if (!attendance) {
       return res.status(404).json({ success: false, message: 'Attendance record not found' });
@@ -405,8 +397,7 @@ router.patch('/:id/review-auto-punch-out', protect, authorize('HR'), async (req,
   try {
     const { remarks } = req.body;
     const attendance = await Attendance.findById(req.params.id)
-      .populate('employee', 'employeeId fullName')
-      .populate('shift', 'name startTime endTime');
+      .populate('employee', 'employeeId fullName');
 
     if (!attendance) {
       return res.status(404).json({ success: false, message: 'Attendance record not found' });
@@ -442,22 +433,25 @@ router.patch('/:id/review-auto-punch-out', protect, authorize('HR'), async (req,
  */
 router.get('/pending-alerts', protect, authorize('HR'), async (req, res, next) => {
   try {
-    const [shortAttendanceAlerts, autoPunchOutRecords] = await Promise.all([
+    const [shortAttendanceAlerts, autoPunchOutRecords, settings] = await Promise.all([
       Attendance.find({ 'shortAttendanceAlert.status': 'Pending' })
         .populate('employee', 'employeeId fullName department designation')
-        .populate('shift', 'name startTime endTime')
         .sort({ date: -1 }),
       Attendance.find({ autoPunchedOut: true, 'autoPunchOutAlert.reviewed': false })
         .populate('employee', 'employeeId fullName department designation')
-        .populate('shift', 'name startTime endTime')
-        .sort({ date: -1 })
+        .sort({ date: -1 }),
+      SystemSetting.findOne().lean()
     ]);
 
     res.json({
       success: true,
       count: shortAttendanceAlerts.length + autoPunchOutRecords.length,
       shortAttendanceAlerts,
-      autoPunchOutRecords
+      autoPunchOutRecords,
+      thresholds: {
+        fullDayThresholdHours: settings?.fullDayThresholdHours ?? settings?.defaultRequiredHours ?? 8,
+        halfDayThresholdHours: settings?.halfDayThresholdHours ?? 4
+      }
     });
   } catch (err) {
     next(err);
@@ -486,16 +480,22 @@ router.get('/short-attendance-alerts', protect, authorize('HR'), async (req, res
       filter.date = { $regex: new RegExp(`^${month}`) };
     }
 
-    const alerts = await Attendance.find(filter)
-      .populate('employee', 'employeeId fullName department designation salary')
-      .populate('shift', 'name startTime endTime requiredHours fullDayWorkingHoursThreshold halfDayWorkingHoursThreshold')
-      .populate('shortAttendanceAlert.resolvedBy', 'name email')
-      .sort({ date: -1 });
+    const [alerts, settings] = await Promise.all([
+      Attendance.find(filter)
+        .populate('employee', 'employeeId fullName department designation salary')
+        .populate('shortAttendanceAlert.resolvedBy', 'name email')
+        .sort({ date: -1 }),
+      SystemSetting.findOne().lean()
+    ]);
 
     res.json({
       success: true,
       count: alerts.length,
-      alerts
+      alerts,
+      thresholds: {
+        fullDayThresholdHours: settings?.fullDayThresholdHours ?? settings?.defaultRequiredHours ?? 8,
+        halfDayThresholdHours: settings?.halfDayThresholdHours ?? 4
+      }
     });
   } catch (err) {
     next(err);
@@ -533,7 +533,7 @@ router.get('/today', protect, async (req, res, next) => {
     const attendance = await Attendance.findOne({
       employee: req.user.employee._id,
       date: todayStr
-    }).populate('shift').populate('dailyReport').populate('holiday');
+    }).populate('dailyReport').populate('holiday');
 
     res.json({
       success: true,
@@ -562,7 +562,6 @@ router.get('/my-history', protect, async (req, res, next) => {
     }
 
     const history = await Attendance.find(filter)
-      .populate('shift')
       .populate('dailyReport')
       .populate('holiday')
       .sort({ date: -1 })
@@ -660,7 +659,6 @@ router.get('/all', protect, authorize('HR'), async (req, res, next) => {
 
     let records = await Attendance.find(filter)
       .populate('employee', 'employeeId fullName department designation joiningDate createdAt')
-      .populate('shift')
       .populate('dailyReport')
       .populate('holiday')
       .sort({ date: -1, createdAt: -1 });
@@ -769,7 +767,7 @@ router.post('/review-correction', protect, authorize('HR'), async (req, res, nex
       return res.status(400).json({ success: false, message: 'Decision must be Approved or Rejected' });
     }
 
-    const attendance = await Attendance.findById(attendanceId).populate('shift').populate('employee');
+    const attendance = await Attendance.findById(attendanceId).populate('employee');
     if (!attendance) {
       return res.status(404).json({ success: false, message: 'Attendance record not found' });
     }
@@ -793,7 +791,6 @@ router.post('/review-correction', protect, authorize('HR'), async (req, res, nex
       const metrics = AttendanceService.calculateAttendanceMetrics(
         attendance.punchIn,
         attendance.punchOut,
-        attendance.shift,
         settings,
         attendance.isHoliday
       );
@@ -868,7 +865,7 @@ router.post('/manual-correct', protect, authorize('HR'), async (req, res, next) 
     let targetDate = date;
 
     if (attendanceId && mongoose.Types.ObjectId.isValid(attendanceId)) {
-      attendance = await Attendance.findById(attendanceId).populate('shift');
+      attendance = await Attendance.findById(attendanceId);
     } else if (attendanceId && typeof attendanceId === 'string' && (attendanceId.startsWith('absent-') || attendanceId.startsWith('unrecorded-'))) {
       const parts = attendanceId.split('-');
       targetEmpId = targetEmpId || parts[1];
@@ -880,16 +877,15 @@ router.post('/manual-correct', protect, authorize('HR'), async (req, res, next) 
         return res.status(404).json({ success: false, message: 'Attendance record or employee/date not found' });
       }
 
-      attendance = await Attendance.findOne({ employee: targetEmpId, date: targetDate }).populate('shift');
+      attendance = await Attendance.findOne({ employee: targetEmpId, date: targetDate });
       if (!attendance) {
-        const employeeDoc = await Employee.findById(targetEmpId).populate('assignedShift');
+        const employeeDoc = await Employee.findById(targetEmpId);
         if (!employeeDoc) {
           return res.status(404).json({ success: false, message: 'Employee not found' });
         }
         attendance = new Attendance({
           employee: targetEmpId,
           date: targetDate,
-          shift: employeeDoc.assignedShift?._id,
           status: status || 'Full Day'
         });
       }
@@ -905,7 +901,6 @@ router.post('/manual-correct', protect, authorize('HR'), async (req, res, next) 
       const metrics = AttendanceService.calculateAttendanceMetrics(
         attendance.punchIn,
         attendance.punchOut,
-        attendance.shift,
         settings,
         attendance.isHoliday
       );
@@ -920,7 +915,6 @@ router.post('/manual-correct', protect, authorize('HR'), async (req, res, next) 
       const metrics = AttendanceService.calculateAttendanceMetrics(
         attendance.punchIn,
         null,
-        attendance.shift,
         settings,
         attendance.isHoliday
       );

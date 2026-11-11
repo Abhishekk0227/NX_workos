@@ -42,6 +42,7 @@ router.put('/', protect, authorize('HR'), async (req, res, next) => {
       employmentTypes,
       gracePeriodMinutes,
       enableGracePeriod,
+      fullDayThresholdHours,
       halfDayThresholdHours,
       halfDayDeductionPercentage,
       enableLateDeduction,
@@ -53,6 +54,8 @@ router.put('/', protect, authorize('HR'), async (req, res, next) => {
       monthlyClAllowance,
       yearlyClTotal,
       yearlySlTotal,
+      workStartTime,
+      workEndTime,
       defaultRequiredHours,
       dailyRateBasis
     } = req.body;
@@ -62,8 +65,38 @@ router.put('/', protect, authorize('HR'), async (req, res, next) => {
     if (departments) settings.departments = departments;
     if (designations) settings.designations = designations;
     if (employmentTypes) settings.employmentTypes = employmentTypes;
+    const nextFullDay = fullDayThresholdHours !== undefined
+      ? Number(fullDayThresholdHours)
+      : (defaultRequiredHours !== undefined ? Number(defaultRequiredHours) : (settings.fullDayThresholdHours ?? settings.defaultRequiredHours ?? 8));
+    const nextHalfDay = halfDayThresholdHours !== undefined
+      ? Number(halfDayThresholdHours)
+      : (settings.halfDayThresholdHours ?? 4);
+
+    if (
+      fullDayThresholdHours !== undefined ||
+      halfDayThresholdHours !== undefined ||
+      defaultRequiredHours !== undefined
+    ) {
+      if (isNaN(nextFullDay) || nextFullDay <= 0 || isNaN(nextHalfDay) || nextHalfDay <= 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Working hour thresholds must be greater than 0.'
+        });
+      }
+      if (nextHalfDay >= nextFullDay) {
+        return res.status(400).json({
+          success: false,
+          message: 'Half-Day working hours threshold must be strictly less than Full-Day threshold.'
+        });
+      }
+    }
+
     if (gracePeriodMinutes !== undefined) settings.gracePeriodMinutes = Number(gracePeriodMinutes);
     if (enableGracePeriod !== undefined) settings.enableGracePeriod = Boolean(enableGracePeriod);
+    if (fullDayThresholdHours !== undefined) {
+      settings.fullDayThresholdHours = Number(fullDayThresholdHours);
+      settings.defaultRequiredHours = Number(fullDayThresholdHours);
+    }
     if (halfDayThresholdHours !== undefined) settings.halfDayThresholdHours = Number(halfDayThresholdHours);
     if (halfDayDeductionPercentage !== undefined) settings.halfDayDeductionPercentage = Number(halfDayDeductionPercentage);
     if (enableLateDeduction !== undefined) settings.enableLateDeduction = Boolean(enableLateDeduction);
@@ -75,7 +108,12 @@ router.put('/', protect, authorize('HR'), async (req, res, next) => {
     if (monthlyClAllowance !== undefined) settings.monthlyClAllowance = Number(monthlyClAllowance);
     if (yearlyClTotal !== undefined) settings.yearlyClTotal = Number(yearlyClTotal);
     if (yearlySlTotal !== undefined) settings.yearlySlTotal = Number(yearlySlTotal);
-    if (defaultRequiredHours !== undefined) settings.defaultRequiredHours = Number(defaultRequiredHours);
+    if (workStartTime !== undefined) settings.workStartTime = workStartTime;
+    if (workEndTime !== undefined) settings.workEndTime = workEndTime;
+    if (defaultRequiredHours !== undefined && fullDayThresholdHours === undefined) {
+      settings.defaultRequiredHours = Number(defaultRequiredHours);
+      settings.fullDayThresholdHours = Number(defaultRequiredHours);
+    }
     if (dailyRateBasis) settings.dailyRateBasis = dailyRateBasis;
 
     await settings.save();

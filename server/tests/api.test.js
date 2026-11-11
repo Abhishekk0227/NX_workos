@@ -3,41 +3,48 @@ const assert = require('node:assert/strict');
 const AttendanceService = require('../src/services/attendanceService');
 const PayrollService = require('../src/services/payrollService');
 
-test('AttendanceService: Time conversion and late arrival calculation', () => {
-  const shift = {
-    startTime: '09:00',
-    endTime: '18:00',
-    requiredHours: 8.5,
-    gracePeriodMinutes: 15
+test('AttendanceService: Pure hours-based thresholds and late arrival calculation', () => {
+  const settings = {
+    companyTimezone: 'Asia/Kolkata',
+    workStartTime: '09:00',
+    workEndTime: '18:00',
+    fullDayThresholdHours: 8,
+    halfDayThresholdHours: 4
   };
 
-  // Punch in at 09:10 (10 mins after shift start 09:00)
-  const onTimeDate = new Date('2026-10-31T09:10:00');
-  const metricsOnTime = AttendanceService.calculateAttendanceMetrics(onTimeDate, null, shift);
-  assert.equal(metricsOnTime.lateMinutes, 10, 'Should record 10 late minutes from shift start');
+  // Punch in at 09:10 IST (10 mins after work start 09:00)
+  const onTimeDate = AttendanceService.getTimestampForTimeInTimezone('2026-10-31', '09:10', 'Asia/Kolkata');
+  const metricsOnTime = AttendanceService.calculateAttendanceMetrics(onTimeDate, null, settings);
+  assert.equal(metricsOnTime.lateMinutes, 10, 'Should record 10 late minutes from work start time');
   assert.equal(metricsOnTime.status, 'Working', 'Status should be Working');
 
-  // Punch in at 09:30 (15m past grace period, 30m past shift start)
-  const lateDate = new Date('2026-10-31T09:30:00');
-  const metricsLate = AttendanceService.calculateAttendanceMetrics(lateDate, null, shift);
+  // Punch in at 09:30 IST (30m past work start)
+  const lateDate = AttendanceService.getTimestampForTimeInTimezone('2026-10-31', '09:30', 'Asia/Kolkata');
+  const metricsLate = AttendanceService.calculateAttendanceMetrics(lateDate, null, settings);
   assert.equal(metricsLate.lateMinutes, 30, 'Should calculate 30 late minutes');
 
-  // Punch out at 18:00 (8.83h worked, 10m late)
-  const punchOutDate = new Date('2026-10-31T18:00:00');
-  const metricsFull = AttendanceService.calculateAttendanceMetrics(onTimeDate, punchOutDate, shift);
-  assert.equal(metricsFull.status, 'Late', 'Status should be Late when arrived past shift start');
+  // Punch out at 18:00 IST (8.83h worked >= 8h threshold -> Full Day)
+  const punchOutDate = AttendanceService.getTimestampForTimeInTimezone('2026-10-31', '18:00', 'Asia/Kolkata');
+  const metricsFull = AttendanceService.calculateAttendanceMetrics(onTimeDate, punchOutDate, settings);
+  assert.equal(metricsFull.status, 'Full Day', 'Status should be Full Day for >= 8 hours worked');
   assert.equal(metricsFull.actualWorkingHours, 8.83, 'Working hours should be calculated correctly');
 
-  // Pure on-time punch in at 09:00
-  const sharpOnTime = new Date('2026-10-31T09:00:00');
-  const metricsSharp = AttendanceService.calculateAttendanceMetrics(sharpOnTime, punchOutDate, shift);
-  assert.equal(metricsSharp.status, 'Present', 'Status should be Present when arrived on time');
+  // Sharp on-time arrival at 09:00 IST, out at 18:00 IST -> 9 hours, 0 late minutes
+  const sharpOnTime = AttendanceService.getTimestampForTimeInTimezone('2026-10-31', '09:00', 'Asia/Kolkata');
+  const metricsSharp = AttendanceService.calculateAttendanceMetrics(sharpOnTime, punchOutDate, settings);
+  assert.equal(metricsSharp.status, 'Full Day', 'Status should be Full Day for 9 hours worked');
   assert.equal(metricsSharp.lateMinutes, 0, 'Zero late minutes for on-time arrival');
 
-  // Worked less than 6 hours -> Half Day
-  const earlyPunchOut = new Date('2026-10-31T12:00:00');
-  const metricsHalfDay = AttendanceService.calculateAttendanceMetrics(onTimeDate, earlyPunchOut, shift);
-  assert.equal(metricsHalfDay.status, 'Half Day', 'Status should be Half Day if worked under 6 hours');
+  // Worked 5 hours (>= 4h and < 8h) -> Half Day
+  const halfPunchOut = AttendanceService.getTimestampForTimeInTimezone('2026-10-31', '14:10', 'Asia/Kolkata');
+  const metricsHalfDay = AttendanceService.calculateAttendanceMetrics(onTimeDate, halfPunchOut, settings);
+  assert.equal(metricsHalfDay.status, 'Half Day', 'Status should be Half Day for 5 hours worked');
+
+  // Worked less than 4 hours -> Short Attendance
+  const shortPunchOut = AttendanceService.getTimestampForTimeInTimezone('2026-10-31', '12:00', 'Asia/Kolkata');
+  const metricsShort = AttendanceService.calculateAttendanceMetrics(onTimeDate, shortPunchOut, settings);
+  assert.equal(metricsShort.status, 'Short Attendance', 'Status should be Short Attendance for < 4 hours');
+  assert.equal(metricsShort.isShortAttendance, true, 'Short Attendance flag should be true');
 });
 
 test('PayrollService: Days in month and All Days - Sundays calculation', () => {
@@ -71,34 +78,31 @@ test('PayrollService: Days in month and All Days - Sundays calculation', () => {
 });
 
 test('AttendanceService: Timezone-safe direct working hours calculation (punchOut - punchIn)', () => {
-  const shift = {
-    startTime: '10:00',
-    endTime: '18:00',
-    requiredHours: 8,
-    gracePeriodMinutes: 10
-  };
   const settings = {
     companyTimezone: 'Asia/Kolkata',
-    halfDayThresholdHours: 6
+    workStartTime: '10:00',
+    workEndTime: '18:00',
+    fullDayThresholdHours: 8,
+    halfDayThresholdHours: 4
   };
 
-  // 10:39 AM IST punch in, 05:52 PM IST punch out
+  // 10:39 AM IST punch in, 05:52 PM IST punch out (7.21 hrs -> between 4h and 8h = Half Day)
   const punchInUTC = '2026-11-02T05:09:29.294Z';
   const punchOutUTC = '2026-11-02T12:22:21.247Z';
 
-  const metrics = AttendanceService.calculateAttendanceMetrics(punchInUTC, punchOutUTC, shift, settings);
-  assert.equal(metrics.actualWorkingHours, 7.21, 'Working hours must be ~7.21 hrs, NOT 2.37 hrs');
-  assert.equal(metrics.lateMinutes, 39, 'Punch in at 10:39 AM is 39m late for 10:00 shift');
-  assert.equal(metrics.earlyMinutes, 8, 'Punch out at 17:52 PM is 8m early before 18:00');
-  assert.equal(metrics.status, 'Late', 'Status should be Late, NOT Half Day');
+  const metrics = AttendanceService.calculateAttendanceMetrics(punchInUTC, punchOutUTC, settings);
+  assert.equal(metrics.actualWorkingHours, 7.21, 'Working hours must be ~7.21 hrs');
+  assert.equal(metrics.lateMinutes, 39, 'Punch in at 10:39 AM is 39m after 10:00 work start');
+  assert.equal(metrics.earlyMinutes, 8, 'Punch out at 17:52 PM is 8m before 18:00');
+  assert.equal(metrics.status, 'Half Day', 'Status should be Half Day for 7.21 hours (< 8h full-day threshold)');
 
-  // User Specific Case: 9:58 AM IST punch in (04:28 UTC), 7:20 PM IST punch out (13:50 UTC) -> 9:22 hours
+  // User Specific Case: 9:58 AM IST punch in (04:28 UTC), 7:20 PM IST punch out (13:50 UTC) -> 9:22 hours -> Full Day
   const userPunchIn = '2026-11-02T04:28:00.000Z'; // 09:58 AM IST
   const userPunchOut = '2026-11-02T13:50:00.000Z'; // 19:20 (07:20 PM) IST
-  const userMetrics = AttendanceService.calculateAttendanceMetrics(userPunchIn, userPunchOut, shift, settings);
+  const userMetrics = AttendanceService.calculateAttendanceMetrics(userPunchIn, userPunchOut, settings);
   assert.equal(userMetrics.workingHoursFormatted, '9:22', 'Working hours formatted must be exactly 9:22');
   assert.equal(userMetrics.actualWorkingHours, 9.37, 'Working hours decimal must be 9.37 hrs (562 minutes / 60)');
-  assert.equal(userMetrics.lateMinutes, 0, 'Arrival at 09:58 AM is on-time for 10:00 AM shift');
-  assert.equal(userMetrics.status, 'Present', 'Status should be Present');
+  assert.equal(userMetrics.lateMinutes, 0, 'Arrival at 09:58 AM has 0 late minutes');
+  assert.equal(userMetrics.status, 'Full Day', 'Status should be Full Day for 9.37 hours');
 });
 

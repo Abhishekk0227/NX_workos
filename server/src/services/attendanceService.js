@@ -174,10 +174,6 @@ class AttendanceService {
         if (h.applicability === 'Department' && employee.department && h.applicableDepartments?.includes(employee.department)) {
           return h;
         }
-        if (h.applicability === 'Shift' && employee.assignedShift) {
-          const shiftId = employee.assignedShift._id ? employee.assignedShift._id.toString() : employee.assignedShift.toString();
-          if (h.applicableShifts?.some(s => s.toString() === shiftId)) return h;
-        }
         if (h.applicability === 'Custom' && employee._id) {
           if (h.applicableEmployees?.some(e => e.toString() === employee._id.toString())) return h;
         }
@@ -192,17 +188,37 @@ class AttendanceService {
   /**
    * Calculate late minutes, early departure minutes, actual working hours, status, and alert triggers.
    *
-   * Threshold rules:
-   * - 8 hours or more (>= fullDayThreshold): "Full Day" (or "Late" if arrived after shift start), 100%
-   * - 4 to less than 8 hours (>= halfDayThreshold && < fullDayThreshold): "Half Day", 50%
-   * - < 4 hours (< halfDayThreshold): "Short Attendance", HR decides, generates Short Attendance Alert
-   * - No attendance: "Absent" (or "Holiday" if holiday), 0%
+   * Pure working-hours threshold rules (configurable by HR in SystemSetting):
+   * - >= fullDayThresholdHours (default 8 hrs): "Full Day" (100% salary)
+   * - >= halfDayThresholdHours & < fullDayThresholdHours (default 4 to <8 hrs): "Half Day" (50% salary)
+   * - < halfDayThresholdHours (default <4 hrs): "Short Attendance" (HR decides, generates alert)
+   * - No attendance: "Absent" (0% salary) or "Holiday" on Holidays
    */
-  static calculateAttendanceMetrics(punchIn, punchOut, shift, settings = null, isHoliday = false) {
+  static calculateAttendanceMetrics(
+    punchIn,
+    punchOut,
+    settingsOrObj = null,
+    isHolidayOrSettings = false,
+    legacyIsHoliday = false
+  ) {
+    let resolvedSettings = settingsOrObj;
+    let resolvedIsHoliday = false;
+    if (typeof isHolidayOrSettings === 'object' && isHolidayOrSettings !== null) {
+      resolvedSettings = isHolidayOrSettings;
+      resolvedIsHoliday = Boolean(legacyIsHoliday);
+    } else if (typeof isHolidayOrSettings === 'boolean') {
+      resolvedIsHoliday = isHolidayOrSettings;
+    } else {
+      resolvedIsHoliday = Boolean(legacyIsHoliday);
+    }
+
+    const effectiveSettings = resolvedSettings || {};
+    const timezone = this.getTimezone(effectiveSettings);
+
     let lateMinutes = 0;
     let earlyMinutes = 0;
     let actualWorkingHours = 0;
-    let status = isHoliday ? 'Holiday' : 'Absent';
+    let status = resolvedIsHoliday ? 'Holiday' : 'Absent';
     let isShortAttendance = false;
 
     if (!punchIn) {
@@ -211,31 +227,22 @@ class AttendanceService {
         earlyMinutes: 0,
         actualWorkingHours: 0,
         workingHoursFormatted: '0:00',
-        status: isHoliday ? 'Holiday' : 'Absent',
+        status: resolvedIsHoliday ? 'Holiday' : 'Absent',
         isShortAttendance: false
       };
     }
 
-    const defaultShift = {
-      startTime: '09:00',
-      endTime: '18:00',
-      requiredHours: 8,
-      fullDayWorkingHoursThreshold: 8,
-      halfDayWorkingHoursThreshold: 4,
-      gracePeriodMinutes: 15,
-      breakDurationMinutes: 60
-    };
+    const workStartTime = effectiveSettings.workStartTime || '10:00';
+    const workEndTime = effectiveSettings.workEndTime || '18:00';
+    const fullDayThreshold = effectiveSettings.fullDayThresholdHours ?? effectiveSettings.defaultRequiredHours ?? 8;
+    const halfDayThreshold = effectiveSettings.halfDayThresholdHours ?? 4;
 
-    const timezone = this.getTimezone(settings);
-    const activeShift = shift || defaultShift;
-    const shiftStartMinutes = this.timeToMinutes(activeShift.startTime);
-    const shiftEndMinutes = this.timeToMinutes(activeShift.endTime);
-
+    const startMinutes = this.timeToMinutes(workStartTime);
+    const endMinutes = this.timeToMinutes(workEndTime);
     const punchInMinutes = this.dateToMinutes(punchIn, timezone);
 
-    // Calculate Late Arrival: count late minutes from shift start
-    if (punchInMinutes > shiftStartMinutes) {
-      lateMinutes = punchInMinutes - shiftStartMinutes;
+    if (punchInMinutes > startMinutes) {
+      lateMinutes = punchInMinutes - startMinutes;
     }
 
     // If still working (not punched out yet)
@@ -245,15 +252,15 @@ class AttendanceService {
         earlyMinutes: 0,
         actualWorkingHours: 0,
         workingHoursFormatted: '0:00',
-        status: isHoliday ? 'Working on Holiday' : 'Working',
+        status: resolvedIsHoliday ? 'Working on Holiday' : 'Working',
         isShortAttendance: false
       };
     }
 
     // Punched out calculations
     const punchOutMinutes = this.dateToMinutes(punchOut, timezone);
-    if (!activeShift.isOvernight && punchOutMinutes < shiftEndMinutes) {
-      earlyMinutes = shiftEndMinutes - punchOutMinutes;
+    if (punchOutMinutes < endMinutes) {
+      earlyMinutes = endMinutes - punchOutMinutes;
     }
 
     // Direct punchOut - punchIn difference (actual elapsed duration)
@@ -270,38 +277,15 @@ class AttendanceService {
       workingHoursFormatted = `${hours}:${String(minutes).padStart(2, '0')}`;
     }
 
-    // Explicit threshold configuration check
-    const hasExplicitThresholds = activeShift.fullDayWorkingHoursThreshold != null || activeShift.halfDayWorkingHoursThreshold != null;
-
-    if (hasExplicitThresholds) {
-      const fullDayThreshold = activeShift.fullDayWorkingHoursThreshold ?? 8;
-      const halfDayThreshold = activeShift.halfDayWorkingHoursThreshold ?? 4;
-
-      if (isHoliday) {
-        status = 'Working on Holiday';
-      } else if (actualWorkingHours >= fullDayThreshold) {
-        status = 'Full Day';
-      } else if (actualWorkingHours >= halfDayThreshold) {
-        status = 'Half Day';
-      } else {
-        status = 'Short Attendance';
-        isShortAttendance = true;
-      }
+    if (resolvedIsHoliday) {
+      status = 'Working on Holiday';
+    } else if (actualWorkingHours >= fullDayThreshold) {
+      status = 'Full Day';
+    } else if (actualWorkingHours >= halfDayThreshold) {
+      status = 'Half Day';
     } else {
-      // Legacy compatibility when thresholds are not explicitly defined on shift
-      const halfDayThreshold = settings?.halfDayThresholdHours ?? 6;
-      if (isHoliday) {
-        status = 'Working on Holiday';
-      } else if (settings?.shortAttendanceThresholdHours && actualWorkingHours < settings.shortAttendanceThresholdHours) {
-        status = 'Short Attendance';
-        isShortAttendance = true;
-      } else if (actualWorkingHours < halfDayThreshold) {
-        status = 'Half Day';
-      } else if (lateMinutes > 0) {
-        status = 'Late';
-      } else {
-        status = 'Present';
-      }
+      status = 'Short Attendance';
+      isShortAttendance = true;
     }
 
     return {
@@ -316,52 +300,39 @@ class AttendanceService {
 
   /**
    * Process Automatic Punch-Out for forgotten punch sessions.
-   * - For standard shifts: auto punch out at 12:00 AM IST of the next calendar day.
-   * - For overnight shifts: auto punch out at configured shift end time IST.
+   * Automatically punches out incomplete sessions from prior dates at 12:00 AM IST of the next calendar day.
    */
   static async processAutoPunchOut() {
     const Attendance = require('../models/Attendance');
     const NotificationService = require('./notificationService');
     const now = new Date();
     const todayStr = this.formatDate(now, 'Asia/Kolkata');
+    const settings = (await SystemSetting.findOne().lean()) || {};
 
     // Find all incomplete sessions where punchIn is present, but punchOut is null
     const incompleteSessions = await Attendance.find({
       punchIn: { $ne: null },
       punchOut: null,
       date: { $lt: todayStr } // Sessions started before today (past midnight 12:00 AM IST)
-    }).populate('employee').populate('shift');
+    }).populate('employee');
 
     const updated = [];
 
     for (const session of incompleteSessions) {
-      const shift = session.shift;
-      const isOvernight = Boolean(
-        shift?.isOvernight ||
-        (shift?.startTime && shift?.endTime && this.timeToMinutes(shift.endTime) < this.timeToMinutes(shift.startTime))
-      );
-
       // Deterministic calendar next-day calculation
       const [year, month, day] = session.date.split('-').map(Number);
       const nextDayDate = new Date(Date.UTC(year, month - 1, day + 1));
       const nextDayStr = nextDayDate.toISOString().slice(0, 10);
 
-      let autoPunchOutTime;
-      if (isOvernight && shift?.endTime) {
-        // Overnight shift: Follow configured shift-end time on the next calendar day (Do NOT punch out at midnight)
-        autoPunchOutTime = this.getTimestampForTimeInTimezone(nextDayStr, shift.endTime, 'Asia/Kolkata');
-      } else {
-        // Standard shift: Automatically punch out at 12:00 AM IST (00:00:00 IST of next calendar day)
-        autoPunchOutTime = this.getTimestampForTimeInTimezone(nextDayStr, '00:00', 'Asia/Kolkata');
-      }
+      // Automatically punch out at 12:00 AM IST (00:00:00 IST of next calendar day)
+      const autoPunchOutTime = this.getTimestampForTimeInTimezone(nextDayStr, '00:00', 'Asia/Kolkata');
 
-      // If autoPunchOutTime is in the future compared to now, skip (e.g. overnight shift still active)
       if (autoPunchOutTime.getTime() > now.getTime()) {
         continue;
       }
 
       const isHoliday = !!session.isHoliday;
-      const metrics = this.calculateAttendanceMetrics(session.punchIn, autoPunchOutTime, shift, null, isHoliday);
+      const metrics = this.calculateAttendanceMetrics(session.punchIn, autoPunchOutTime, settings, isHoliday);
 
       session.punchOut = autoPunchOutTime;
       session.autoPunchedOut = true;
@@ -386,14 +357,11 @@ class AttendanceService {
       session.auditHistory.push({
         action: 'AUTO_PUNCH_OUT',
         performedAt: now,
-        reason: isOvernight
-          ? 'Overnight shift ended; automatically punched out by system at configured shift-end time.'
-          : 'Employee did not punch out; automatically punched out by system at 12:00 AM IST cutoff.',
+        reason: 'Employee did not punch out; automatically punched out by system at 12:00 AM IST cutoff.',
         details: {
           sessionDate: session.date,
           punchIn: session.punchIn,
           autoPunchOutTime,
-          isOvernight,
           actualWorkingHours: metrics.actualWorkingHours,
           status: metrics.status
         }

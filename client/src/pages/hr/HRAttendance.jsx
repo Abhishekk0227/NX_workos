@@ -501,7 +501,7 @@ export default function HRAttendance() {
                     </span>
                   </div>
                   <div className="text-slate-600 mt-0.5 text-[11px]">
-                    Date: <strong>{att.date}</strong> | Logged: <strong>{att.actualWorkingHours || 0} hrs</strong> ({att.status}) | Shift: {att.shift?.name || 'Default'}
+                    Date: <strong>{att.date}</strong> | Logged: <strong>{att.actualWorkingHours || 0} hrs</strong> ({att.status}) | Dept: {att.employee?.department || 'General'}
                   </div>
                 </div>
                 <div className="flex items-center gap-2 self-end sm:self-auto">

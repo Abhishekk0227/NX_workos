@@ -43,6 +43,11 @@ const payrollRecordSchema = new mongoose.Schema(
       required: true,
       min: 0
     },
+    bonusAmount: {
+      type: Number,
+      default: 0,
+      min: 0
+    },
     dailyRateBasis: {
       type: String,
       enum: ['CalendarDays', 'WorkingDays', '30DaysFixed'],
@@ -65,6 +70,10 @@ const payrollRecordSchema = new mongoose.Schema(
       default: 0
     },
     weeklyOffDays: {
+      type: Number,
+      default: 0
+    },
+    holidayDays: {
       type: Number,
       default: 0
     },
@@ -131,9 +140,34 @@ const payrollRecordSchema = new mongoose.Schema(
       type: Number,
       default: 0
     },
+    totalDeductions: {
+      type: Number,
+      default: 0
+    },
     netPayable: {
       type: Number,
       required: true
+    },
+    isNetPayableOverridden: {
+      type: Boolean,
+      default: false
+    },
+    isManuallyEdited: {
+      type: Boolean,
+      default: false
+    },
+    manualEditReason: {
+      type: String,
+      default: ''
+    },
+    lastEditedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null
+    },
+    lastEditedAt: {
+      type: Date,
+      default: null
     },
     status: {
       type: String,

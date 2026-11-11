@@ -92,8 +92,7 @@ class LeaveService {
     isHalfDay,
     halfDayType,
     reasonCategory,
-    reasonDetails,
-    shift
+    reasonDetails
   }) {
     const flagReasons = [];
     let isLateApplication = false;
@@ -150,15 +149,15 @@ class LeaveService {
     // 4. Configurable Cut-off timing check (Conditions 32-34)
     const todayStr = AttendanceService.formatDate(new Date());
     if (startDate === todayStr) {
-      const shiftStartTime = shift?.startTime || '09:30';
-      const [sh, sm] = shiftStartTime.split(':').map(Number);
-      const shiftStartMinutes = (sh || 9) * 60 + (sm || 30);
+      const workStartTime = settings.workStartTime || '10:00';
+      const [sh, sm] = workStartTime.split(':').map(Number);
+      const startMinutes = (sh || 10) * 60 + (sm || 0);
 
-      let cutOffMinutes = shiftStartMinutes - (settings.fullDayCutoffMinutes || 120);
+      let cutOffMinutes = startMinutes - (settings.fullDayCutoffMinutes || 120);
 
       if (isHalfDay) {
         if (halfDayType === 'FirstHalf') {
-          cutOffMinutes = shiftStartMinutes - (settings.morningHalfDayCutoffMinutes || 60);
+          cutOffMinutes = startMinutes - (settings.morningHalfDayCutoffMinutes || 60);
         } else if (halfDayType === 'SecondHalf') {
           const lunchTime = settings.lunchStartTime || '13:30';
           const [lh, lm] = lunchTime.split(':').map(Number);
@@ -172,7 +171,7 @@ class LeaveService {
 
       if (currentMinutes > cutOffMinutes) {
         isLateApplication = true;
-        flagReasons.push('Late application: submitted past the configured shift cut-off time');
+        flagReasons.push('Late application: submitted past the configured cut-off time');
       }
     }
 

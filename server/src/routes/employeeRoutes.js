@@ -53,7 +53,6 @@ router.get('/', protect, authorize('HR'), async (req, res, next) => {
     }
 
     const employees = await Employee.find(filter)
-      .populate('assignedShift')
       .populate('leavePolicy')
       .populate('user', 'isActive lastLogin')
       .sort({ createdAt: -1 });
@@ -83,7 +82,6 @@ router.post('/', protect, authorize('HR'), async (req, res, next) => {
       designation,
       employmentType = 'Full-Time',
       joiningDate = new Date(),
-      assignedShift,
       weeklyOff = ['Sunday'],
       leavePolicy,
       initialPassword = 'Employee@123',
@@ -131,7 +129,6 @@ router.post('/', protect, authorize('HR'), async (req, res, next) => {
       designation,
       employmentType,
       joiningDate,
-      assignedShift: assignedShift || null,
       weeklyOff,
       leavePolicy: leavePolicy || null
     });
@@ -231,7 +228,6 @@ router.post('/', protect, authorize('HR'), async (req, res, next) => {
 router.get('/:id', protect, async (req, res, next) => {
   try {
     const employee = await Employee.findById(req.params.id)
-      .populate('assignedShift')
       .populate('leavePolicy')
       .populate('user', 'isActive lastLogin');
 
@@ -268,7 +264,6 @@ router.put('/:id', protect, authorize('HR'), async (req, res, next) => {
       department,
       designation,
       employmentType,
-      assignedShift,
       weeklyOff,
       leavePolicy,
       employmentStatus
@@ -309,7 +304,6 @@ router.put('/:id', protect, authorize('HR'), async (req, res, next) => {
     if (department) employee.department = department;
     if (designation) employee.designation = designation;
     if (employmentType) employee.employmentType = employmentType;
-    if (assignedShift !== undefined) employee.assignedShift = assignedShift || null;
     if (weeklyOff) employee.weeklyOff = weeklyOff;
     if (leavePolicy !== undefined) employee.leavePolicy = leavePolicy || null;
     if (employmentStatus) employee.employmentStatus = employmentStatus;

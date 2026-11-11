@@ -95,7 +95,7 @@ router.post('/test-push', protect, async (req, res, next) => {
     const notification = await Notification.create({
       recipient: req.user._id,
       title: 'NX Work OS — Push Notification Test',
-      message: 'Real-time push notification verified! You will receive live shift, broadcast, and task alerts.',
+      message: 'Real-time push notification verified! You will receive live attendance, broadcast, and task alerts.',
       type: 'System',
       link: '/'
     });

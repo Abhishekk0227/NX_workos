@@ -38,7 +38,6 @@ router.post('/login', async (req, res, next) => {
         .populate({
           path: 'employee',
           populate: [
-            { path: 'assignedShift' },
             { path: 'leavePolicy' }
           ]
         });
@@ -64,7 +63,6 @@ router.post('/login', async (req, res, next) => {
         .populate({
           path: 'employee',
           populate: [
-            { path: 'assignedShift' },
             { path: 'leavePolicy' }
           ]
         });
@@ -86,7 +84,6 @@ router.post('/login', async (req, res, next) => {
             .populate({
               path: 'employee',
               populate: [
-                { path: 'assignedShift' },
                 { path: 'leavePolicy' }
               ]
             });
@@ -107,7 +104,6 @@ router.post('/login', async (req, res, next) => {
       .populate({
         path: 'employee',
         populate: [
-          { path: 'assignedShift' },
           { path: 'leavePolicy' }
         ]
       });
@@ -147,7 +143,6 @@ router.post('/login', async (req, res, next) => {
           .populate({
             path: 'employee',
             populate: [
-              { path: 'assignedShift' },
               { path: 'leavePolicy' }
             ]
           });
@@ -187,7 +182,6 @@ router.get('/me', protect, async (req, res, next) => {
     const user = await User.findById(req.user._id).populate({
       path: 'employee',
       populate: [
-        { path: 'assignedShift' },
         { path: 'leavePolicy' }
       ]
     });
@@ -274,7 +268,6 @@ router.put('/profile-picture', protect, async (req, res, next) => {
     const updatedUser = await User.findById(req.user._id).populate({
       path: 'employee',
       populate: [
-        { path: 'assignedShift' },
         { path: 'leavePolicy' }
       ]
     });

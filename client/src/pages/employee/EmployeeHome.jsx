@@ -45,6 +45,7 @@ export default function EmployeeHome() {
   const [broadcasts, setBroadcasts] = useState([]);
   const [upcomingHolidays, setUpcomingHolidays] = useState([]);
   const [activeReminders, setActiveReminders] = useState([]);
+  const [workHoursPolicy, setWorkHoursPolicy] = useState({ fullDayThresholdHours: 8, halfDayThresholdHours: 4 });
   const [loading, setLoading] = useState(true);
 
   // Notice Read & Acknowledge Modal state
@@ -61,14 +62,15 @@ export default function EmployeeHome() {
   const fetchHomeData = async () => {
     setLoading(true);
     try {
-      const [attRes, balRes, taskRes, broadRes, holRes, remRes, pendingReportRes] = await Promise.allSettled([
+      const [attRes, balRes, taskRes, broadRes, holRes, remRes, pendingReportRes, setRes] = await Promise.allSettled([
         api.get('/attendance/today'),
         api.get('/leaves/balance'),
         api.get('/tasks/my'),
         api.get('/broadcasts/active'),
         api.get('/holidays/upcoming'),
         api.get('/reminders?status=Pending'),
-        api.get('/reports/pending-auto-punch-out')
+        api.get('/reports/pending-auto-punch-out'),
+        api.get('/settings')
       ]);
 
       if (attRes.status === 'fulfilled') {
@@ -100,6 +102,13 @@ export default function EmployeeHome() {
         setShowMissingReportModal(true);
       } else {
         setPendingAutoPunchOutReport(null);
+      }
+      if (setRes.status === 'fulfilled' && setRes.value.data?.settings) {
+        const s = setRes.value.data.settings;
+        setWorkHoursPolicy({
+          fullDayThresholdHours: s.fullDayThresholdHours ?? s.defaultRequiredHours ?? 8,
+          halfDayThresholdHours: s.halfDayThresholdHours ?? 4
+        });
       }
     } catch (err) {
       console.error('Error fetching home data:', err);
@@ -164,11 +173,9 @@ export default function EmployeeHome() {
   const isWorking = attendance?.punchIn && !attendance?.punchOut;
   const isPunchedOut = attendance?.punchIn && attendance?.punchOut;
 
-  // Shift details
-  const shiftName = emp?.assignedShift?.name || 'General Shift';
-  const shiftTime = emp?.assignedShift?.startTime && emp?.assignedShift?.endTime
-    ? `${emp.assignedShift.startTime} - ${emp.assignedShift.endTime}`
-    : '10:00 AM - 6:00 PM';
+  // Working hours target details
+  const fullDayHrs = workHoursPolicy.fullDayThresholdHours || 8;
+  const halfDayHrs = workHoursPolicy.halfDayThresholdHours || 4;
 
   // Live Real-Time Working Hours Timer
   const [liveWorkingHours, setLiveWorkingHours] = useState('00:00');
@@ -394,23 +401,23 @@ export default function EmployeeHome() {
         </div>
       </div>
 
-      {/* 2. Today's Shift Card matching Screenshot */}
+      {/* 2. Daily Working Hours Card */}
       <div className="bg-white p-4 sm:p-5 rounded-3xl border border-slate-100 shadow-2xs space-y-4">
-        {/* Shift Details Row */}
+        {/* Working Hours Details Row */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-500 flex items-center justify-center shrink-0">
               <Clock className="w-5 h-5 text-blue-500" />
             </div>
             <div>
-              <span className="text-xs text-slate-400 font-medium block leading-tight">Today's Shift</span>
+              <span className="text-xs text-slate-400 font-medium block leading-tight">Daily Working Hours</span>
               <span className="text-sm sm:text-base font-bold text-slate-900 leading-tight">
-                {shiftTime}
+                {fullDayHrs} hrs Full Day • {halfDayHrs} hrs Half Day
               </span>
             </div>
           </div>
           <span className="text-xs px-3 py-1 bg-slate-100 text-slate-600 font-semibold rounded-xl">
-            {shiftName}
+            Hours-Based
           </span>
         </div>
 
@@ -440,7 +447,7 @@ export default function EmployeeHome() {
         ) : (
           <div className="w-full py-3 px-4 bg-emerald-50 border border-emerald-200 text-emerald-800 font-bold text-xs sm:text-sm rounded-2xl text-center flex items-center justify-center gap-2 shadow-2xs">
             <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
-            <span>Shift Completed ({formatWorkingHours(attendance)} recorded)</span>
+            <span>Work Session Completed ({formatWorkingHours(attendance)} recorded)</span>
           </div>
         )}
       </div>

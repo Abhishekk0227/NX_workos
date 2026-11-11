@@ -25,9 +25,8 @@ import { useAuth } from '../../context/AuthContext';
 
 export default function HRSettings() {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState('shifts'); // 'shifts' | 'policy' | 'company' | 'roles' | 'notifications' | 'profile'
+  const [activeTab, setActiveTab] = useState('hours'); // 'hours' | 'policy' | 'company' | 'roles' | 'notifications' | 'profile'
 
-  const [shifts, setShifts] = useState([]);
   const [settings, setSettings] = useState({
     companyName: 'NX Global Technologies',
     companyEmail: 'contact@nxglobal.com',
@@ -37,7 +36,8 @@ export default function HRSettings() {
     designations: ['Developer', 'Designer', 'QA Tester', 'Operations Specialist', 'HR Manager'],
     gracePeriodMinutes: 15,
     enableGracePeriod: true,
-    halfDayThresholdHours: 6,
+    fullDayThresholdHours: 8,
+    halfDayThresholdHours: 4,
     halfDayDeductionPercentage: 50,
     enableLateDeduction: true,
     enableShortfallDeduction: false,
@@ -45,6 +45,8 @@ export default function HRSettings() {
     morningHalfDayCutoffMinutes: 60,
     afternoonHalfDayCutoffMinutes: 60,
     lunchStartTime: '13:30',
+    workStartTime: '10:00',
+    workEndTime: '18:00',
     monthlyClAllowance: 1,
     yearlyClTotal: 12,
     yearlySlTotal: 12,
@@ -54,23 +56,6 @@ export default function HRSettings() {
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-
-  // Shift Management State (Section 1)
-  const [newShift, setNewShift] = useState({
-    name: '',
-    startTime: '10:00',
-    halfDayCutoffTime: '14:00',
-    endTime: '18:00',
-    gracePeriodMinutes: 15,
-    fullDayWorkingHoursThreshold: 8,
-    halfDayWorkingHoursThreshold: 4,
-    requiredHours: 8,
-    breakDurationMinutes: 60,
-    isActive: true,
-    isDefault: false
-  });
-  const [editingShift, setEditingShift] = useState(null);
-  const [showEditShiftModal, setShowEditShiftModal] = useState(false);
 
   // Password update form
   const [currentPassword, setCurrentPassword] = useState('');
@@ -89,13 +74,15 @@ export default function HRSettings() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [shiftRes, setRes] = await Promise.all([
-        api.get('/shifts'),
-        api.get('/settings')
-      ]);
-      setShifts(shiftRes.data?.shifts || []);
+      const setRes = await api.get('/settings');
       if (setRes.data?.settings) {
-        setSettings((prev) => ({ ...prev, ...setRes.data.settings }));
+        const fetched = setRes.data.settings;
+        setSettings((prev) => ({
+          ...prev,
+          ...fetched,
+          fullDayThresholdHours: fetched.fullDayThresholdHours ?? fetched.defaultRequiredHours ?? 8,
+          halfDayThresholdHours: fetched.halfDayThresholdHours ?? 4
+        }));
       }
     } catch (err) {
       console.error(err);
@@ -110,78 +97,35 @@ export default function HRSettings() {
 
   const handleSaveSettings = async (e) => {
     if (e) e.preventDefault();
+    const fullHrs = Number(settings.fullDayThresholdHours || 8);
+    const halfHrs = Number(settings.halfDayThresholdHours || 4);
+    if (isNaN(fullHrs) || fullHrs <= 0 || isNaN(halfHrs) || halfHrs <= 0) {
+      alert('Full-Day and Half-Day thresholds must be positive numbers.');
+      return;
+    }
+    if (halfHrs >= fullHrs) {
+      alert('Half-Day working hours threshold must be strictly less than Full-Day threshold.');
+      return;
+    }
+
     setSaving(true);
     try {
-      const res = await api.put('/settings', settings);
+      const res = await api.put('/settings', {
+        ...settings,
+        fullDayThresholdHours: fullHrs,
+        halfDayThresholdHours: halfHrs,
+        defaultRequiredHours: fullHrs
+      });
       if (res.data?.success) {
+        if (res.data.settings) {
+          setSettings((prev) => ({ ...prev, ...res.data.settings }));
+        }
         alert('Settings saved successfully!');
       }
     } catch (err) {
       alert(err.response?.data?.message || 'Save failed');
     } finally {
       setSaving(false);
-    }
-  };
-
-  const handleCreateShift = async (e) => {
-    e.preventDefault();
-    try {
-      const res = await api.post('/shifts', newShift);
-      if (res.data?.success) {
-        alert('Shift template added!');
-        setNewShift({
-          name: '',
-          startTime: '10:00',
-          halfDayCutoffTime: '14:00',
-          endTime: '18:00',
-          gracePeriodMinutes: 15,
-          fullDayWorkingHoursThreshold: 8,
-          halfDayWorkingHoursThreshold: 4,
-          requiredHours: 8,
-          breakDurationMinutes: 60,
-          isActive: true,
-          isDefault: false
-        });
-        fetchData();
-      }
-    } catch (err) {
-      alert(err.response?.data?.message || 'Failed to add shift template');
-    }
-  };
-
-  const handleToggleShiftStatus = async (shiftId) => {
-    try {
-      const res = await api.patch(`/shifts/${shiftId}/toggle`);
-      if (res.data?.success) {
-        fetchData();
-      }
-    } catch (err) {
-      alert(err.response?.data?.message || 'Toggle failed');
-    }
-  };
-
-  const handleUpdateShift = async (e) => {
-    e.preventDefault();
-    if (!editingShift) return;
-    try {
-      const res = await api.put(`/shifts/${editingShift._id}`, editingShift);
-      if (res.data?.success) {
-        setShowEditShiftModal(false);
-        setEditingShift(null);
-        fetchData();
-      }
-    } catch (err) {
-      alert(err.response?.data?.message || 'Update failed');
-    }
-  };
-
-  const handleDeleteShift = async (shiftId, name) => {
-    if (!window.confirm(`Are you sure you want to delete shift "${name}"?`)) return;
-    try {
-      await api.delete(`/shifts/${shiftId}`);
-      fetchData();
-    } catch (err) {
-      alert(err.response?.data?.message || 'Delete failed');
     }
   };
 
@@ -209,8 +153,8 @@ export default function HRSettings() {
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">Roles & Settings</h1>
-          <p className="text-xs text-slate-500 mt-0.5">Configure shifts, company parameters, attendance policies, and security</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">Roles &amp; Settings</h1>
+          <p className="text-xs text-slate-500 mt-0.5">Configure working hours thresholds, company parameters, attendance policies, and security</p>
         </div>
 
         <button
@@ -226,7 +170,7 @@ export default function HRSettings() {
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
         <div className="p-2 sm:p-2.5 bg-slate-50 border-b border-slate-200/80 flex items-center gap-1.5 overflow-x-auto w-full max-w-full">
           {[
-            { id: 'shifts', label: 'Shift & Hours', icon: Clock },
+            { id: 'hours', label: 'Working Hours Rules', icon: Clock },
             { id: 'policy', label: 'Attendance & Leave Policy', icon: ShieldCheck },
             { id: 'company', label: 'Company Settings', icon: Building2 },
             { id: 'roles', label: 'Employee Roles', icon: Shield },
@@ -251,207 +195,178 @@ export default function HRSettings() {
           })}
         </div>
 
-        {/* TAB 1: SHIFT MANAGEMENT (Section 1) */}
-        {activeTab === 'shifts' && (
-          <div className="p-6 space-y-6">
+        {/* TAB 1: WORKING HOURS & THRESHOLDS */}
+        {activeTab === 'hours' && (
+          <form onSubmit={handleSaveSettings} className="p-6 space-y-6 max-w-3xl">
             <div>
-              <div className="flex items-center justify-between mb-1">
-                <h3 className="font-bold text-slate-900 text-sm">Shift Templates &amp; Hours Configuration</h3>
-                <span className="text-xs text-slate-500">{shifts.length} Templates Configured</span>
-              </div>
-              <p className="text-xs text-slate-500 mb-4">
-                Define start/end times, half-day cutoff, grace periods, and full/half-day working hour thresholds.
+              <h3 className="font-bold text-slate-900 text-sm mb-1">
+                Working Hours &amp; Attendance Threshold Rules
+              </h3>
+              <p className="text-xs text-slate-500">
+                Attendance status and salary eligibility are calculated directly from actual eligible working hours.
               </p>
-
-              <div className="space-y-3">
-                {shifts.map((s) => (
-                  <div
-                    key={s._id}
-                    className={`p-4 rounded-2xl border transition flex flex-col md:flex-row md:items-center justify-between gap-4 text-xs ${
-                      s.isActive
-                        ? 'bg-slate-50 border-slate-200/80 shadow-xs'
-                        : 'bg-slate-100/50 border-slate-200 opacity-60'
-                    }`}
-                  >
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-slate-900 text-sm">{s.name}</span>
-                        {s.isDefault && (
-                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                            Default
-                          </span>
-                        )}
-                        <span
-                          className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                            s.isActive ? 'bg-blue-100 text-blue-800' : 'bg-slate-200 text-slate-700'
-                          }`}
-                        >
-                          {s.isActive ? 'Active' : 'Inactive'}
-                        </span>
-                      </div>
-                      <div className="text-slate-500 mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 font-medium">
-                        <span>Timing: <strong className="text-slate-700">{s.startTime} - {s.endTime}</strong></span>
-                        <span>•</span>
-                        <span>Half-Day Cutoff: <strong className="text-slate-700">{s.halfDayCutoffTime || '14:00'}</strong></span>
-                        <span>•</span>
-                        <span>Grace: <strong className="text-slate-700">{s.gracePeriodMinutes} mins</strong></span>
-                        <span>•</span>
-                        <span>Full Day: <strong className="text-slate-700">{s.fullDayWorkingHoursThreshold || 8} hrs</strong></span>
-                        <span>•</span>
-                        <span>Half Day: <strong className="text-slate-700">{s.halfDayWorkingHoursThreshold || 4} hrs</strong></span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 shrink-0">
-                      <button
-                        onClick={() => {
-                          setEditingShift({
-                            ...s,
-                            halfDayCutoffTime: s.halfDayCutoffTime || '14:00',
-                            fullDayWorkingHoursThreshold: s.fullDayWorkingHoursThreshold || 8,
-                            halfDayWorkingHoursThreshold: s.halfDayWorkingHoursThreshold || 4
-                          });
-                          setShowEditShiftModal(true);
-                        }}
-                        className="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 font-semibold rounded-xl transition cursor-pointer"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => handleToggleShiftStatus(s._id)}
-                        className={`px-3 py-1.5 rounded-xl font-semibold transition cursor-pointer ${
-                          s.isActive
-                            ? 'bg-amber-100 hover:bg-amber-200 text-amber-900'
-                            : 'bg-emerald-100 hover:bg-emerald-200 text-emerald-900'
-                        }`}
-                      >
-                        {s.isActive ? 'Deactivate' : 'Activate'}
-                      </button>
-                      {!s.isDefault && (
-                        <button
-                          onClick={() => handleDeleteShift(s._id, s.name)}
-                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition cursor-pointer"
-                          title="Delete Shift"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
             </div>
 
-            {/* Add Shift Form */}
-            <form onSubmit={handleCreateShift} className="pt-6 border-t border-slate-100 space-y-4">
-              <h4 className="font-bold text-slate-900 text-xs uppercase tracking-wider">
-                Create New Shift Template
+            {/* Live Classification Preview Table */}
+            <div className="overflow-x-auto rounded-2xl border border-slate-200/80 bg-slate-50/60">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="bg-slate-100/80 text-slate-600 font-bold border-b border-slate-200/80">
+                    <th className="py-2.5 px-4">Working Hours</th>
+                    <th className="py-2.5 px-4">Attendance Status</th>
+                    <th className="py-2.5 px-4">Salary Eligibility</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200/60 bg-white">
+                  <tr>
+                    <td className="py-2.5 px-4 font-mono font-semibold text-slate-800">
+                      {settings.fullDayThresholdHours || 8} hours or more
+                    </td>
+                    <td className="py-2.5 px-4">
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                        Full Day
+                      </span>
+                    </td>
+                    <td className="py-2.5 px-4 font-bold text-emerald-700">100%</td>
+                  </tr>
+                  <tr>
+                    <td className="py-2.5 px-4 font-mono font-semibold text-slate-800">
+                      {settings.halfDayThresholdHours || 4} to less than {settings.fullDayThresholdHours || 8} hours
+                    </td>
+                    <td className="py-2.5 px-4">
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900">
+                        Half Day
+                      </span>
+                    </td>
+                    <td className="py-2.5 px-4 font-bold text-amber-700">
+                      {100 - Number(settings.halfDayDeductionPercentage ?? 50)}% ({settings.halfDayDeductionPercentage ?? 50}% Deduction)
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="py-2.5 px-4 font-mono font-semibold text-slate-800">
+                      Less than {settings.halfDayThresholdHours || 4} hours
+                    </td>
+                    <td className="py-2.5 px-4">
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800">
+                        Short Attendance
+                      </span>
+                    </td>
+                    <td className="py-2.5 px-4 font-semibold text-rose-700">HR Decides (Alert Generated)</td>
+                  </tr>
+                  <tr>
+                    <td className="py-2.5 px-4 font-mono font-semibold text-slate-800">No attendance</td>
+                    <td className="py-2.5 px-4">
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-200 text-slate-700">
+                        Absent
+                      </span>
+                    </td>
+                    <td className="py-2.5 px-4 font-semibold text-slate-600">0% (Paid on Holidays)</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            {/* Configurable Hours Inputs */}
+            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/70 space-y-4">
+              <h4 className="font-bold text-slate-900 text-xs flex items-center gap-2">
+                <Sliders className="w-4 h-4 text-emerald-600" />
+                Configure Working Hours Thresholds
               </h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3.5">
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Shift Name *</label>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Full-Day Threshold (Hours) *
+                  </label>
                   <input
-                    type="text"
+                    type="number"
+                    step="0.5"
+                    min="1"
                     required
-                    placeholder="e.g. Standard 10 AM - 6 PM Shift"
-                    value={newShift.name}
-                    onChange={(e) => setNewShift({ ...newShift, name: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-emerald-500"
+                    value={settings.fullDayThresholdHours ?? 8}
+                    onChange={(e) =>
+                      setSettings({
+                        ...settings,
+                        fullDayThresholdHours: Number(e.target.value),
+                        defaultRequiredHours: Number(e.target.value)
+                      })
+                    }
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-emerald-700 outline-none focus:ring-2 focus:ring-emerald-500"
                   />
+                  <span className="text-[10px] text-slate-400 mt-0.5 block">
+                    Hours &ge; this value count as Full Day (100% pay)
+                  </span>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Shift Start Time *</label>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Half-Day Threshold (Hours) *
+                  </label>
                   <input
-                    type="text"
+                    type="number"
+                    step="0.5"
+                    min="0.5"
                     required
-                    placeholder="10:00"
-                    value={newShift.startTime}
-                    onChange={(e) => setNewShift({ ...newShift, startTime: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none"
+                    value={settings.halfDayThresholdHours ?? 4}
+                    onChange={(e) => setSettings({ ...settings, halfDayThresholdHours: Number(e.target.value) })}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-amber-700 outline-none focus:ring-2 focus:ring-amber-500"
                   />
+                  <span className="text-[10px] text-slate-400 mt-0.5 block">
+                    Hours between Half-Day and Full-Day = Half Day; below this = Short Attendance
+                  </span>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Half-Day Cutoff Time *</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="14:00"
-                    value={newShift.halfDayCutoffTime}
-                    onChange={(e) => setNewShift({ ...newShift, halfDayCutoffTime: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Shift End Time *</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="18:00"
-                    value={newShift.endTime}
-                    onChange={(e) => setNewShift({ ...newShift, endTime: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Grace Period (Minutes)</label>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Half-Day Deduction Percentage (%)
+                  </label>
                   <input
                     type="number"
                     min="0"
-                    value={newShift.gracePeriodMinutes}
-                    onChange={(e) => setNewShift({ ...newShift, gracePeriodMinutes: Number(e.target.value) })}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none"
+                    max="100"
+                    value={settings.halfDayDeductionPercentage ?? 50}
+                    onChange={(e) =>
+                      setSettings({ ...settings, halfDayDeductionPercentage: Number(e.target.value) })
+                    }
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs outline-none"
                   />
+                  <span className="text-[10px] text-slate-400 mt-0.5 block">
+                    Default 50% salary deduction on Half Day
+                  </span>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Full-Day Working Hours Threshold</label>
-                  <input
-                    type="number"
-                    step="0.5"
-                    placeholder="8"
-                    value={newShift.fullDayWorkingHoursThreshold}
-                    onChange={(e) => setNewShift({ ...newShift, fullDayWorkingHoursThreshold: Number(e.target.value) })}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Half-Day Working Hours Threshold</label>
-                  <input
-                    type="number"
-                    step="0.5"
-                    placeholder="4"
-                    value={newShift.halfDayWorkingHoursThreshold}
-                    onChange={(e) => setNewShift({ ...newShift, halfDayWorkingHoursThreshold: Number(e.target.value) })}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none"
-                  />
-                </div>
-
-                <div className="flex items-center gap-2 pt-6">
-                  <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={newShift.isDefault}
-                      onChange={(e) => setNewShift({ ...newShift, isDefault: e.target.checked })}
-                      className="rounded text-emerald-600"
-                    />
-                    <span>Set as Company Default</span>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Standard Work Start Time (HH:mm)
                   </label>
+                  <input
+                    type="text"
+                    value={settings.workStartTime || '10:00'}
+                    onChange={(e) => setSettings({ ...settings, workStartTime: e.target.value })}
+                    placeholder="10:00"
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs outline-none"
+                  />
+                  <span className="text-[10px] text-slate-400 mt-0.5 block">
+                    Used for leave advance cutoff &amp; late minutes reference (IST)
+                  </span>
                 </div>
               </div>
+            </div>
 
+            <div className="p-3.5 bg-blue-50/70 border border-blue-200/70 rounded-xl text-[11px] text-blue-900">
+              <strong>Automatic Punch-Out Cutoff:</strong> Employees who forget to punch out are automatically punched out at <strong>12:00 AM IST</strong> of the next day, and attendance is classified using these exact working-hours thresholds.
+            </div>
+
+            <div className="pt-1 flex justify-end">
               <button
                 type="submit"
-                className="px-5 py-2.5 bg-slate-900 hover:bg-black text-white text-xs font-bold rounded-xl shadow-xs transition cursor-pointer"
+                disabled={saving}
+                className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs transition cursor-pointer disabled:opacity-50"
               >
-                Create Shift Template
+                Save Working Hours Rules
               </button>
-            </form>
-          </div>
+            </div>
+          </form>
         )}
 
         {/* TAB 2: ATTENDANCE & LEAVE POLICY (Conditions 1-80) */}
@@ -502,7 +417,7 @@ export default function HRSettings() {
                   <div>
                     <span className="text-xs font-semibold text-slate-800 block">Enable Per-Minute Late Deduction in Payroll</span>
                     <span className="text-[10px] text-slate-400">
-                      Calculates salary deduction based on exact late arrival minutes: (Daily Rate ÷ Shift Minutes) × Late Mins
+                      Calculates salary deduction based on exact late arrival minutes: (Daily Rate &divide; Working Minutes) &times; Late Mins
                     </span>
                   </div>
                   <input
@@ -515,44 +430,26 @@ export default function HRSettings() {
               </div>
             </div>
 
-            {/* Section 2: Half-Day Working Hours & Deduction */}
-            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/70 space-y-3">
-              <h4 className="font-bold text-slate-900 text-xs flex items-center gap-2">
-                <Sliders className="w-4 h-4 text-blue-600" />
-                Half-Day Threshold & Salary Deduction (Conditions 15-17, 21-22, 57)
-              </h4>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Half-Day Working Hours Threshold
-                  </label>
-                  <input
-                    type="number"
-                    step="0.5"
-                    min="1"
-                    value={settings.halfDayThresholdHours || 6}
-                    onChange={(e) => setSettings({ ...settings, halfDayThresholdHours: Number(e.target.value) })}
-                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs outline-none"
-                  />
-                  <span className="text-[10px] text-slate-400 mt-0.5 block">Punch out before this threshold marks Half-Day</span>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Half-Day Deduction Percentage (%)
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    value={settings.halfDayDeductionPercentage || 50}
-                    onChange={(e) => setSettings({ ...settings, halfDayDeductionPercentage: Number(e.target.value) })}
-                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs outline-none"
-                  />
-                  <span className="text-[10px] text-slate-400 mt-0.5 block">Default 50% salary deduction on half-day</span>
-                </div>
+            {/* Section 2: Working Hours Summary Note */}
+            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/70 space-y-2">
+              <div className="flex items-center justify-between">
+                <h4 className="font-bold text-slate-900 text-xs flex items-center gap-2">
+                  <Sliders className="w-4 h-4 text-blue-600" />
+                  Working Hours Classification Thresholds
+                </h4>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('hours')}
+                  className="text-[11px] font-bold text-emerald-700 hover:text-emerald-800 underline cursor-pointer"
+                >
+                  Edit in Working Hours Rules
+                </button>
               </div>
+              <p className="text-xs text-slate-600">
+                Full Day: <strong>&ge; {settings.fullDayThresholdHours ?? 8} hrs</strong> (100% pay) &bull;
+                Half Day: <strong>{settings.halfDayThresholdHours ?? 4} to &lt; {settings.fullDayThresholdHours ?? 8} hrs</strong> ({settings.halfDayDeductionPercentage ?? 50}% deduction) &bull;
+                Short Attendance: <strong>&lt; {settings.halfDayThresholdHours ?? 4} hrs</strong> (HR decides)
+              </p>
             </div>
 
             {/* Section 3: Leave Quotas & 1 Monthly Paid CL Rule */}
@@ -618,7 +515,7 @@ export default function HRSettings() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Full-Day Leave Advance Cutoff (Minutes before Shift)
+                    Full-Day Leave Advance Cutoff (Minutes before Start)
                   </label>
                   <input
                     type="number"
@@ -627,12 +524,12 @@ export default function HRSettings() {
                     onChange={(e) => setSettings({ ...settings, fullDayCutoffMinutes: Number(e.target.value) })}
                     className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs outline-none"
                   />
-                  <span className="text-[10px] text-slate-400 mt-0.5 block">e.g. 120 mins (2 hours before shift start)</span>
+                  <span className="text-[10px] text-slate-400 mt-0.5 block">e.g. 120 mins (2 hours before work start)</span>
                 </div>
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Morning Half-Day Cutoff (Minutes before Shift)
+                    Morning Half-Day Cutoff (Minutes before Start)
                   </label>
                   <input
                     type="number"
@@ -641,7 +538,7 @@ export default function HRSettings() {
                     onChange={(e) => setSettings({ ...settings, morningHalfDayCutoffMinutes: Number(e.target.value) })}
                     className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs outline-none"
                   />
-                  <span className="text-[10px] text-slate-400 mt-0.5 block">e.g. 60 mins before shift start</span>
+                  <span className="text-[10px] text-slate-400 mt-0.5 block">e.g. 60 mins before work start</span>
                 </div>
 
                 <div>
@@ -761,7 +658,7 @@ export default function HRSettings() {
                     { feature: 'Autonomous Leave Application (Auto <= 24 hrs)', emp: true, hr: true },
                     { feature: 'Leave Approval & LWP / SL Reclassification', emp: false, hr: true },
                     { feature: 'Payroll Review & Itemized Deductions (Confidential)', emp: false, hr: true },
-                    { feature: 'Shift Clamping & Policy Configuration', emp: false, hr: true }
+                    { feature: 'Working Hours & Policy Configuration', emp: false, hr: true }
                   ].map((row, i) => (
                     <tr key={i} className="hover:bg-slate-50">
                       <td className="py-3 px-4 font-semibold text-slate-800">{row.feature}</td>
@@ -900,159 +797,6 @@ export default function HRSettings() {
           </div>
         )}
       </div>
-      {/* EDIT SHIFT MODAL */}
-      {showEditShiftModal && editingShift && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="w-full max-w-lg bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden">
-            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
-              <h3 className="font-bold text-slate-900 text-sm">Edit Shift Template</h3>
-              <button
-                onClick={() => {
-                  setShowEditShiftModal(false);
-                  setEditingShift(null);
-                }}
-                className="p-1 rounded-full text-slate-400 hover:text-slate-600 transition"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleUpdateShift} className="p-5 space-y-3.5 text-xs">
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">Shift Name *</label>
-                <input
-                  type="text"
-                  required
-                  value={editingShift.name}
-                  onChange={(e) => setEditingShift({ ...editingShift, name: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Start Time (HH:mm) *</label>
-                  <input
-                    type="text"
-                    required
-                    value={editingShift.startTime}
-                    onChange={(e) => setEditingShift({ ...editingShift, startTime: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Half-Day Cutoff (HH:mm) *</label>
-                  <input
-                    type="text"
-                    required
-                    value={editingShift.halfDayCutoffTime}
-                    onChange={(e) => setEditingShift({ ...editingShift, halfDayCutoffTime: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">End Time (HH:mm) *</label>
-                  <input
-                    type="text"
-                    required
-                    value={editingShift.endTime}
-                    onChange={(e) => setEditingShift({ ...editingShift, endTime: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Grace Period (Minutes)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={editingShift.gracePeriodMinutes}
-                    onChange={(e) =>
-                      setEditingShift({ ...editingShift, gracePeriodMinutes: Number(e.target.value) })
-                    }
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Full-Day Threshold (Hours)</label>
-                  <input
-                    type="number"
-                    step="0.5"
-                    value={editingShift.fullDayWorkingHoursThreshold}
-                    onChange={(e) =>
-                      setEditingShift({
-                        ...editingShift,
-                        fullDayWorkingHoursThreshold: Number(e.target.value)
-                      })
-                    }
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Half-Day Threshold (Hours)</label>
-                  <input
-                    type="number"
-                    step="0.5"
-                    value={editingShift.halfDayWorkingHoursThreshold}
-                    onChange={(e) =>
-                      setEditingShift({
-                        ...editingShift,
-                        halfDayWorkingHoursThreshold: Number(e.target.value)
-                      })
-                    }
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="flex items-center gap-4 pt-2">
-                <label className="flex items-center gap-2 font-medium text-slate-700 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={editingShift.isActive}
-                    onChange={(e) => setEditingShift({ ...editingShift, isActive: e.target.checked })}
-                    className="rounded text-blue-600"
-                  />
-                  <span>Active Shift</span>
-                </label>
-                <label className="flex items-center gap-2 font-medium text-slate-700 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={editingShift.isDefault}
-                    onChange={(e) => setEditingShift({ ...editingShift, isDefault: e.target.checked })}
-                    className="rounded text-blue-600"
-                  />
-                  <span>Company Default Shift</span>
-                </label>
-              </div>
-
-              <div className="flex items-center justify-end gap-3 pt-3">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowEditShiftModal(false);
-                    setEditingShift(null);
-                  }}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold shadow-xs transition"
-                >
-                  Save Changes
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

@@ -3,7 +3,6 @@ const SalaryProfile = require('../models/SalaryProfile');
 const Attendance = require('../models/Attendance');
 const LeaveRequest = require('../models/LeaveRequest');
 const Employee = require('../models/Employee');
-const ShiftTemplate = require('../models/ShiftTemplate');
 const SystemSetting = require('../models/SystemSetting');
 const Holiday = require('../models/Holiday');
 
@@ -45,7 +44,7 @@ class PayrollService {
    * Calculate payroll for a single employee for a specific month (YYYY-MM)
    */
   static async calculateEmployeePayroll(employeeId, month) {
-    const employee = await Employee.findById(employeeId).populate('assignedShift');
+    const employee = await Employee.findById(employeeId);
     if (!employee) throw new Error('Employee not found');
 
     const settings = await SystemSetting.findOne().lean();
@@ -111,9 +110,14 @@ class PayrollService {
         lwpDeduction: 0,
         shortfallDeduction: 0,
         deductionBreakdown: [],
+        bonusAmount: 0,
         otherDeductions: 0,
         totalDeductions: 0,
-        netPayable: 0
+        netPayable: 0,
+        isNetPayableOverridden: false,
+        isManuallyEdited: false,
+        manualEditReason: '',
+        notes: ''
       };
     }
 
@@ -187,9 +191,6 @@ class PayrollService {
       if (h.applicability === 'All') isApplicable = true;
       else if (h.applicability === 'Department' && employee.department && h.applicableDepartments?.includes(employee.department)) {
         isApplicable = true;
-      } else if (h.applicability === 'Shift' && employee.assignedShift) {
-        const sId = employee.assignedShift._id ? employee.assignedShift._id.toString() : employee.assignedShift.toString();
-        if (h.applicableShifts?.some(s => s.toString() === sId)) isApplicable = true;
       } else if (h.applicability === 'Custom' && h.applicableEmployees?.some(e => e.toString() === employee._id.toString())) {
         isApplicable = true;
       }
@@ -256,9 +257,9 @@ class PayrollService {
       ? parseFloat(((fullMonthlyGross / totalMonthWorkingDays) * activeWorkingDays).toFixed(2))
       : fullMonthlyGross;
 
-    const shiftHours = employee.assignedShift?.fullDayWorkingHoursThreshold || employee.assignedShift?.requiredHours || settings?.defaultRequiredHours || 8;
-    const shiftMinutes = Math.max(60, shiftHours * 60);
-    const perMinuteRate = parseFloat((perDayRate / shiftMinutes).toFixed(4));
+    const requiredDailyHours = settings?.fullDayThresholdHours || settings?.defaultRequiredHours || 8;
+    const dailyWorkMinutes = Math.max(60, requiredDailyHours * 60);
+    const perMinuteRate = parseFloat((perDayRate / dailyWorkMinutes).toFixed(4));
 
     // Deduction 1: Late Arrival
     const enableLateDeduction = settings ? settings.enableLateDeduction !== false : true;
@@ -381,9 +382,205 @@ class PayrollService {
       lwpDeduction,
       shortfallDeduction,
       deductionBreakdown,
+      bonusAmount: 0,
       otherDeductions: 0,
       totalDeductions,
-      netPayable
+      netPayable,
+      isNetPayableOverridden: false,
+      isManuallyEdited: false,
+      manualEditReason: '',
+      notes: ''
+    };
+  }
+
+  /**
+   * Compute total deductions consistently across preview, history, and manual edits
+   */
+  static computeTotalDeductions(fields = {}) {
+    const sum =
+      Number(fields.lateDeduction || 0) +
+      Number(fields.halfDayDeduction || 0) +
+      Number(fields.shortAttendanceDeduction || 0) +
+      Number(fields.lwpDeduction || 0) +
+      Number(fields.shortfallDeduction || 0) +
+      Number(fields.otherDeductions || 0);
+    return parseFloat(sum.toFixed(2));
+  }
+
+  /**
+   * Validate and build an updated payroll payload from HR manual edits.
+   * Throws an Error when the record is Finalized, reason is missing, or numbers are invalid.
+   */
+  static buildManualPayrollUpdate(baseRecord = {}, edits = {}) {
+    if (baseRecord.status === 'Finalized' || baseRecord.savedStatus === 'Finalized') {
+      throw new Error('Finalized payroll records are locked and cannot be edited.');
+    }
+
+    const cleanReason = typeof edits.reason === 'string' ? edits.reason.trim() : '';
+    if (!cleanReason) {
+      throw new Error('An audit reason is required when manually editing payroll.');
+    }
+
+    const parseNonNeg = (incoming, fallback, label) => {
+      const raw = incoming !== undefined && incoming !== null && incoming !== '' ? incoming : fallback;
+      const num = Number(raw);
+      if (!Number.isFinite(num) || num < 0) {
+        throw new Error(`${label} must be a non-negative number.`);
+      }
+      return parseFloat(num.toFixed(2));
+    };
+
+    const grossSalary = parseNonNeg(edits.grossSalary, baseRecord.grossSalary || 0, 'Gross salary');
+    const bonusAmount = parseNonNeg(edits.bonusAmount, baseRecord.bonusAmount || 0, 'Bonus / allowance');
+    const presentDays = parseNonNeg(edits.presentDays, baseRecord.presentDays || 0, 'Present days');
+    const halfDays = parseNonNeg(edits.halfDays, baseRecord.halfDays || 0, 'Half days');
+    const paidLeaveDays = parseNonNeg(edits.paidLeaveDays, baseRecord.paidLeaveDays || 0, 'Paid leave days');
+    const weeklyOffDays = parseNonNeg(edits.weeklyOffDays, baseRecord.weeklyOffDays || 0, 'Weekly off days');
+    const holidayDays = parseNonNeg(edits.holidayDays, baseRecord.holidayDays || 0, 'Holiday days');
+    const lwpDays = parseNonNeg(edits.lwpDays, baseRecord.lwpDays || 0, 'LWP days');
+    const payableDays = parseNonNeg(edits.payableDays, baseRecord.payableDays || 0, 'Payable days');
+
+    const lateDeduction = parseNonNeg(edits.lateDeduction, baseRecord.lateDeduction || 0, 'Late deduction');
+    const halfDayDeduction = parseNonNeg(edits.halfDayDeduction, baseRecord.halfDayDeduction || 0, 'Half-day deduction');
+    const shortAttendanceDeduction = parseNonNeg(
+      edits.shortAttendanceDeduction,
+      baseRecord.shortAttendanceDeduction || 0,
+      'Short attendance deduction'
+    );
+    const lwpDeduction = parseNonNeg(edits.lwpDeduction, baseRecord.lwpDeduction || 0, 'LWP deduction');
+    const shortfallDeduction = parseNonNeg(edits.shortfallDeduction, baseRecord.shortfallDeduction || 0, 'Shortfall deduction');
+    const otherDeductions = parseNonNeg(edits.otherDeductions, baseRecord.otherDeductions || 0, 'Other deductions');
+
+    const deductionBreakdown = [];
+    if (lateDeduction > 0) {
+      deductionBreakdown.push({ type: 'Late_Arrival', description: 'Late Arrival Deduction (HR Adjusted)', amount: lateDeduction });
+    }
+    if (halfDayDeduction > 0) {
+      deductionBreakdown.push({ type: 'Half_Day', description: 'Half Day Deduction (HR Adjusted)', amount: halfDayDeduction });
+    }
+    if (shortAttendanceDeduction > 0) {
+      deductionBreakdown.push({
+        type: 'Short_Attendance',
+        description: 'Short Attendance Deduction (HR Adjusted)',
+        amount: shortAttendanceDeduction
+      });
+    }
+    if (lwpDeduction > 0) {
+      deductionBreakdown.push({ type: 'LWP', description: 'Unpaid Leave / LWP Deduction (HR Adjusted)', amount: lwpDeduction });
+    }
+    if (shortfallDeduction > 0) {
+      deductionBreakdown.push({ type: 'Shortfall', description: 'Shortfall Deduction (HR Adjusted)', amount: shortfallDeduction });
+    }
+    if (otherDeductions > 0) {
+      deductionBreakdown.push({
+        type: 'Other_Manual',
+        description: 'Other / Manual Deduction (HR Entry)',
+        amount: otherDeductions
+      });
+    }
+
+    const totalDeductions = PayrollService.computeTotalDeductions({
+      lateDeduction,
+      halfDayDeduction,
+      shortAttendanceDeduction,
+      lwpDeduction,
+      shortfallDeduction,
+      otherDeductions
+    });
+
+    const isNetPayableOverridden = Boolean(edits.overrideNetPayable);
+    let netPayable;
+    if (isNetPayableOverridden) {
+      if (edits.netPayable === undefined || edits.netPayable === null || edits.netPayable === '') {
+        throw new Error('Net payable amount is required when net payable override is enabled.');
+      }
+      netPayable = parseNonNeg(edits.netPayable, 0, 'Net payable');
+    } else {
+      netPayable = Math.max(0, parseFloat((grossSalary + bonusAmount - totalDeductions).toFixed(2)));
+    }
+
+    return {
+      grossSalary,
+      bonusAmount,
+      presentDays,
+      halfDays,
+      paidLeaveDays,
+      weeklyOffDays,
+      holidayDays,
+      lwpDays,
+      payableDays,
+      lateDeduction,
+      halfDayDeduction,
+      shortAttendanceDeduction,
+      lwpDeduction,
+      shortfallDeduction,
+      otherDeductions,
+      totalDeductions,
+      deductionBreakdown,
+      netPayable,
+      isNetPayableOverridden,
+      manualEditReason: cleanReason,
+      notes: typeof edits.notes === 'string' ? edits.notes.trim() : (baseRecord.notes || '')
+    };
+  }
+
+  /**
+   * Merge saved PayrollRecord state into a freshly computed preview so HR manual
+   * edits and finalized records are preserved across reloads.
+   */
+  static mergeSavedRecordIntoPreview(preview, existingRecord) {
+    if (!existingRecord) {
+      return {
+        ...preview,
+        savedStatus: 'Unprocessed',
+        existingRecordId: null
+      };
+    }
+
+    if (existingRecord.isManuallyEdited || existingRecord.status === 'Finalized') {
+      const totalDeductions =
+        existingRecord.totalDeductions > 0 || existingRecord.isManuallyEdited
+          ? Number(existingRecord.totalDeductions ?? PayrollService.computeTotalDeductions(existingRecord))
+          : PayrollService.computeTotalDeductions(existingRecord);
+
+      return {
+        ...preview,
+        grossSalary: existingRecord.grossSalary,
+        bonusAmount: existingRecord.bonusAmount || 0,
+        presentDays: existingRecord.presentDays,
+        halfDays: existingRecord.halfDays,
+        paidLeaveDays: existingRecord.paidLeaveDays,
+        weeklyOffDays: existingRecord.weeklyOffDays,
+        holidayDays: existingRecord.holidayDays ?? preview.holidayDays ?? 0,
+        lwpDays: existingRecord.lwpDays,
+        payableDays: existingRecord.payableDays,
+        lateDeduction: existingRecord.lateDeduction,
+        halfDayDeduction: existingRecord.halfDayDeduction,
+        shortAttendanceDeduction: existingRecord.shortAttendanceDeduction,
+        lwpDeduction: existingRecord.lwpDeduction,
+        shortfallDeduction: existingRecord.shortfallDeduction,
+        otherDeductions: existingRecord.otherDeductions || 0,
+        totalDeductions,
+        deductionBreakdown: existingRecord.isManuallyEdited
+          ? (existingRecord.deductionBreakdown || [])
+          : (Array.isArray(existingRecord.deductionBreakdown) && existingRecord.deductionBreakdown.length > 0
+              ? existingRecord.deductionBreakdown
+              : preview.deductionBreakdown),
+        netPayable: existingRecord.netPayable,
+        isNetPayableOverridden: Boolean(existingRecord.isNetPayableOverridden),
+        isManuallyEdited: Boolean(existingRecord.isManuallyEdited),
+        manualEditReason: existingRecord.manualEditReason || '',
+        lastEditedAt: existingRecord.lastEditedAt || null,
+        notes: existingRecord.notes || '',
+        savedStatus: existingRecord.status,
+        existingRecordId: existingRecord._id
+      };
+    }
+
+    return {
+      ...preview,
+      savedStatus: existingRecord.status,
+      existingRecordId: existingRecord._id
     };
   }
 

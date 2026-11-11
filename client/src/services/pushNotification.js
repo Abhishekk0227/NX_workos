@@ -40,7 +40,7 @@ export const requestPushPermission = async (triggerWelcomeNotice = true) => {
       // Show welcome confirmation notification
       if (triggerWelcomeNotice) {
         await showPushNotification('NX Work OS — Push Notifications Active! 🔔', {
-          body: 'You will now receive instant shift alerts, company notices, and task updates.',
+          body: 'You will now receive instant attendance alerts, company notices, and task updates.',
           url: '/'
         });
       }
