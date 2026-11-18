@@ -67,7 +67,7 @@ const taskSchema = new mongoose.Schema(
     },
     taskType: {
       type: String,
-      enum: ['Personal', 'HR_Assigned'],
+      enum: ['Personal', 'HR_Assigned', 'Manager_Assigned'],
       default: 'Personal'
     },
     employee: {
@@ -93,7 +93,7 @@ const taskSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ['New', 'In Progress', 'On Hold', 'Completed', 'Overdue'],
+      enum: ['New', 'In Progress', 'Submitted', 'Pending Review', 'Completed', 'Overdue', 'On Hold'],
       default: 'New'
     },
     progressPercentage: {
@@ -116,6 +116,42 @@ const taskSchema = new mongoose.Schema(
     completionRemarks: {
       type: String,
       default: ''
+    },
+    deadlineMissed: {
+      type: Boolean,
+      default: false,
+      index: true
+    },
+    missedDeadlineAt: {
+      type: Date,
+      default: null
+    },
+    submittedAt: {
+      type: Date,
+      default: null
+    },
+    completedAt: {
+      type: Date,
+      default: null
+    },
+    isSubmittedLate: {
+      type: Boolean,
+      default: false
+    },
+    submissionNote: {
+      type: String,
+      default: '',
+      trim: true
+    },
+    submissionLink: {
+      type: String,
+      default: '',
+      trim: true
+    },
+    managerFeedback: {
+      type: String,
+      default: '',
+      trim: true
     },
     auditHistory: [
       {
@@ -147,10 +183,12 @@ taskSchema.pre('save', function (next) {
     }
   }
 
-  // Check overdue condition
-  if (this.dueDate && this.status !== 'Completed' && new Date(this.dueDate) < new Date()) {
-    if (this.status !== 'On Hold') {
-      this.status = 'Overdue';
+  // Check overdue condition and mark deadline missed
+  if (this.dueDate && !['Completed', 'Submitted', 'On Hold'].includes(this.status) && new Date(this.dueDate) < new Date()) {
+    this.status = 'Overdue';
+    this.deadlineMissed = true;
+    if (!this.missedDeadlineAt) {
+      this.missedDeadlineAt = new Date();
     }
   }
   next();

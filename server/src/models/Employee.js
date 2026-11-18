@@ -75,6 +75,23 @@ const employeeSchema = new mongoose.Schema(
     profilePicture: {
       type: String,
       default: ''
+    },
+    assignedManager: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Employee',
+      default: null,
+      index: true
+    },
+    assignedStudents: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Employee'
+      }
+    ],
+    isManager: {
+      type: Boolean,
+      default: false,
+      index: true
     }
   },
   {

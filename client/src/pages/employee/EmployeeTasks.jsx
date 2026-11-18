@@ -21,7 +21,9 @@ import {
   MessageSquare,
   Send,
   Flame,
-  AlertCircle
+  AlertCircle,
+  ExternalLink,
+  AlertTriangle
 } from 'lucide-react';
 import api from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
@@ -31,14 +33,21 @@ export default function EmployeeTasks() {
   const { user } = useAuth();
   const [personalTasks, setPersonalTasks] = useState([]);
   const [hrAssignedTasks, setHrAssignedTasks] = useState([]);
+  const [managerAssignedTasks, setManagerAssignedTasks] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Active Tab: 'my' | 'hr'
+  // Active Tab: 'my' | 'manager' | 'hr'
   const [activeTab, setActiveTab] = useState('my');
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [priorityFilter, setPriorityFilter] = useState('All');
+
+  // Submission Modal State (for Manager Assigned tasks)
+  const [submitTask, setSubmitTask] = useState(null);
+  const [submissionNote, setSubmissionNote] = useState('');
+  const [submissionLink, setSubmissionLink] = useState('');
+  const [submittingWork, setSubmittingWork] = useState(false);
 
   // Menu Dropdown State
   const [activeMenuId, setActiveMenuId] = useState(null);
@@ -89,6 +98,7 @@ export default function EmployeeTasks() {
       if (res.data?.success) {
         setPersonalTasks(res.data.personalTasks || []);
         setHrAssignedTasks(res.data.hrAssignedTasks || []);
+        setManagerAssignedTasks(res.data.managerAssignedTasks || []);
       }
     } catch (err) {
       console.error('Failed to load tasks:', err);
@@ -230,7 +240,34 @@ export default function EmployeeTasks() {
   };
 
   // Active list based on tab
-  const currentList = activeTab === 'my' ? personalTasks : hrAssignedTasks;
+  const currentList =
+    activeTab === 'my'
+      ? personalTasks
+      : activeTab === 'manager'
+      ? managerAssignedTasks
+      : hrAssignedTasks;
+
+  const handleSubmitWork = async (e) => {
+    e.preventDefault();
+    if (!submitTask) return;
+    setSubmittingWork(true);
+    try {
+      const res = await api.post(`/tasks/${submitTask._id}/submit`, {
+        submissionNote,
+        submissionLink
+      });
+      if (res.data?.success) {
+        setSubmitTask(null);
+        setSubmissionNote('');
+        setSubmissionLink('');
+        fetchTasks();
+      }
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to submit task');
+    } finally {
+      setSubmittingWork(false);
+    }
+  };
 
   const filteredTasks = currentList.filter((t) => {
     const matchesSearch = t.title.toLowerCase().includes(search.toLowerCase());
@@ -272,14 +309,14 @@ export default function EmployeeTasks() {
         </p>
       </div>
 
-      {/* 2. Top Tabs: My Tasks (X) | Assigned by HR (Y) */}
-      <div className="bg-slate-100/90 p-1 rounded-2xl flex max-w-sm">
+      {/* 2. Top Tabs: My Tasks (X) | Manager Tasks (Z) | Assigned by HR (Y) */}
+      <div className="bg-slate-100/90 p-1 rounded-2xl flex max-w-md gap-1">
         <button
           onClick={() => {
             setActiveTab('my');
             setStatusFilter('All');
           }}
-          className={`flex-1 py-2 px-3 text-xs font-bold rounded-xl transition cursor-pointer ${
+          className={`flex-1 py-2 px-2.5 text-xs font-bold rounded-xl transition cursor-pointer text-center ${
             activeTab === 'my'
               ? 'bg-blue-600 text-white shadow-xs'
               : 'text-slate-600 hover:text-slate-900'
@@ -290,16 +327,30 @@ export default function EmployeeTasks() {
 
         <button
           onClick={() => {
+            setActiveTab('manager');
+            setStatusFilter('All');
+          }}
+          className={`flex-1 py-2 px-2.5 text-xs font-bold rounded-xl transition cursor-pointer text-center ${
+            activeTab === 'manager'
+              ? 'bg-purple-600 text-white shadow-xs'
+              : 'text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          Manager Tasks ({managerAssignedTasks.length})
+        </button>
+
+        <button
+          onClick={() => {
             setActiveTab('hr');
             setStatusFilter('All');
           }}
-          className={`flex-1 py-2 px-3 text-xs font-bold rounded-xl transition cursor-pointer ${
+          className={`flex-1 py-2 px-2.5 text-xs font-bold rounded-xl transition cursor-pointer text-center ${
             activeTab === 'hr'
               ? 'bg-blue-600 text-white shadow-xs'
               : 'text-slate-600 hover:text-slate-900'
           }`}
         >
-          Assigned by HR ({hrAssignedTasks.length})
+          HR Tasks ({hrAssignedTasks.length})
         </button>
       </div>
 
@@ -556,17 +607,38 @@ export default function EmployeeTasks() {
                 {/* Row 2: Metadata (Project, Due Date, Status Pill, Progress Ratio) */}
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-2.5 text-xs text-slate-500">
                   <div className="flex items-center gap-1.5 font-medium text-slate-700">
-                    <Layers className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                    <span>{task.taskType === 'HR_Assigned' ? 'HR Assigned' : 'NX Work OS'}</span>
+                    <Layers className={`w-3.5 h-3.5 shrink-0 ${task.taskType === 'Manager_Assigned' ? 'text-purple-600' : 'text-slate-400'}`} />
+                    <span>
+                      {task.taskType === 'Manager_Assigned'
+                        ? 'Manager Assigned'
+                        : task.taskType === 'HR_Assigned'
+                        ? 'HR Assigned'
+                        : 'NX Work OS'}
+                    </span>
                   </div>
 
                   <div className="flex items-center gap-1.5">
                     <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                     <span>
                       {task.dueDate
-                        ? new Date(task.dueDate).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })
+                        ? new Date(task.dueDate).toLocaleString('en-IN', {
+                            day: '2-digit',
+                            month: 'short',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })
                         : 'Today'}
                     </span>
+                    {task.taskType === 'Manager_Assigned' && (task.deadlineMissed || task.status === 'Overdue') && (
+                      <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-rose-100 text-rose-700 border border-rose-200">
+                        Overdue
+                      </span>
+                    )}
+                    {task.isSubmittedLate && (
+                      <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-100 text-amber-700 border border-amber-200">
+                        Submitted Late
+                      </span>
+                    )}
                   </div>
 
                   <div className="flex items-center gap-2 ml-auto">
@@ -578,6 +650,55 @@ export default function EmployeeTasks() {
                     </span>
                   </div>
                 </div>
+
+                {/* Manager Feedback Alert if present */}
+                {task.managerFeedback && (
+                  <div className="mt-2.5 p-2.5 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-amber-900 space-y-0.5">
+                    <div className="font-bold flex items-center gap-1 text-amber-800">
+                      <AlertCircle className="w-3.5 h-3.5" /> Manager Feedback:
+                    </div>
+                    <p className="font-medium text-amber-950">{task.managerFeedback}</p>
+                  </div>
+                )}
+
+                {/* Manager Task Submission Row */}
+                {task.taskType === 'Manager_Assigned' && (
+                  <div className="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
+                    {task.status === 'Submitted' ? (
+                      <div className="flex items-center gap-2 text-xs font-bold text-indigo-700 bg-indigo-50 px-3 py-1.5 rounded-xl border border-indigo-200 w-full justify-between">
+                        <span className="flex items-center gap-1.5">
+                          <Clock className="w-3.5 h-3.5" /> Work Submitted (Under Review)
+                        </span>
+                        {task.submissionLink && (
+                          <a
+                            href={task.submissionLink}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-indigo-900 underline flex items-center gap-1 text-[11px]"
+                          >
+                            <ExternalLink className="w-3 h-3" /> View Work
+                          </a>
+                        )}
+                      </div>
+                    ) : task.status !== 'Completed' ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSubmitTask(task);
+                          setSubmissionNote(task.submissionNote || '');
+                          setSubmissionLink(task.submissionLink || '');
+                        }}
+                        className="w-full py-2 px-3 bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 cursor-pointer shadow-xs transition"
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5" /> Submit Work to Manager
+                      </button>
+                    ) : (
+                      <div className="text-xs font-bold text-emerald-700 flex items-center gap-1.5">
+                        <CheckCircle2 className="w-4 h-4" /> Task Approved & Completed
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Progress Bar matching Image 1 */}
                 <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden mt-3">
@@ -911,6 +1032,85 @@ export default function EmployeeTasks() {
                   className="px-5 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold rounded-xl shadow-xs transition"
                 >
                   {savingTask ? 'Saving...' : editingTask ? 'Update Task' : 'Save Task'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* SUBMIT WORK MODAL FOR MANAGER ASSIGNED TASKS */}
+      {submitTask && (
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100 space-y-4 animate-in fade-in zoom-in-95 duration-200 text-xs">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+              <div>
+                <h3 className="font-extrabold text-base text-slate-900">Submit Work to Manager</h3>
+                <p className="text-[11px] text-slate-400 font-medium">{submitTask.title}</p>
+              </div>
+              <button
+                onClick={() => setSubmitTask(null)}
+                className="p-1 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmitWork} className="space-y-3">
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">
+                  Project / Drive / Github Link (Optional)
+                </label>
+                <input
+                  type="url"
+                  placeholder="https://github.com/... or Google Drive link"
+                  value={submissionLink}
+                  onChange={e => setSubmissionLink(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-1 focus:ring-purple-500 font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">
+                  Submission Notes / Deliverables Summary
+                </label>
+                <textarea
+                  rows={3}
+                  placeholder="Explain what was accomplished, deliverables completed, notes for your manager..."
+                  value={submissionNote}
+                  onChange={e => setSubmissionNote(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-1 focus:ring-purple-500 resize-none font-medium"
+                />
+              </div>
+
+              <div className="p-3 bg-purple-50 rounded-xl text-purple-900 text-[11px] space-y-1">
+                <div className="font-bold flex items-center gap-1">
+                  <Clock className="w-3.5 h-3.5 text-purple-600" /> Deadline Check:
+                </div>
+                <div>
+                  Deadline: {submitTask.dueDate ? new Date(submitTask.dueDate).toLocaleString('en-IN') : 'None'}
+                </div>
+                {submitTask.dueDate && new Date(submitTask.dueDate) < new Date() && (
+                  <div className="text-rose-600 font-bold">
+                    Note: The deadline has passed. This will be recorded as a late submission.
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setSubmitTask(null)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingWork}
+                  className="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold cursor-pointer transition disabled:opacity-50"
+                >
+                  {submittingWork ? 'Submitting...' : 'Confirm Submission'}
                 </button>
               </div>
             </form>

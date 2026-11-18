@@ -117,6 +117,8 @@ export default function Login() {
       const loggedInUser = await login(email.trim(), password);
       if (loggedInUser.role === 'HR') {
         navigate('/hr/dashboard');
+      } else if (loggedInUser.role === 'Manager') {
+        navigate('/manager/dashboard');
       } else {
         navigate('/employee/home');
       }

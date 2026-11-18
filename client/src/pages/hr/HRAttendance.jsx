@@ -917,10 +917,6 @@ export default function HRAttendance() {
                 <span>Present</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
-                <span>Late</span>
-              </div>
-              <div className="flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 rounded-full bg-orange-500" />
                 <span>Half Day</span>
               </div>
@@ -1087,7 +1083,6 @@ export default function HRAttendance() {
                 <option value="All">All Statuses</option>
                 <option value="Full Day">Full Day</option>
                 <option value="Present">Present</option>
-                <option value="Late">Late</option>
                 <option value="Half Day">Half Day</option>
                 <option value="Short Attendance">Short Attendance</option>
                 <option value="Working">Working</option>
@@ -1134,7 +1129,6 @@ export default function HRAttendance() {
               </div>
             ) : (
               records.map((att) => {
-                const isLate = att.lateMinutes > 0;
                 return (
                   <div
                     key={att._id}
@@ -1176,9 +1170,6 @@ export default function HRAttendance() {
                         <span className="font-semibold text-slate-800">
                           {formatTime24(att.punchIn)}
                         </span>
-                        {isLate && (
-                          <span className="text-[9px] text-amber-600 font-bold block">+{att.lateMinutes}m late</span>
-                        )}
                       </div>
 
                       <div>
@@ -1245,7 +1236,6 @@ export default function HRAttendance() {
                     </tr>
                   ) : (
                     records.map((att) => {
-                      const isLate = att.lateMinutes > 0;
                       return (
                         <tr key={att._id} className="hover:bg-slate-50/70 transition">
                           <td className="py-3.5 px-4">
@@ -1260,16 +1250,9 @@ export default function HRAttendance() {
 
                           <td className="py-3.5 px-4">
                             {att.punchIn ? (
-                              <div>
-                                <span className="font-semibold text-slate-900 font-mono">
-                                  {formatTime24(att.punchIn)}
-                                </span>
-                                {isLate && (
-                                  <div className="text-[10px] text-amber-600 font-medium">
-                                    +{att.lateMinutes}m late
-                                  </div>
-                                )}
-                              </div>
+                              <span className="font-semibold text-slate-900 font-mono">
+                                {formatTime24(att.punchIn)}
+                              </span>
                             ) : (
                               <span className="text-slate-400 italic">Not marked</span>
                             )}
@@ -1392,7 +1375,7 @@ export default function HRAttendance() {
 
             <form onSubmit={handleManualOverride} className="p-6 space-y-4 text-xs">
               <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 leading-relaxed">
-                Manual corrections recalculate late minutes and working hours server-side, logging an immutable audit record with your HR identity.
+                Manual corrections recalculate working hours server-side, logging an immutable audit record with your HR identity.
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -1424,9 +1407,8 @@ export default function HRAttendance() {
                   onChange={(e) => setOverrideData({ ...overrideData, status: e.target.value })}
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none"
                 >
-                  <option value="Auto">Auto (Auto-calculate: Present / Late / Half Day)</option>
+                  <option value="Auto">Auto (Auto-calculate: Full Day / Half Day / Short Attendance)</option>
                   <option value="Present">Present (Force Present)</option>
-                  <option value="Late">Late (Force Late)</option>
                   <option value="Half Day">Half Day (Force Half Day)</option>
                   <option value="Absent">Absent (Force Absent)</option>
                 </select>

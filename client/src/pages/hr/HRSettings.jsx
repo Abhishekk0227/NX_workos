@@ -347,7 +347,7 @@ export default function HRSettings() {
                     className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs outline-none"
                   />
                   <span className="text-[10px] text-slate-400 mt-0.5 block">
-                    Used for leave advance cutoff &amp; late minutes reference (IST)
+                    Reference start time for leave advance cutoff &amp; working schedule (IST)
                   </span>
                 </div>
               </div>

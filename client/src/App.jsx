@@ -9,10 +9,12 @@ import Login from './pages/auth/Login';
 // Layouts
 import HRLayout from './components/layout/HRLayout';
 import EmployeeLayout from './components/layout/EmployeeLayout';
+import ManagerLayout from './components/layout/ManagerLayout';
 
 // HR Pages
 import HRDashboard from './pages/hr/HRDashboard';
 import HREmployees from './pages/hr/HREmployees';
+import HRManagers from './pages/hr/HRManagers';
 import HRAttendance from './pages/hr/HRAttendance';
 import HRTasksReports from './pages/hr/HRTasksReports';
 import HRLeave from './pages/hr/HRLeave';
@@ -22,6 +24,13 @@ import HRBroadcast from './pages/hr/HRBroadcast';
 import HRMoreMenu from './pages/hr/HRMoreMenu';
 import HRHolidayCalendar from './pages/hr/HRHolidayCalendar';
 import HRReports from './pages/hr/HRReports';
+
+// Manager Pages
+import ManagerDashboard from './pages/manager/ManagerDashboard';
+import ManagerStudents from './pages/manager/ManagerStudents';
+import ManagerTasks from './pages/manager/ManagerTasks';
+import ManagerDeadlines from './pages/manager/ManagerDeadlines';
+import ManagerHistory from './pages/manager/ManagerHistory';
 
 // Employee Pages (5 Sections)
 import EmployeeHome from './pages/employee/EmployeeHome';
@@ -46,7 +55,10 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
   }
 
   if (allowedRoles && !allowedRoles.includes(user.role)) {
-    // If unauthorized for HR, redirect to Employee home
+    // If unauthorized, redirect to appropriate role portal
+    if (user.role === 'Manager') {
+      return <Navigate to="/manager/dashboard" replace />;
+    }
     if (user.role === 'Employee') {
       return <Navigate to="/employee/home" replace />;
     }
@@ -65,7 +77,9 @@ const RootRedirector = () => {
   }
 
   if (!user) return <Navigate to="/login" replace />;
-  return user.role === 'HR' ? <Navigate to="/hr/dashboard" replace /> : <Navigate to="/employee/home" replace />;
+  if (user.role === 'Manager') return <Navigate to="/manager/dashboard" replace />;
+  if (user.role === 'HR') return <Navigate to="/hr/dashboard" replace />;
+  return <Navigate to="/employee/home" replace />;
 };
 
 export default function App() {
@@ -89,6 +103,7 @@ export default function App() {
               <Route index element={<Navigate to="/hr/dashboard" replace />} />
               <Route path="dashboard" element={<HRDashboard />} />
               <Route path="employees" element={<HREmployees />} />
+              <Route path="managers" element={<HRManagers />} />
               <Route path="attendance" element={<HRAttendance />} />
               <Route path="holidays" element={<HRHolidayCalendar />} />
               <Route path="reports" element={<HRReports />} />
@@ -100,11 +115,28 @@ export default function App() {
               <Route path="more" element={<HRMoreMenu />} />
             </Route>
 
+            {/* Manager Panel Routes */}
+            <Route
+              path="/manager"
+              element={
+                <ProtectedRoute allowedRoles={['Manager', 'HR']}>
+                  <ManagerLayout />
+                </ProtectedRoute>
+              }
+            >
+              <Route index element={<Navigate to="/manager/dashboard" replace />} />
+              <Route path="dashboard" element={<ManagerDashboard />} />
+              <Route path="students" element={<ManagerStudents />} />
+              <Route path="tasks" element={<ManagerTasks />} />
+              <Route path="deadlines" element={<ManagerDeadlines />} />
+              <Route path="history" element={<ManagerHistory />} />
+            </Route>
+
             {/* Employee Panel Routes - Exactly 5 Sections */}
             <Route
               path="/employee"
               element={
-                <ProtectedRoute allowedRoles={['Employee', 'HR']}>
+                <ProtectedRoute allowedRoles={['Employee', 'HR', 'Manager']}>
                   <EmployeeLayout />
                 </ProtectedRoute>
               }

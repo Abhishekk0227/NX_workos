@@ -15,10 +15,19 @@ export default function Header({ onToggleMobileNav, searchPlaceholder = 'Search 
 
   const emp = user?.employee;
   const isHR = user?.role === 'HR';
+  const isManager = user?.role === 'Manager';
 
-  const displayName = isHR ? 'HR Admin' : (emp?.fullName || 'Rahul Sharma');
-  const displayRole = isHR ? 'HR Panel' : `${emp?.employeeId || 'NX001'} | ${emp?.designation || 'Developer'}`;
-  const displayInitials = isHR ? 'HR' : (emp?.fullName ? emp.fullName.split(' ').map(n => n[0]).join('') : 'RS');
+  const displayName = isHR ? 'HR Admin' : isManager ? (emp?.fullName || 'Manager') : (emp?.fullName || 'Rahul Sharma');
+  const displayRole = isHR
+    ? 'HR Panel'
+    : isManager
+    ? `Manager • ${emp?.department || 'Supervisor'}`
+    : `${emp?.employeeId || 'NX001'} | ${emp?.designation || 'Developer'}`;
+  const displayInitials = isHR
+    ? 'HR'
+    : isManager
+    ? (emp?.fullName ? emp.fullName.split(' ').map(n => n[0]).join('') : 'MG')
+    : (emp?.fullName ? emp.fullName.split(' ').map(n => n[0]).join('') : 'RS');
 
   return (
     <>

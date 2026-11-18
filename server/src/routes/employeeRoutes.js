@@ -54,7 +54,7 @@ router.get('/', protect, authorize('HR'), async (req, res, next) => {
 
     const employees = await Employee.find(filter)
       .populate('leavePolicy')
-      .populate('user', 'isActive lastLogin')
+      .populate('user', 'isActive lastLogin role')
       .sort({ createdAt: -1 });
 
     res.json({

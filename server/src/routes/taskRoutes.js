@@ -63,11 +63,14 @@ router.get('/my', protect, async (req, res, next) => {
 
     const personalTasks = tasks.filter((t) => t.taskType === 'Personal');
     const hrAssignedTasks = tasks.filter((t) => t.taskType === 'HR_Assigned');
+    const managerAssignedTasks = tasks.filter((t) => t.taskType === 'Manager_Assigned');
 
     res.json({
       success: true,
       personalTasks,
-      hrAssignedTasks
+      hrAssignedTasks,
+      managerAssignedTasks,
+      tasks
     });
   } catch (err) {
     next(err);
@@ -439,6 +442,79 @@ router.delete('/:id', protect, async (req, res, next) => {
     res.json({
       success: true,
       message: 'Task deleted successfully'
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /api/tasks/:id/submit
+ * Student / Employee submits their task for review
+ */
+router.post('/:id/submit', protect, async (req, res, next) => {
+  try {
+    const { submissionNote, submissionLink } = req.body;
+    const task = await Task.findById(req.params.id)
+      .populate('employee', 'employeeId fullName department designation')
+      .populate('assignedBy', 'name email');
+
+    if (!task) {
+      return res.status(404).json({ success: false, message: 'Task not found' });
+    }
+
+    if (!req.user.employee || task.employee?._id?.toString() !== req.user.employee._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'Only the assigned student/employee can submit this task'
+      });
+    }
+
+    const now = new Date();
+    const isLate = task.dueDate ? now > new Date(task.dueDate) : false;
+
+    task.status = 'Submitted';
+    task.submittedAt = now;
+    task.submissionNote = (submissionNote || '').trim();
+    task.submissionLink = (submissionLink || '').trim();
+    if (isLate) {
+      task.isSubmittedLate = true;
+      task.deadlineMissed = true;
+      if (!task.missedDeadlineAt) task.missedDeadlineAt = task.dueDate;
+    }
+
+    task.auditHistory.push({
+      action: 'SUBMITTED',
+      performedBy: req.user._id,
+      performedAt: now,
+      details: {
+        onTime: !isLate,
+        submittedAt: now,
+        submissionNote: task.submissionNote,
+        submissionLink: task.submissionLink
+      }
+    });
+
+    await task.save();
+
+    if (task.assignedBy) {
+      try {
+        await NotificationService.send({
+          recipient: task.assignedBy._id || task.assignedBy,
+          title: `Task Submitted: ${task.title}`,
+          message: `${task.employee?.fullName || 'Student'} submitted task "${task.title}"${isLate ? ' (Late Submission recorded)' : ''}.`,
+          type: 'Task',
+          link: '/manager/tasks'
+        });
+      } catch (e) {
+        console.warn('Submission notification note:', e.message);
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `Task submitted successfully${isLate ? ' (Late Submission)' : ''}`,
+      task
     });
   } catch (err) {
     next(err);

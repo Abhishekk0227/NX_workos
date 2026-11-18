@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
   Users,
+  UserCheck,
   MoreVertical,
   MoreHorizontal,
   ArrowLeft,
@@ -33,6 +34,7 @@ import api from '../../api/client';
 import { TableShimmer, CardListShimmer } from '../../components/common/Shimmer';
 
 export default function HREmployees() {
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const urlStatus = searchParams.get('status') || 'All';
   const urlSearch = searchParams.get('search') || '';
@@ -170,6 +172,30 @@ export default function HREmployees() {
     }
   };
 
+  const handleToggleManager = async (emp) => {
+    const isNowManager = !emp.isManager;
+    const confirmMsg = isNowManager
+      ? `Are you sure you want to designate ${emp.fullName} (${emp.employeeId}) as Manager?\n\nThey will get access to the Manager panel to assign tasks and track deadlines.`
+      : `Are you sure you want to revoke Manager role from ${emp.fullName}?`;
+    if (!window.confirm(confirmMsg)) return;
+
+    try {
+      const res = await api.post('/manager/admin/designate', {
+        employeeId: emp._id,
+        isManager: isNowManager
+      });
+      if (res.data?.success) {
+        alert(res.data.message);
+        fetchData();
+        if (selectedEmployee && selectedEmployee._id === emp._id) {
+          setSelectedEmployee({ ...selectedEmployee, isManager: isNowManager });
+        }
+      }
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to update manager designation');
+    }
+  };
+
   const openEditModal = (emp) => {
     setEditFormData({
       _id: emp._id,
@@ -304,18 +330,26 @@ export default function HREmployees() {
           <p className="text-xs text-slate-500 mt-0.5">Manage employee directory, roles, status, and permissions</p>
         </div>
 
-        <button
-          onClick={() => {
-            setFormData({
-              ...formData,
-              leavePolicy: policies[0]?._id || ''
-            });
-            setShowCreateModal(true);
-          }}
-          className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl shadow-xs transition cursor-pointer"
-        >
-          <UserPlus className="w-4 h-4" /> Add Employee
-        </button>
+        <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
+          <button
+            onClick={() => navigate('/hr/managers')}
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-semibold rounded-xl border border-blue-200 transition cursor-pointer"
+          >
+            <UserCheck className="w-4 h-4" /> Managers & Students
+          </button>
+          <button
+            onClick={() => {
+              setFormData({
+                ...formData,
+                leavePolicy: policies[0]?._id || ''
+              });
+              setShowCreateModal(true);
+            }}
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl shadow-xs transition cursor-pointer"
+          >
+            <UserPlus className="w-4 h-4" /> Add Employee
+          </button>
+        </div>
       </div>
 
       
@@ -402,8 +436,13 @@ export default function HREmployees() {
                   <div className="font-mono text-[11px] font-bold text-slate-900 tracking-tight">
                     {emp.employeeId}
                   </div>
-                  <div className="text-xs font-bold text-slate-800 leading-tight">
+                  <div className="text-xs font-bold text-slate-800 leading-tight flex items-center gap-1.5">
                     {emp.fullName}
+                    {(emp.isManager || emp.user?.role === 'Manager') && (
+                      <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-purple-100 text-purple-800 border border-purple-200">
+                        Manager
+                      </span>
+                    )}
                   </div>
                   <div className="text-[11px] text-slate-400">
                     {emp.designation}
@@ -460,6 +499,16 @@ export default function HREmployees() {
                         className="w-full text-left px-3 py-2 hover:bg-slate-50 font-medium text-slate-700 flex items-center gap-2"
                       >
                         <DollarSign className="w-3.5 h-3.5 text-emerald-500" /> Salary Profile
+                      </button>
+                      <button
+                        onClick={() => {
+                          handleToggleManager(emp);
+                          setActiveMenuId(null);
+                        }}
+                        className="w-full text-left px-3 py-2 hover:bg-slate-50 font-medium text-purple-700 flex items-center gap-2"
+                      >
+                        <Shield className="w-3.5 h-3.5 text-purple-600" />
+                        {emp.isManager ? 'Revoke Manager' : 'Designate as Manager'}
                       </button>
                       <button
                         onClick={() => {
@@ -525,8 +574,13 @@ export default function HREmployees() {
                           {emp.fullName?.charAt(0)}
                         </div>
                         <div>
-                          <div className="font-bold text-slate-900 text-xs">
+                          <div className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
                             {emp.fullName}
+                            {(emp.isManager || emp.user?.role === 'Manager') && (
+                              <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-purple-100 text-purple-800 border border-purple-200">
+                                Manager
+                              </span>
+                            )}
                           </div>
                           <div className="text-[11px] text-slate-400">{emp.officialEmail}</div>
                         </div>
@@ -601,6 +655,17 @@ export default function HREmployees() {
                           title="Edit/Reset Password (HR Only)"
                         >
                           <KeyRound className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleToggleManager(emp)}
+                          className={`p-1.5 rounded-lg transition cursor-pointer ${
+                            emp.isManager
+                              ? 'text-purple-600 bg-purple-50 hover:bg-purple-100'
+                              : 'text-slate-500 hover:text-purple-600 hover:bg-purple-50'
+                          }`}
+                          title={emp.isManager ? 'Revoke Manager Role' : 'Designate as Manager'}
+                        >
+                          <Shield className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => handleToggleStatus(emp)}

@@ -215,8 +215,10 @@ class AttendanceService {
     const effectiveSettings = resolvedSettings || {};
     const timezone = this.getTimezone(effectiveSettings);
 
-    let lateMinutes = 0;
-    let earlyMinutes = 0;
+    // Flexible working hours: lateness is NOT calculated or penalized.
+    // Attendance is evaluated purely on total eligible hours worked.
+    const lateMinutes = 0;
+    const earlyMinutes = 0;
     let actualWorkingHours = 0;
     let status = resolvedIsHoliday ? 'Holiday' : 'Absent';
     let isShortAttendance = false;
@@ -232,35 +234,19 @@ class AttendanceService {
       };
     }
 
-    const workStartTime = effectiveSettings.workStartTime || '10:00';
-    const workEndTime = effectiveSettings.workEndTime || '18:00';
     const fullDayThreshold = effectiveSettings.fullDayThresholdHours ?? effectiveSettings.defaultRequiredHours ?? 8;
     const halfDayThreshold = effectiveSettings.halfDayThresholdHours ?? 4;
-
-    const startMinutes = this.timeToMinutes(workStartTime);
-    const endMinutes = this.timeToMinutes(workEndTime);
-    const punchInMinutes = this.dateToMinutes(punchIn, timezone);
-
-    if (punchInMinutes > startMinutes) {
-      lateMinutes = punchInMinutes - startMinutes;
-    }
 
     // If still working (not punched out yet)
     if (!punchOut) {
       return {
-        lateMinutes,
+        lateMinutes: 0,
         earlyMinutes: 0,
         actualWorkingHours: 0,
         workingHoursFormatted: '0:00',
         status: resolvedIsHoliday ? 'Working on Holiday' : 'Working',
         isShortAttendance: false
       };
-    }
-
-    // Punched out calculations
-    const punchOutMinutes = this.dateToMinutes(punchOut, timezone);
-    if (punchOutMinutes < endMinutes) {
-      earlyMinutes = endMinutes - punchOutMinutes;
     }
 
     // Direct punchOut - punchIn difference (actual elapsed duration)
@@ -289,8 +275,8 @@ class AttendanceService {
     }
 
     return {
-      lateMinutes,
-      earlyMinutes,
+      lateMinutes: 0,
+      earlyMinutes: 0,
       actualWorkingHours,
       workingHoursFormatted,
       status,

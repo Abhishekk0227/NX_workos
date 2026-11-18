@@ -14,7 +14,8 @@ import {
   LayoutGrid,
   CalendarDays,
   BarChart3,
-  Clock
+  Clock,
+  UserCheck
 } from 'lucide-react';
 import Header from '../common/Header';
 import { useAuth } from '../../context/AuthContext';
@@ -34,6 +35,7 @@ export default function HRLayout() {
   const navItems = [
     { name: 'Dashboard', path: '/hr/dashboard', icon: LayoutDashboard },
     { name: 'Employees', path: '/hr/employees', icon: Users },
+    { name: 'Managers & Students', path: '/hr/managers', icon: UserCheck },
     { name: 'Attendance', path: '/hr/attendance', icon: CalendarCheck },
     { name: 'Holiday Calendar', path: '/hr/holidays', icon: CalendarDays },
     { name: 'Leave Management', path: '/hr/leave', icon: CalendarOff },

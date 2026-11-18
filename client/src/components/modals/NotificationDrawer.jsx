@@ -26,7 +26,7 @@ import {
   showPushNotification
 } from '../../services/pushNotification';
 import { resolveNotificationRoute } from '../../utils/navigation';
-import { formatTime12 } from '../../utils/timeUtils';
+import { formatTime12, formatRelativeNotificationDate } from '../../utils/timeUtils';
 
 export default function NotificationDrawer({ isOpen, onClose }) {
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
@@ -160,7 +160,7 @@ export default function NotificationDrawer({ isOpen, onClose }) {
         </div>
 
         {/* Notification List */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {notifications.length === 0 ? (
             <div className="text-center py-20 text-slate-400 bg-white rounded-3xl p-6 border border-slate-100 shadow-2xs">
               <Bell className="w-12 h-12 mx-auto mb-2 opacity-30 text-blue-600" />
@@ -168,49 +168,102 @@ export default function NotificationDrawer({ isOpen, onClose }) {
               <p className="text-[11px] text-slate-400 mt-1">You are all caught up!</p>
             </div>
           ) : (
-            notifications.map((item) => {
-              const read = item.isRead || (item.readBy || []).some(r => r.user === user?._id || r.user?._id === user?._id);
+            (() => {
+              const getNotificationGroup = (dateStr) => {
+                if (!dateStr) return 'Earlier';
+                const targetDate = new Date(dateStr);
+                if (isNaN(targetDate.getTime())) return 'Earlier';
+                const getFormattedDatePart = (d) =>
+                  new Intl.DateTimeFormat('en-CA', {
+                    timeZone: 'Asia/Kolkata',
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit'
+                  }).format(d);
+                const now = new Date();
+                const todayStr = getFormattedDatePart(now);
+                const targetStr = getFormattedDatePart(targetDate);
+                const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+                const yesterdayStr = getFormattedDatePart(yesterday);
 
-              return (
-                <div
-                  key={item._id}
-                  onClick={() => handleItemClick(item)}
-                  className={`group bg-white p-3.5 rounded-2xl border transition-all cursor-pointer relative overflow-hidden ${
-                    read
-                      ? 'border-slate-100 text-slate-600 hover:border-slate-300'
-                      : 'border-blue-200/90 shadow-2xs hover:border-blue-400'
-                  }`}
-                >
-                  {/* Left blue accent indicator for unread */}
-                  {!read && (
-                    <span className="absolute left-0 top-0 bottom-0 w-1 bg-blue-600 rounded-l" />
-                  )}
+                if (targetStr === todayStr) return 'Today';
+                if (targetStr === yesterdayStr) return 'Yesterday';
+                return 'Earlier';
+              };
 
-                  <div className="flex items-start gap-3">
-                    {getIcon(item.type, item.title)}
+              const grouped = notifications.reduce((acc, item) => {
+                const group = getNotificationGroup(item.createdAt);
+                if (!acc[group]) acc[group] = [];
+                acc[group].push(item);
+                return acc;
+              }, {});
 
-                    <div className="flex-1 min-w-0 pr-1">
-                      <div className="flex items-center justify-between gap-1 mb-1">
-                        <div className="flex items-center gap-1.5 min-w-0">
-                          <p className="text-xs font-bold text-slate-900 truncate group-hover:text-blue-600 transition">
-                            {item.title}
-                          </p>
-                          {!read && (
-                            <span className="w-2 h-2 rounded-full bg-blue-600 shrink-0" />
-                          )}
-                        </div>
-                        <span className="text-[10px] text-slate-400 whitespace-nowrap font-medium">
-                          {formatTime12(item.createdAt)}
-                        </span>
-                      </div>
-                      <p className="text-xs text-slate-600 leading-relaxed line-clamp-2">
-                        {item.message}
-                      </p>
+              return ['Today', 'Yesterday', 'Earlier'].map((groupName) => {
+                const items = grouped[groupName];
+                if (!items || items.length === 0) return null;
+
+                return (
+                  <div key={groupName} className="space-y-2.5">
+                    <div className="flex items-center gap-2 pt-1 pb-0.5 px-0.5">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 bg-slate-200/70 px-2 py-0.5 rounded-md flex items-center gap-1">
+                        <Calendar className="w-3 h-3 text-slate-500" />
+                        {groupName} ({items.length})
+                      </span>
+                      <div className="flex-1 h-px bg-slate-200/80" />
                     </div>
+
+                    {items.map((item) => {
+                      const read =
+                        item.isRead ||
+                        (item.readBy || []).some(
+                          (r) => r.user === user?._id || r.user?._id === user?._id
+                        );
+
+                      return (
+                        <div
+                          key={item._id}
+                          onClick={() => handleItemClick(item)}
+                          className={`group bg-white p-3.5 rounded-2xl border transition-all cursor-pointer relative overflow-hidden ${
+                            read
+                              ? 'border-slate-100 text-slate-600 hover:border-slate-300'
+                              : 'border-blue-200/90 shadow-2xs hover:border-blue-400'
+                          }`}
+                        >
+                          {/* Left blue accent indicator for unread */}
+                          {!read && (
+                            <span className="absolute left-0 top-0 bottom-0 w-1 bg-blue-600 rounded-l" />
+                          )}
+
+                          <div className="flex items-start gap-3">
+                            {getIcon(item.type, item.title)}
+
+                            <div className="flex-1 min-w-0 pr-1">
+                              <div className="flex items-center justify-between gap-1 mb-1">
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                  <p className="text-xs font-bold text-slate-900 truncate group-hover:text-blue-600 transition">
+                                    {item.title}
+                                  </p>
+                                  {!read && (
+                                    <span className="w-2 h-2 rounded-full bg-blue-600 shrink-0" />
+                                  )}
+                                </div>
+                                <span className="text-[10px] text-slate-400 whitespace-nowrap font-medium flex items-center gap-1">
+                                  <Clock className="w-3 h-3 text-slate-400 shrink-0" />
+                                  {formatRelativeNotificationDate(item.createdAt)}
+                                </span>
+                              </div>
+                              <p className="text-xs text-slate-600 leading-relaxed line-clamp-2">
+                                {item.message}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
-                </div>
-              );
-            })
+                );
+              });
+            })()
           )}
         </div>
 

@@ -167,13 +167,7 @@ class PayrollService {
       } else if (s === 'Incomplete') {
         incompleteDays++;
       }
-
-      // Late minutes deducted if not already deducted as half day or short attendance
-      if (s !== 'Half Day' && s !== 'Half-day' && s !== 'Short Attendance') {
-        if (att.lateMinutes > 0) {
-          totalLateMinutes += att.lateMinutes;
-        }
-      }
+      // Under flexible working hours, late minutes are not calculated or deducted
     }
 
     // Fetch official holidays for this month to ensure unscheduled/unpunched holidays are paid & not deducted as Absent
@@ -261,11 +255,8 @@ class PayrollService {
     const dailyWorkMinutes = Math.max(60, requiredDailyHours * 60);
     const perMinuteRate = parseFloat((perDayRate / dailyWorkMinutes).toFixed(4));
 
-    // Deduction 1: Late Arrival
-    const enableLateDeduction = settings ? settings.enableLateDeduction !== false : true;
-    const lateDeduction = enableLateDeduction && totalLateMinutes > 0
-      ? parseFloat((totalLateMinutes * perMinuteRate).toFixed(2))
-      : 0;
+    // Under flexible working hours (8 hours min requirement), lateness is not deducted
+    const lateDeduction = 0;
 
     // Deduction 2: Half-Day (50% day salary deduction)
     const halfDayDeductionPct = settings?.halfDayDeductionPercentage || 50;
@@ -307,13 +298,6 @@ class PayrollService {
 
     // Build Itemized Deduction Breakdown
     const deductionBreakdown = [];
-    if (lateDeduction > 0) {
-      deductionBreakdown.push({
-        type: 'Late_Arrival',
-        description: `Late Arrival (${totalLateMinutes} mins @ ₹${perMinuteRate.toFixed(2)}/min)`,
-        amount: lateDeduction
-      });
-    }
     if (halfDayDeduction > 0) {
       deductionBreakdown.push({
         type: 'Half_Day',
@@ -339,7 +323,7 @@ class PayrollService {
     const totalAccountedDays = presentDays + halfDays + incompleteDays + paidLeaveDays + lwpDays + holidayDays;
     const unmarkedDays = Math.max(0, activeWorkingDays - totalAccountedDays);
 
-    const totalDeductions = parseFloat((lateDeduction + halfDayDeduction + shortAttendanceDeduction + lwpDeduction + shortfallDeduction).toFixed(2));
+    const totalDeductions = parseFloat((halfDayDeduction + shortAttendanceDeduction + lwpDeduction + shortfallDeduction).toFixed(2));
     const netPayable = Math.max(0, parseFloat((grossSalary - totalDeductions).toFixed(2)));
     const payableDays = Math.min(
       effectiveActiveDays,

@@ -128,8 +128,7 @@ export default function EmployeeAttendance() {
 
       if (record) {
         status = record.status;
-        if (record.status === 'Present' || record.status === 'Full Day') dotColor = 'bg-[#10b981]';
-        else if (record.status === 'Late') dotColor = 'bg-[#f59e0b]';
+        if (record.status === 'Present' || record.status === 'Full Day' || record.status === 'Late') dotColor = 'bg-[#10b981]';
         else if (record.status === 'Half Day' || record.status === 'Half-day') dotColor = 'bg-[#f97316]';
         else if (record.status === 'Short Attendance') dotColor = 'bg-[#a855f7]';
         else if (record.status === 'Holiday') dotColor = 'bg-[#06b6d4]';

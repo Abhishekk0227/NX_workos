@@ -59,6 +59,55 @@ export function formatDateTimeIST(dateStr, timeZone = COMPANY_TIMEZONE) {
 }
 
 /**
+ * Formats notification timestamp with relative date:
+ * - "Today, 10:30 AM"
+ * - "Yesterday, 04:15 PM"
+ * - "18 Nov, 10:30 AM" (current year)
+ * - "18 Nov 2025, 10:30 AM" (different year)
+ */
+export function formatRelativeNotificationDate(dateStr, timeZone = COMPANY_TIMEZONE) {
+  if (!dateStr) return '—';
+  const targetDate = new Date(dateStr);
+  if (isNaN(targetDate.getTime())) return '—';
+
+  const now = new Date();
+  const getFormattedDatePart = (d) => {
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).format(d);
+  };
+
+  const todayStr = getFormattedDatePart(now);
+  const targetStr = getFormattedDatePart(targetDate);
+  const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  const yesterdayStr = getFormattedDatePart(yesterday);
+
+  const timeStr = formatTime12(targetDate, timeZone);
+
+  if (targetStr === todayStr) {
+    return `Today, ${timeStr}`;
+  }
+  if (targetStr === yesterdayStr) {
+    return `Yesterday, ${timeStr}`;
+  }
+
+  const targetYear = targetDate.getFullYear();
+  const currentYear = now.getFullYear();
+
+  const dateShort = targetDate.toLocaleDateString('en-IN', {
+    day: 'numeric',
+    month: 'short',
+    year: targetYear !== currentYear ? 'numeric' : undefined,
+    timeZone
+  });
+
+  return `${dateShort}, ${timeStr}`;
+}
+
+/**
  * Formats attendance working hours into "H:mm hrs" (e.g. "9:22 hrs")
  * Direct punchOut - punchIn difference
  */

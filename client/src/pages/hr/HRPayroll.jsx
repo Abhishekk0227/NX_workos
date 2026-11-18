@@ -309,7 +309,6 @@ export default function HRPayroll() {
 
   const liveManualDeductionsTotal = parseFloat(
     (
-      (Number(editForm.lateDeduction) || 0) +
       (Number(editForm.halfDayDeduction) || 0) +
       (Number(editForm.shortAttendanceDeduction) || 0) +
       (Number(editForm.lwpDeduction) || 0) +
@@ -346,7 +345,7 @@ export default function HRPayroll() {
         weeklyOffDays: Number(editForm.weeklyOffDays),
         lwpDays: Number(editForm.lwpDays),
         payableDays: Number(editForm.payableDays),
-        lateDeduction: Number(editForm.lateDeduction || 0),
+        lateDeduction: 0,
         halfDayDeduction: Number(editForm.halfDayDeduction || 0),
         shortAttendanceDeduction: Number(editForm.shortAttendanceDeduction || 0),
         lwpDeduction: Number(editForm.lwpDeduction || 0),
@@ -674,7 +673,6 @@ export default function HRPayroll() {
                         </button>
                       )}
                       {item.paidLeaveDays > 0 && <span className="ml-1 text-blue-600">+{item.paidLeaveDays}LV</span>}
-                      {item.totalLateMinutes > 0 && <span className="ml-1 text-rose-500 font-mono">({item.totalLateMinutes}m L)</span>}
                     </div>
 
                     <div className="flex items-center gap-1.5">
@@ -724,7 +722,6 @@ export default function HRPayroll() {
                       <th className="py-3.5 px-4">Employee</th>
                       <th className="py-3.5 px-4">Calendar Days</th>
                       <th className="py-3.5 px-4">Present / Half / Short</th>
-                      <th className="py-3.5 px-4">Late Mins</th>
                       <th className="py-3.5 px-4">Paid Leave / LWP</th>
                       <th className="py-3.5 px-4">Gross Salary</th>
                       <th className="py-3.5 px-4">Deductions</th>
@@ -736,7 +733,7 @@ export default function HRPayroll() {
                   <tbody className="divide-y divide-slate-100">
                     {previews.length === 0 ? (
                       <tr>
-                        <td colSpan="10" className="py-12 text-center text-slate-400">
+                        <td colSpan="9" className="py-12 text-center text-slate-400">
                           No payroll records generated yet for {selectedMonth}. Click "Generate Payroll" above.
                         </td>
                       </tr>
@@ -771,19 +768,6 @@ export default function HRPayroll() {
                                 <AlertTriangle className="w-2.5 h-2.5 text-purple-600" />
                                 {item.shortAttendanceDays} Short
                               </button>
-                            )}
-                          </td>
-
-                          <td className="py-3.5 px-4">
-                            {item.totalLateMinutes > 0 ? (
-                              <div>
-                                <span className="font-mono text-rose-600 font-bold">{item.totalLateMinutes}m</span>
-                                {item.lateDeduction > 0 && (
-                                  <div className="text-[10px] text-rose-500 font-mono">-₹{item.lateDeduction}</div>
-                                )}
-                              </div>
-                            ) : (
-                              <span className="text-slate-400">0m</span>
                             )}
                           </td>
 
@@ -1600,18 +1584,7 @@ export default function HRPayroll() {
               {/* Section 3: Deductions */}
               <div>
                 <h4 className="font-bold text-slate-800 text-[11px] uppercase tracking-wider mb-2.5">Itemized Deductions (₹)</h4>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  <div>
-                    <label className="block font-semibold text-slate-600 mb-1">Late Deduction</label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={editForm.lateDeduction}
-                      onChange={(e) => setEditForm((f) => ({ ...f, lateDeduction: e.target.value }))}
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono outline-none focus:border-blue-500"
-                    />
-                  </div>
+                <div className="grid grid-cols-2 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block font-semibold text-slate-600 mb-1">Half-Day Deduction</label>
                     <input
@@ -1645,7 +1618,7 @@ export default function HRPayroll() {
                       className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono outline-none focus:border-blue-500"
                     />
                   </div>
-                  <div className="col-span-2 sm:col-span-2">
+                  <div>
                     <label className="block font-semibold text-slate-600 mb-1">Other / Manual Deduction (₹)</label>
                     <input
                       type="number"

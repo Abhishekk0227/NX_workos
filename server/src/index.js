@@ -1,3 +1,12 @@
+const dns = require('dns');
+
+// On Windows or certain ISP DNS servers, SRV lookup fails with querySrv ECONNREFUSED.
+try {
+  dns.setServers(['8.8.8.8', '8.8.4.4', '1.1.1.1']);
+} catch (e) {
+  // Ignore fallback error
+}
+
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
@@ -90,6 +99,7 @@ app.use('/api/payroll', require('./routes/payrollRoutes'));
 app.use('/api/notifications', require('./routes/notificationRoutes'));
 app.use('/api/broadcasts', require('./routes/broadcastRoutes'));
 app.use('/api/audit-logs', require('./routes/auditRoutes'));
+app.use('/api/manager', require('./routes/managerRoutes'));
 
 // 404 handler
 app.use('*', (req, res) => {

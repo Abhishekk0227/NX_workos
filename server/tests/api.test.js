@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const AttendanceService = require('../src/services/attendanceService');
 const PayrollService = require('../src/services/payrollService');
 
-test('AttendanceService: Pure hours-based thresholds and late arrival calculation', () => {
+test('AttendanceService: Pure hours-based thresholds under flexible hours (no late penalties)', () => {
   const settings = {
     companyTimezone: 'Asia/Kolkata',
     workStartTime: '09:00',
@@ -12,16 +12,16 @@ test('AttendanceService: Pure hours-based thresholds and late arrival calculatio
     halfDayThresholdHours: 4
   };
 
-  // Punch in at 09:10 IST (10 mins after work start 09:00)
+  // Punch in at 09:10 IST (Flexible hours: no late arrival recorded)
   const onTimeDate = AttendanceService.getTimestampForTimeInTimezone('2026-10-31', '09:10', 'Asia/Kolkata');
   const metricsOnTime = AttendanceService.calculateAttendanceMetrics(onTimeDate, null, settings);
-  assert.equal(metricsOnTime.lateMinutes, 10, 'Should record 10 late minutes from work start time');
+  assert.equal(metricsOnTime.lateMinutes, 0, 'Late minutes must always be 0 under flexible hours');
   assert.equal(metricsOnTime.status, 'Working', 'Status should be Working');
 
-  // Punch in at 09:30 IST (30m past work start)
+  // Punch in at 09:30 IST
   const lateDate = AttendanceService.getTimestampForTimeInTimezone('2026-10-31', '09:30', 'Asia/Kolkata');
   const metricsLate = AttendanceService.calculateAttendanceMetrics(lateDate, null, settings);
-  assert.equal(metricsLate.lateMinutes, 30, 'Should calculate 30 late minutes');
+  assert.equal(metricsLate.lateMinutes, 0, 'Late minutes must always be 0 under flexible hours');
 
   // Punch out at 18:00 IST (8.83h worked >= 8h threshold -> Full Day)
   const punchOutDate = AttendanceService.getTimestampForTimeInTimezone('2026-10-31', '18:00', 'Asia/Kolkata');
@@ -29,11 +29,11 @@ test('AttendanceService: Pure hours-based thresholds and late arrival calculatio
   assert.equal(metricsFull.status, 'Full Day', 'Status should be Full Day for >= 8 hours worked');
   assert.equal(metricsFull.actualWorkingHours, 8.83, 'Working hours should be calculated correctly');
 
-  // Sharp on-time arrival at 09:00 IST, out at 18:00 IST -> 9 hours, 0 late minutes
+  // Sharp arrival at 09:00 IST, out at 18:00 IST -> 9 hours, 0 late minutes
   const sharpOnTime = AttendanceService.getTimestampForTimeInTimezone('2026-10-31', '09:00', 'Asia/Kolkata');
   const metricsSharp = AttendanceService.calculateAttendanceMetrics(sharpOnTime, punchOutDate, settings);
   assert.equal(metricsSharp.status, 'Full Day', 'Status should be Full Day for 9 hours worked');
-  assert.equal(metricsSharp.lateMinutes, 0, 'Zero late minutes for on-time arrival');
+  assert.equal(metricsSharp.lateMinutes, 0, 'Zero late minutes under flexible hours');
 
   // Worked 5 hours (>= 4h and < 8h) -> Half Day
   const halfPunchOut = AttendanceService.getTimestampForTimeInTimezone('2026-10-31', '14:10', 'Asia/Kolkata');
@@ -67,10 +67,9 @@ test('PayrollService: Days in month and All Days - Sundays calculation', () => {
   const perMinuteRate = parseFloat((perDayRate / shiftMinutes).toFixed(4));
   assert.equal(perMinuteRate, 0.25, 'Per minute rate must be 120 / 480 = ₹0.25/min');
 
-  // 8 minutes late deduction
-  const lateMinutes = 8;
-  const lateDeduction = parseFloat((lateMinutes * perMinuteRate).toFixed(2));
-  assert.equal(lateDeduction, 2.00, '8m late should deduct exactly ₹2.00');
+  // Flexible hours: late deduction is 0
+  const lateDeduction = 0;
+  assert.equal(lateDeduction, 0, 'Late deduction must be 0 under flexible working hours');
 
   // Half day deduction (< 6 hrs worked = 50% day salary)
   const halfDayDeduction = parseFloat((0.5 * perDayRate).toFixed(2));
@@ -92,8 +91,8 @@ test('AttendanceService: Timezone-safe direct working hours calculation (punchOu
 
   const metrics = AttendanceService.calculateAttendanceMetrics(punchInUTC, punchOutUTC, settings);
   assert.equal(metrics.actualWorkingHours, 7.21, 'Working hours must be ~7.21 hrs');
-  assert.equal(metrics.lateMinutes, 39, 'Punch in at 10:39 AM is 39m after 10:00 work start');
-  assert.equal(metrics.earlyMinutes, 8, 'Punch out at 17:52 PM is 8m before 18:00');
+  assert.equal(metrics.lateMinutes, 0, 'Flexible hours: 0 late minutes');
+  assert.equal(metrics.earlyMinutes, 0, 'Flexible hours: 0 early minutes');
   assert.equal(metrics.status, 'Half Day', 'Status should be Half Day for 7.21 hours (< 8h full-day threshold)');
 
   // User Specific Case: 9:58 AM IST punch in (04:28 UTC), 7:20 PM IST punch out (13:50 UTC) -> 9:22 hours -> Full Day

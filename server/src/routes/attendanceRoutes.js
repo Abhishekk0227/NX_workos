@@ -100,12 +100,11 @@ router.post('/punch-in', protect, async (req, res, next) => {
     const formattedPunchInTime = AttendanceService.formatTime(now, {}, timezone);
 
     try {
-      const lateAlert = metrics.lateMinutes > 0 ? ` [Late by ${metrics.lateMinutes} mins]` : ' on time';
       const holidayAlert = isHoliday ? ' (Working on Holiday)' : '';
       await NotificationService.send({
         targetRole: 'HR',
         title: 'Employee Punched In',
-        message: `${employee.fullName} (${employee.employeeId}) punched in at ${formattedPunchInTime}${lateAlert}${holidayAlert}.`,
+        message: `${employee.fullName} (${employee.employeeId}) punched in at ${formattedPunchInTime}${holidayAlert}.`,
         type: 'Attendance',
         link: '/hr/attendance'
       });
@@ -561,11 +560,19 @@ router.get('/my-history', protect, async (req, res, next) => {
       filter.date = { $regex: new RegExp(`^${month}`) };
     }
 
-    const history = await Attendance.find(filter)
+    const rawHistory = await Attendance.find(filter)
       .populate('dailyReport')
       .populate('holiday')
       .sort({ date: -1 })
       .limit(60);
+
+    const history = rawHistory.map(r => {
+      const obj = r.toObject ? r.toObject() : { ...r };
+      obj.lateMinutes = 0;
+      obj.earlyMinutes = 0;
+      if (obj.status === 'Late') obj.status = 'Full Day';
+      return obj;
+    });
 
     res.json({
       success: true,
@@ -662,6 +669,14 @@ router.get('/all', protect, authorize('HR'), async (req, res, next) => {
       .populate('dailyReport')
       .populate('holiday')
       .sort({ date: -1, createdAt: -1 });
+
+    records = records.map(r => {
+      const obj = r.toObject ? r.toObject() : { ...r };
+      obj.lateMinutes = 0;
+      obj.earlyMinutes = 0;
+      if (obj.status === 'Late') obj.status = 'Full Day';
+      return obj;
+    });
 
     // When querying a specific date (e.g. today or a past date), generate virtual records for active employees without attendance
     if (date) {

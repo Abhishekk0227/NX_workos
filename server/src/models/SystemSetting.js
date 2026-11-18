@@ -60,7 +60,7 @@ const systemSettingSchema = new mongoose.Schema(
     },
     enableLateDeduction: {
       type: Boolean,
-      default: true
+      default: false
     },
     enableShortfallDeduction: {
       type: Boolean,

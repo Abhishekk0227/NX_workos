@@ -1,20 +1,34 @@
 import axios from 'axios';
 
-// Get API Base URL with seamless local dev & production fallback
+// Get API Base URL with seamless local dev, mobile network & production fallback
 const getApiBaseUrl = () => {
+  // If running in browser
+  if (typeof window !== 'undefined') {
+    const hostname = window.location.hostname;
+    const protocol = window.location.protocol;
+
+    // 1. If running on Vercel or any HTTPS domain -> use Vercel backend directly
+    if (hostname.includes('vercel.app') || protocol === 'https:') {
+      return 'https://nx-workos-server.vercel.app/api';
+    }
+
+    // 2. If running locally via LAN IP (e.g. mobile testing on 10.x.x.x or 192.168.x.x)
+    if (hostname && hostname !== 'localhost' && hostname !== '127.0.0.1') {
+      return `http://${hostname}:5000/api`;
+    }
+  }
+
+  // 3. If running in Vite DEV mode on localhost -> use local backend port 5000
   if (import.meta.env.DEV) {
     const localUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
     const cleaned = localUrl.replace(/\/$/, '');
-    // If VITE_API_URL points to Vercel, ignore it in DEV and use local backend port 5000
     if (cleaned.includes('vercel.app')) {
       return 'http://localhost:5000/api';
     }
     return cleaned.endsWith('/api') ? cleaned : `${cleaned}/api`;
   }
-  if (import.meta.env.VITE_API_URL) {
-    const cleaned = import.meta.env.VITE_API_URL.replace(/\/$/, '');
-    return cleaned.endsWith('/api') ? cleaned : `${cleaned}/api`;
-  }
+
+  // 4. Default fallback to Vercel production backend
   return 'https://nx-workos-server.vercel.app/api';
 };
 

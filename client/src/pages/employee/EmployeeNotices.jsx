@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import api from '../../api/client';
 import { NoticeShimmer } from '../../components/common/Shimmer';
+import { formatRelativeNotificationDate } from '../../utils/timeUtils';
 
 export default function EmployeeNotices() {
   const [notices, setNotices] = useState([]);
@@ -211,16 +212,9 @@ export default function EmployeeNotices() {
                       )}
                     </div>
 
-                    <div className="text-[11px] text-slate-400 flex items-center gap-1">
+                    <div className="text-[11px] text-slate-400 flex items-center gap-1 font-medium">
                       <Clock className="w-3.5 h-3.5" />
-                      <span>
-                        {new Date(notice.createdAt).toLocaleDateString('en-US', {
-                          month: 'short',
-                          day: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit'
-                        })}
-                      </span>
+                      <span>{formatRelativeNotificationDate(notice.createdAt)}</span>
                     </div>
                   </div>
 
