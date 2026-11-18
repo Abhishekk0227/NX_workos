@@ -22,7 +22,8 @@ import {
   CalendarDays,
   Eye,
   X,
-  Flame
+  Flame,
+  FileText
 } from 'lucide-react';
 import api from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
