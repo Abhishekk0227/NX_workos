@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import { Bell, Search, ChevronDown, LogOut, User, Shield, Menu, Radio, Clock } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useNotifications } from '../../context/NotificationContext';
@@ -9,13 +10,17 @@ import PwaInstallButton from './PwaInstallButton';
 export default function Header({ onToggleMobileNav, searchPlaceholder = 'Search anything...' }) {
   const { user, logout } = useAuth();
   const { unreadCount } = useNotifications();
+  const location = useLocation();
   const [showNotifications, setShowNotifications] = useState(false);
   const [showReminders, setShowReminders] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
 
   const emp = user?.employee;
   const isHR = user?.role === 'HR';
-  const isManager = user?.role === 'Manager';
+  const isManager = user?.role === 'Manager' || Boolean(emp?.isManager);
+  const onManagerRoute = location.pathname.startsWith('/manager');
+  const onEmployeeRoute = location.pathname.startsWith('/employee');
+  const onHRRoute = location.pathname.startsWith('/hr');
 
   const displayName = isHR ? 'HR Admin' : isManager ? (emp?.fullName || 'Manager') : (emp?.fullName || 'Rahul Sharma');
   const displayRole = isHR
@@ -54,8 +59,30 @@ export default function Header({ onToggleMobileNav, searchPlaceholder = 'Search 
           </div>
         </div>
 
-        {/* Right: PWA Download Button + Push Notifications + Profile */}
+        {/* Right: Portal Switch + PWA Download Button + Push Notifications + Profile */}
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+          {/* Quick Portal Switch Button for Managers & HR */}
+          {isManager && onEmployeeRoute && (
+            <Link
+              to="/manager/dashboard"
+              className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-xl text-xs font-bold shadow-xs transition active:scale-95"
+              title="Open Manager Panel"
+            >
+              <Shield className="w-3.5 h-3.5" />
+              <span>Manager Panel</span>
+            </Link>
+          )}
+          {(isManager || isHR) && onManagerRoute && (
+            <Link
+              to="/employee/home"
+              className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold shadow-2xs border border-slate-200 transition active:scale-95"
+              title="Open Employee Portal"
+            >
+              <User className="w-3.5 h-3.5 text-blue-600" />
+              <span>Employee Portal</span>
+            </Link>
+          )}
+
           {/* PWA Download / Install App Button */}
           <PwaInstallButton />
 
@@ -108,11 +135,52 @@ export default function Header({ onToggleMobileNav, searchPlaceholder = 'Search 
 
             {/* Dropdown Menu */}
             {showUserMenu && (
-              <div className="absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-xl border border-slate-100 py-1.5 z-50 text-xs animate-in fade-in zoom-in-95 duration-150">
+              <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-xl border border-slate-100 py-1.5 z-50 text-xs animate-in fade-in zoom-in-95 duration-150">
                 <div className="px-3.5 py-2 border-b border-slate-100">
                   <div className="font-bold text-slate-900">{displayName}</div>
                   <div className="text-[10px] text-slate-400 truncate">{user?.email}</div>
+                  {isManager && (
+                    <span className="inline-block mt-1 px-2 py-0.5 bg-purple-50 text-purple-700 font-bold text-[9px] rounded-full border border-purple-200 uppercase tracking-wider">
+                      Manager Role Active
+                    </span>
+                  )}
                 </div>
+
+                {/* Role / Portal Switcher */}
+                {(isManager || isHR) && (
+                  <div className="py-1 border-b border-slate-100">
+                    <Link
+                      to="/manager/dashboard"
+                      onClick={() => setShowUserMenu(false)}
+                      className={`w-full text-left px-3.5 py-2 flex items-center gap-2 font-semibold transition ${
+                        onManagerRoute ? 'bg-purple-50 text-purple-700 font-bold' : 'text-slate-700 hover:bg-slate-50'
+                      }`}
+                    >
+                      <Shield className="w-4 h-4 text-purple-600" /> Manager Panel
+                    </Link>
+                    <Link
+                      to="/employee/home"
+                      onClick={() => setShowUserMenu(false)}
+                      className={`w-full text-left px-3.5 py-2 flex items-center gap-2 font-semibold transition ${
+                        onEmployeeRoute ? 'bg-blue-50 text-blue-700 font-bold' : 'text-slate-700 hover:bg-slate-50'
+                      }`}
+                    >
+                      <User className="w-4 h-4 text-blue-600" /> Employee Portal
+                    </Link>
+                    {isHR && (
+                      <Link
+                        to="/hr/dashboard"
+                        onClick={() => setShowUserMenu(false)}
+                        className={`w-full text-left px-3.5 py-2 flex items-center gap-2 font-semibold transition ${
+                          onHRRoute ? 'bg-emerald-50 text-emerald-700 font-bold' : 'text-slate-700 hover:bg-slate-50'
+                        }`}
+                      >
+                        <Shield className="w-4 h-4 text-emerald-600" /> HR Panel
+                      </Link>
+                    )}
+                  </div>
+                )}
+
                 <button
                   onClick={() => {
                     setShowUserMenu(false);

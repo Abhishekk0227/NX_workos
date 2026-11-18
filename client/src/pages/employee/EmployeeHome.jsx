@@ -23,7 +23,8 @@ import {
   Eye,
   X,
   Flame,
-  FileText
+  FileText,
+  ShieldCheck
 } from 'lucide-react';
 import api from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
@@ -220,102 +221,104 @@ export default function EmployeeHome() {
     <div className="space-y-4 max-w-lg mx-auto sm:max-w-2xl lg:max-w-4xl pb-6">
       {/* Active Unacknowledged Notice Highlight Banner */}
       {activeNotice && (
-        <div
-          className={`relative overflow-hidden rounded-3xl p-4 sm:p-5 text-white transition-all duration-300 shadow-xl ${
-            activeNotice.priority === 'Urgent'
-              ? 'bg-gradient-to-r from-red-600 via-rose-600 to-red-700 ring-4 ring-rose-500/30 shadow-rose-500/25'
-              : activeNotice.priority === 'High'
-              ? 'bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 ring-4 ring-amber-400/30 shadow-amber-500/25'
-              : 'bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-700 ring-4 ring-indigo-500/20 shadow-blue-500/20'
-          }`}
-        >
-          {/* Subtle animated background shine */}
-          <div className="absolute -right-8 -bottom-8 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none" />
+        <div className="relative overflow-hidden bg-white rounded-2xl border border-slate-200/90 shadow-2xs p-3 sm:p-3.5 transition-all">
+          {/* Clean left accent bar without rounded-corner border clipping */}
+          <div
+            className={`absolute left-0 top-0 bottom-0 w-1 ${
+              activeNotice.priority === 'Urgent'
+                ? 'bg-rose-500'
+                : activeNotice.priority === 'High'
+                ? 'bg-amber-500'
+                : 'bg-indigo-600'
+            }`}
+          />
 
-          <div className="relative z-10 space-y-3">
-            {/* Top Row: Category, Priority Badge, Date */}
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="flex flex-wrap items-center gap-2">
-                <span
-                  className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider shadow-xs ${
-                    activeNotice.priority === 'Urgent'
-                      ? 'bg-white text-rose-700 animate-pulse'
-                      : activeNotice.priority === 'High'
-                      ? 'bg-white text-amber-800'
-                      : 'bg-white text-blue-700'
-                  }`}
-                >
-                  {activeNotice.priority === 'Urgent' && <Flame className="w-3.5 h-3.5 text-rose-600 animate-bounce" />}
-                  {activeNotice.priority === 'High' && <AlertCircle className="w-3.5 h-3.5 text-amber-600" />}
-                  {activeNotice.priority === 'Normal' && <Megaphone className="w-3.5 h-3.5 text-blue-600" />}
-                  {activeNotice.priority === 'Urgent' ? 'Urgent Action Required' : `${activeNotice.priority} Notice`}
-                </span>
-
-                {activeNotice.category && (
-                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-white/20 text-white backdrop-blur-xs">
-                    {activeNotice.category}
-                  </span>
-                )}
-
-                {activeNotice.targetType === 'SPECIFIC' && (
-                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-200 text-purple-900">
-                    Direct Message
-                  </span>
+          <div className="pl-1.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+            {/* Left: Icon + Badges + Title & Excerpt */}
+            <div className="flex items-start gap-2.5 min-w-0 flex-1">
+              <div
+                className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${
+                  activeNotice.priority === 'Urgent'
+                    ? 'bg-rose-50 text-rose-600'
+                    : activeNotice.priority === 'High'
+                    ? 'bg-amber-50 text-amber-600'
+                    : 'bg-indigo-50 text-indigo-600'
+                }`}
+              >
+                {activeNotice.priority === 'Urgent' ? (
+                  <Flame className="w-4 h-4 text-rose-600" />
+                ) : (
+                  <Megaphone className="w-4 h-4 text-indigo-600" />
                 )}
               </div>
 
-              <div className="text-[11px] text-white/80 font-medium flex items-center gap-1.5">
-                <Clock className="w-3.5 h-3.5" />
-                <span>
-                  {new Date(activeNotice.createdAt).toLocaleDateString('en-US', {
-                    month: 'short',
-                    day: 'numeric'
-                  })}
-                </span>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span
+                    className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md whitespace-nowrap shrink-0 ${
+                      activeNotice.priority === 'Urgent'
+                        ? 'bg-rose-100 text-rose-700'
+                        : activeNotice.priority === 'High'
+                        ? 'bg-amber-100 text-amber-700'
+                        : 'bg-indigo-100 text-indigo-700'
+                    }`}
+                  >
+                    {activeNotice.priority} Notice
+                  </span>
+
+                  {activeNotice.category && (
+                    <span className="text-[10px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md whitespace-nowrap shrink-0">
+                      {activeNotice.category}
+                    </span>
+                  )}
+
+                  {activeNotice.targetType === 'SPECIFIC' && (
+                    <span className="text-[10px] font-bold bg-purple-100 text-purple-700 px-2 py-0.5 rounded-md whitespace-nowrap shrink-0">
+                      Direct
+                    </span>
+                  )}
+
+                  <span className="text-[11px] text-slate-400 font-medium ml-auto flex items-center gap-1 whitespace-nowrap shrink-0">
+                    <Clock className="w-3 h-3 text-slate-400" />
+                    {new Date(activeNotice.createdAt).toLocaleDateString('en-US', {
+                      month: 'short',
+                      day: 'numeric'
+                    })}
+                  </span>
+                </div>
+
+                <h3 className="text-sm font-bold text-slate-900 truncate mt-1">
+                  {activeNotice.title}
+                </h3>
+                <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">
+                  {activeNotice.message}
+                </p>
               </div>
             </div>
 
-            {/* Middle: Title & Message Excerpt */}
-            <div>
-              <h2 className="text-base sm:text-lg font-black tracking-tight text-white leading-tight">
-                {activeNotice.title}
-              </h2>
-              <p className="text-xs text-white/90 font-medium mt-1 line-clamp-2 leading-relaxed">
-                {activeNotice.message}
-              </p>
-            </div>
+            {/* Right: Actions */}
+            <div className="flex items-center gap-2 shrink-0 self-end sm:self-center pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100 w-full sm:w-auto justify-end">
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedNotice(activeNotice);
+                  setShowNoticeModal(true);
+                }}
+                className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition flex items-center gap-1 cursor-pointer whitespace-nowrap"
+              >
+                <Eye className="w-3.5 h-3.5" />
+                <span>Read</span>
+              </button>
 
-            {/* Bottom: Action Buttons */}
-            <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-white/20">
-              <span className="text-[11px] text-white/70 italic font-medium">
-                {unacknowledgedNotices.length > 1
-                  ? `+${unacknowledgedNotices.length - 1} more unread notices on Notice Board`
-                  : 'Official directive requiring your acknowledgement'}
-              </span>
-
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedNotice(activeNotice);
-                    setShowNoticeModal(true);
-                  }}
-                  className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-white/20 hover:bg-white/30 text-white transition flex items-center gap-1.5 cursor-pointer"
-                >
-                  <Eye className="w-3.5 h-3.5" />
-                  <span>Read Full Notice</span>
-                </button>
-
-                <button
-                  type="button"
-                  disabled={acknowledgingId === activeNotice._id}
-                  onClick={() => handleAcknowledgeNotice(activeNotice._id)}
-                  className="px-4 py-1.5 rounded-xl text-xs font-black bg-white text-slate-900 hover:bg-slate-100 shadow-md transition flex items-center gap-1.5 active:scale-95 cursor-pointer disabled:opacity-50"
-                >
-                  <Check className="w-3.5 h-3.5 stroke-[3] text-emerald-600" />
-                  <span>{acknowledgingId === activeNotice._id ? 'Saving...' : 'Acknowledge'}</span>
-                </button>
-              </div>
+              <button
+                type="button"
+                disabled={acknowledgingId === activeNotice._id}
+                onClick={() => handleAcknowledgeNotice(activeNotice._id)}
+                className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white transition flex items-center gap-1.5 shadow-2xs active:scale-95 cursor-pointer disabled:opacity-50 whitespace-nowrap"
+              >
+                <Check className="w-3.5 h-3.5 stroke-[2.5] text-emerald-400" />
+                <span>{acknowledgingId === activeNotice._id ? 'Saving...' : 'Acknowledge'}</span>
+              </button>
             </div>
           </div>
         </div>
@@ -323,46 +326,48 @@ export default function EmployeeHome() {
 
       {/* Missing Daily Report Attention Banner (Auto Punch-Out) */}
       {pendingAutoPunchOutReport && (
-        <div className="bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 text-white p-3.5 sm:p-4 rounded-3xl shadow-md flex items-center justify-between gap-3 animate-in fade-in">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="w-10 h-10 rounded-2xl bg-white/20 backdrop-blur-xs flex items-center justify-center shrink-0">
-              <FileText className="w-5 h-5 text-white" />
-            </div>
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-black uppercase tracking-wider bg-white/25 px-2 py-0.5 rounded-full text-white">
-                  Work Report Required
-                </span>
-                <span className="text-[11px] text-amber-100 font-semibold">
-                  {formatDateIST(pendingAutoPunchOutReport.date)}
-                </span>
+        <div className="bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 text-white p-3.5 sm:p-4 rounded-2xl shadow-sm animate-in fade-in">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1">
+              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-white/20 backdrop-blur-xs flex items-center justify-center shrink-0 mt-0.5 sm:mt-0">
+                <FileText className="w-5 h-5 text-white" />
               </div>
-              <p className="text-xs sm:text-sm font-bold text-white truncate mt-0.5">
-                Auto punched-out: You forgot to punch out on this day. Please submit your daily report.
-              </p>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-[10px] font-black uppercase tracking-wider bg-white/25 px-2.5 py-0.5 rounded-full text-white whitespace-nowrap shrink-0">
+                    Work Report Required
+                  </span>
+                  <span className="text-[11px] text-amber-100 font-semibold whitespace-nowrap shrink-0">
+                    {formatDateIST(pendingAutoPunchOutReport.date)}
+                  </span>
+                </div>
+                <p className="text-xs sm:text-sm font-bold text-white mt-1 leading-snug">
+                  Auto punched-out: You forgot to punch out on this day. Please submit your daily report.
+                </p>
+              </div>
             </div>
+            <button
+              onClick={() => setShowMissingReportModal(true)}
+              className="w-full sm:w-auto px-4 py-2 bg-white text-amber-900 hover:bg-amber-50 active:scale-95 rounded-xl text-xs font-black shadow-xs shrink-0 transition cursor-pointer whitespace-nowrap text-center"
+            >
+              Write Report
+            </button>
           </div>
-          <button
-            onClick={() => setShowMissingReportModal(true)}
-            className="px-4 py-2 bg-white text-amber-900 hover:bg-amber-50 rounded-xl text-xs font-black shadow-sm shrink-0 transition cursor-pointer"
-          >
-            Write Report
-          </button>
         </div>
       )}
 
       {/* Holiday Announcement Banner (If Today is a Holiday) */}
       {attendance?.isHoliday && (
-        <div className="bg-gradient-to-r from-cyan-600 via-teal-600 to-emerald-600 text-white p-3.5 rounded-2xl shadow-md flex items-center justify-between gap-3 animate-in fade-in">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-8 h-8 rounded-xl bg-white/20 backdrop-blur-xs flex items-center justify-center shrink-0">
-              <PartyPopper className="w-4 h-4 text-yellow-300" />
+        <div className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white p-3.5 sm:p-4 rounded-2xl shadow-sm flex items-center justify-between gap-3 animate-in fade-in">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-white/20 backdrop-blur-xs flex items-center justify-center shrink-0">
+              <PartyPopper className="w-5 h-5 text-yellow-300" />
             </div>
             <div className="min-w-0">
-              <span className="text-[10px] font-black uppercase tracking-wider bg-white/25 px-2 py-0.5 rounded-full text-white">
+              <span className="text-[10px] font-black uppercase tracking-wider bg-white/25 px-2.5 py-0.5 rounded-full text-white whitespace-nowrap shrink-0">
                 Holiday Announcement
               </span>
-              <p className="text-xs font-bold text-white truncate mt-0.5">
+              <p className="text-xs sm:text-sm font-bold text-white truncate mt-0.5">
                 Today is {attendance.holiday?.name || 'Company Holiday'} 🎉
               </p>
               <p className="text-[11px] text-teal-100">
@@ -394,9 +399,20 @@ export default function EmployeeHome() {
           </div>
           <div className="min-w-0">
             <span className="text-xs text-slate-400 font-medium block leading-tight">Good Morning,</span>
-            <h1 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight flex items-center gap-1.5 mt-0.5 truncate">
-              {fullName} 👋
-            </h1>
+            <div className="flex items-center gap-2 flex-wrap mt-0.5">
+              <h1 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight truncate">
+                {fullName} 👋
+              </h1>
+              {(user?.role === 'Manager' || user?.employee?.isManager || user?.role === 'HR') && (
+                <Link
+                  to="/manager/dashboard"
+                  className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800 hover:bg-purple-200 border border-purple-200 transition shrink-0 active:scale-95"
+                >
+                  <ShieldCheck className="w-3 h-3 text-purple-700" />
+                  <span>Manager Mode →</span>
+                </Link>
+              )}
+            </div>
             <p className="text-xs text-slate-400 mt-0.5 font-normal truncate">Have a productive day!</p>
           </div>
         </div>

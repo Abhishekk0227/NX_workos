@@ -54,15 +54,21 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
     return <Navigate to="/login" replace />;
   }
 
-  if (allowedRoles && !allowedRoles.includes(user.role)) {
-    // If unauthorized, redirect to appropriate role portal
-    if (user.role === 'Manager') {
-      return <Navigate to="/manager/dashboard" replace />;
-    }
-    if (user.role === 'Employee') {
+  if (allowedRoles) {
+    const isManager = user.role === 'Manager' || Boolean(user.employee?.isManager);
+    const isHR = user.role === 'HR';
+    const isEmployee = user.role === 'Employee' || Boolean(user.employee);
+
+    const hasAccess =
+      (allowedRoles.includes('HR') && isHR) ||
+      (allowedRoles.includes('Manager') && (isManager || isHR)) ||
+      (allowedRoles.includes('Employee') && (isEmployee || isManager || isHR));
+
+    if (!hasAccess) {
+      if (isHR) return <Navigate to="/hr/dashboard" replace />;
+      if (isManager) return <Navigate to="/manager/dashboard" replace />;
       return <Navigate to="/employee/home" replace />;
     }
-    return <Navigate to="/hr/dashboard" replace />;
   }
 
   return children;

@@ -11,7 +11,8 @@ import {
   X,
   ShieldCheck,
   CheckCircle2,
-  CalendarDays
+  CalendarDays,
+  User
 } from 'lucide-react';
 import Header from '../common/Header';
 import { useAuth } from '../../context/AuthContext';
@@ -48,8 +49,12 @@ export default function ManagerLayout() {
         />
       )}
 
-      {/* Desktop Left Sidebar */}
-      <aside className="hidden md:flex md:sticky top-0 left-0 z-40 h-screen w-60 bg-[#0f172a] text-slate-300 flex-col border-r border-slate-800 shrink-0">
+      {/* Desktop & Mobile Left Sidebar Drawer */}
+      <aside
+        className={`fixed md:sticky top-0 left-0 z-50 h-screen w-60 bg-[#0f172a] text-slate-300 flex flex-col border-r border-slate-800 shrink-0 transition-transform duration-300 ease-in-out ${
+          mobileDrawerOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
+        }`}
+      >
         {/* Brand Logo */}
         <div className="p-4 border-b border-slate-800/80 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2.5">
@@ -65,6 +70,12 @@ export default function ManagerLayout() {
               </div>
             </div>
           </div>
+          <button
+            onClick={() => setMobileDrawerOpen(false)}
+            className="md:hidden text-slate-400 hover:text-white p-1"
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
 
         {/* Navigation Links */}
@@ -76,6 +87,7 @@ export default function ManagerLayout() {
               <NavLink
                 key={item.path}
                 to={item.path}
+                onClick={() => setMobileDrawerOpen(false)}
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${
                   isActive
                     ? 'bg-purple-600 text-white shadow-sm shadow-purple-600/30'
@@ -87,6 +99,24 @@ export default function ManagerLayout() {
               </NavLink>
             );
           })}
+
+          {/* Quick Switch to Employee View (Since Manager is also an Employee!) */}
+          <div className="pt-3 mt-2 border-t border-slate-800/80">
+            <div className="px-3 py-1 text-[10px] font-black uppercase tracking-wider text-blue-400">
+              Personal Portal
+            </div>
+            <NavLink
+              to="/employee/home"
+              onClick={() => setMobileDrawerOpen(false)}
+              className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold bg-blue-900/30 hover:bg-blue-900/50 border border-blue-500/30 text-blue-200 hover:text-white shadow-xs transition-all"
+            >
+              <User className="w-4 h-4 text-blue-400 shrink-0" />
+              <div className="min-w-0 flex-1">
+                <div className="leading-tight">My Employee Portal</div>
+                <div className="text-[10px] text-blue-300/80 font-normal truncate mt-0.5">Punch-In, Tasks, Leaves</div>
+              </div>
+            </NavLink>
+          </div>
         </nav>
 
         {/* Sidebar Footer */}
@@ -96,12 +126,19 @@ export default function ManagerLayout() {
             <div className="font-semibold text-slate-200 truncate mt-0.5">
               {user?.employee?.fullName || user?.email}
             </div>
+            <Link
+              to="/employee/home"
+              className="mt-2.5 flex items-center justify-center gap-1.5 w-full py-1.5 px-2 bg-slate-800 hover:bg-slate-700 text-blue-400 hover:text-blue-300 font-bold rounded-lg text-[11px] border border-slate-700 transition"
+            >
+              <User className="w-3.5 h-3.5" />
+              <span>Go to Employee Panel</span>
+            </Link>
             {user?.role === 'HR' && (
               <Link
                 to="/hr/dashboard"
-                className="mt-2 block text-center text-[10px] font-bold text-blue-400 hover:text-blue-300 bg-blue-950/40 p-1.5 rounded-lg border border-blue-800/50"
+                className="mt-1.5 block text-center text-[10px] font-bold text-purple-400 hover:text-purple-300 bg-purple-950/40 p-1.5 rounded-lg border border-purple-800/50"
               >
-                Switch to HR Panel
+                ← Switch to HR Panel
               </Link>
             )}
           </div>

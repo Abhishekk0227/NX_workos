@@ -10,7 +10,8 @@ import {
   X,
   Menu,
   Bell,
-  Megaphone
+  Megaphone,
+  ShieldCheck
 } from 'lucide-react';
 import Header from '../common/Header';
 import { useAuth } from '../../context/AuthContext';
@@ -25,6 +26,8 @@ export default function EmployeeLayout() {
   const location = useLocation();
   const { user } = useAuth();
   const { unreadCount } = useNotifications();
+
+  const isManager = user?.role === 'Manager' || Boolean(user?.employee?.isManager) || user?.role === 'HR';
 
   // Bottom Fixed Mobile Navigation (Exactly 5 items matching EppanelM.png)
   const bottomNavItems = [
@@ -104,6 +107,30 @@ export default function EmployeeLayout() {
               </NavLink>
             );
           })}
+
+          {/* Manager Panel Switcher (Visible to Managers and HR) */}
+          {isManager && (
+            <div className="pt-3 mt-2 border-t border-slate-800/80">
+              <div className="px-3 py-1 text-[10px] font-black uppercase tracking-wider text-purple-400 flex items-center justify-between">
+                <span>Management</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse" />
+              </div>
+              <NavLink
+                to="/manager/dashboard"
+                onClick={() => setMobileDrawerOpen(false)}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-r from-purple-900/60 to-indigo-900/60 border border-purple-500/40 text-purple-200 hover:text-white hover:border-purple-400 shadow-sm transition-all"
+              >
+                <ShieldCheck className="w-4 h-4 text-purple-400 shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <div className="leading-tight flex items-center gap-1.5">
+                    <span>Manager Panel</span>
+                    <span className="px-1.5 py-0.2 bg-purple-500 text-white text-[9px] font-black rounded-full">ACTIVE</span>
+                  </div>
+                  <div className="text-[10px] text-purple-300 font-normal truncate mt-0.5">Tasks & Students</div>
+                </div>
+              </NavLink>
+            </div>
+          )}
         </nav>
       </aside>
 
@@ -125,7 +152,17 @@ export default function EmployeeLayout() {
             <span className="font-extrabold text-sm tracking-tight text-white">NX Work OS</span>
           </div>
 
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2">
+            {isManager && (
+              <NavLink
+                to="/manager/dashboard"
+                className="px-2.5 py-1 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-lg text-[11px] font-bold shadow-xs flex items-center gap-1 active:scale-95 transition cursor-pointer"
+                title="Switch to Manager Panel"
+              >
+                <ShieldCheck className="w-3.5 h-3.5" />
+                <span>Manager</span>
+              </NavLink>
+            )}
             <button
               onClick={() => setShowReminders(true)}
               className="p-1 text-slate-300 hover:text-white"

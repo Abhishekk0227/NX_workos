@@ -17,7 +17,11 @@ const requireManagerOrHR = (req, res, next) => {
   if (!req.user) {
     return res.status(401).json({ success: false, message: 'Authentication required' });
   }
-  if (req.user.role !== 'Manager' && req.user.role !== 'HR') {
+  const isMgr =
+    req.user.role === 'Manager' ||
+    req.user.role === 'HR' ||
+    Boolean(req.user.employee?.isManager);
+  if (!isMgr) {
     return res.status(403).json({
       success: false,
       message: 'Access restricted to Managers and HR administrators'
@@ -37,8 +41,9 @@ async function getAssignedStudentIds(user) {
   }
 
   // If user has an associated employee profile
-  if (user.employee) {
-    const managerEmp = await Employee.findById(user.employee._id || user.employee);
+  const empId = user.employee?._id || user.employee;
+  if (empId) {
+    const managerEmp = await Employee.findById(empId);
     if (!managerEmp) return [];
 
     // Find students where assignedManager matches this manager, or student is in assignedStudents
@@ -855,10 +860,15 @@ router.post('/admin/designate', protect, authorize('HR'), async (req, res, next)
     if (!user && employee.officialEmail) {
       user = await User.findOne({ email: employee.officialEmail.toLowerCase() });
     }
+    if (!user) {
+      user = await User.findOne({ employee: employee._id });
+    }
 
     if (user) {
       user.role = isManager ? 'Manager' : 'Employee';
-      await user.save();
+      user.employee = employee._id;
+      employee.user = user._id;
+      await Promise.all([user.save(), employee.save()]);
     } else if (isManager && employee.officialEmail) {
       const defaultPassword = 'Password@123';
       const hashedPassword = await bcrypt.hash(defaultPassword, 10);

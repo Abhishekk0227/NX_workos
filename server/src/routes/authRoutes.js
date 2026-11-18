@@ -131,8 +131,8 @@ router.post('/login', async (req, res, next) => {
       });
     }
 
-    // Auto-link employee object if user is Employee and employee was missing
-    if (user.role === 'Employee' && !user.employee) {
+    // Auto-link employee object if user is Employee or Manager and employee was missing
+    if (['Employee', 'Manager'].includes(user.role) && !user.employee) {
       const emp = await Employee.findOne({ officialEmail: user.email.toLowerCase() });
       if (emp) {
         user.employee = emp._id;
@@ -146,6 +146,14 @@ router.post('/login', async (req, res, next) => {
               { path: 'leavePolicy' }
             ]
           });
+      }
+    }
+
+    // Auto sync role with employee.isManager flag
+    if (user.employee) {
+      if (user.employee.isManager && user.role === 'Employee') {
+        user.role = 'Manager';
+        await user.save();
       }
     }
 
@@ -185,6 +193,16 @@ router.get('/me', protect, async (req, res, next) => {
         { path: 'leavePolicy' }
       ]
     });
+
+    if (user && user.employee) {
+      if (user.employee.isManager && user.role === 'Employee') {
+        user.role = 'Manager';
+        await user.save();
+      } else if (!user.employee.isManager && user.role === 'Manager') {
+        user.role = 'Employee';
+        await user.save();
+      }
+    }
 
     res.json({
       success: true,
